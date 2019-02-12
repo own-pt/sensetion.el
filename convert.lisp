@@ -6,9 +6,15 @@
 
 (defparameter *sense-map-ht* nil)
 
-(defvar *posn->pos* (alexandria:alist-hash-table
-                     '((#\1 . "n") (#\2 . "v") (#\3 . "a") (#\4 . "r") (#\5 . "s"))
-                     :test #'eql))
+(defun sense-key->synset-id (sk)
+  (gethash sk *sense-map-ht* "|#|"))
+
+(defun posn->pos (posn)
+  (gethash posn
+           (alexandria:alist-hash-table
+            '((#\1 . "n") (#\2 . "v") (#\3 . "a") (#\4 . "r") (#\5 . "a"))
+            :test #'eql)
+           "#|#"))
 
 
 (defun xml->conllus (fps out-fp sensemap-fp)
@@ -44,8 +50,13 @@
           until (eq line 'eof)
           do (destructuring-bind (sk syid * **)
                  (serapeum:split-sequence #\space line)
-               (let* ((posn (elt (elt (serapeum:split-sequence #\% sk) 1) 0))
-                      (pos (gethash posn *posn->pos* "-")))
+               (let* ((p (position #\% sk :test #'eql))
+                      (posn (char sk (1+ p)))
+                      (pos (posn->pos posn)))
+                 (when (eql posn #\5)
+                   ;; change posn of adjective satellites to
+                   ;; adjectives because annotations are this way
+                   (setf (char sk (1+ p)) #\3))
                  (setf (gethash sk map) (concatenate 'string pos syid)))))
     map))
 
@@ -79,7 +90,38 @@
        (expand-tokens (node)
          (serapeum:string-case (plump:tag-name node)
            (("cf" "wf") (list node))
-           (("mwf" "qf") (mapcat #'expand-tokens (plump:child-elements node)))))
+           (("mwf" "qf") (annotate-bounds
+                          (mapcat #'expand-tokens
+                                  (plump:child-elements node))
+                            node))))
+
+       (annotate-bounds (nodes parent)
+         ;; so that we know where qf's and mwf's are
+         (labels
+             ((add (node parent id)
+                (let* ((orig (plump:attribute node "kind")) ; original value, if any
+                       (kind (plump:tag-name parent))
+                       (iden (if (equal kind "qf")
+                                 (format nil "~a-~a" id
+                                         (plump:attribute parent "rend"))
+                                 id)))
+                  (plump:set-attribute node "kind" (add-to-string-list orig kind iden))
+                  node)))
+           (let* ((f (first nodes))
+                  (fid (node-get-id f))
+                  (l (first (last nodes))))
+             (append (list (add f parent fid))
+                     (butlast (rest nodes))
+                     (list (add l parent fid))))))
+
+       (add-to-string-list (orig k v)
+         (cond
+           ((and orig k v)
+            (format nil "~a=~a|~a" k v orig))
+           (orig
+            orig)
+           (t
+            (format nil "~a=~a" k v))))
 
        (make-token (node ix)
          (serapeum:string-case (plump:tag-name node)
@@ -99,14 +141,24 @@
                           :feats (when senses (format nil "s=~{~a~^,~}" senses))
                           :upostag (node-annotation-tag node)
                           :xpostag (node-coll node)
-                          :misc (format nil "id=~a" (node-get-id node)))))
+                          :misc (add-to-string-list
+                                 (plump:attribute node "kind")
+                                 "id"
+                                 (node-get-id node)))))
 
        (node-get-senses (node)
-         (let ((ids (filter-child-elements node
-                                           (lambda (n) (equal (plump:tag-name n) "id")))))
+         (let ((ids (filter-child-elements
+                     node
+                     (lambda (n) (and
+                                  (equal (plump:tag-name n) "id")
+                                  ;; someone had the brilliant idea of
+                                  ;; including this false sense key
+                                  (not (equal
+                                        (plump:attribute n "sk")
+                                        "purposefully_ignored%0:00:00::")))))))
            (mapcar (lambda (s)
                      (let ((sk (plump:attribute s "sk")))
-                       (gethash sk *sense-map-ht* "---")))
+                       (sense-key->synset-id sk)))
                    ids)))
        
        (cf-token (node ix)
