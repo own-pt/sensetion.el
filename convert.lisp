@@ -6,16 +6,6 @@
 
 (defparameter *sense-map-ht* nil)
 
-(defun sense-key->synset-id (sk)
-  (gethash sk *sense-map-ht* "|#|"))
-
-(defun posn->pos (posn)
-  (gethash posn
-           (alexandria:alist-hash-table
-            '((#\1 . "n") (#\2 . "v") (#\3 . "a") (#\4 . "r") (#\5 . "a"))
-            :test #'eql)
-           "#|#"))
-
 
 (defun xml->conllus (fps out-fp sensemap-fp)
   (with-open-file (in-map sensemap-fp)
@@ -59,6 +49,18 @@
                    (setf (char sk (1+ p)) #\3))
                  (setf (gethash sk map) (concatenate 'string pos syid)))))
     map))
+
+
+(defun sense-key->synset-id (sk)
+  (gethash sk *sense-map-ht* "|#|"))
+
+
+(defun posn->pos (posn)
+  (gethash posn
+           (alexandria:alist-hash-table
+            '((#\1 . "n") (#\2 . "v") (#\3 . "a") (#\4 . "r") (#\5 . "a"))
+            :test #'eql)
+           "#|#"))
 
 
 (defun wordnet-sentences (node)
