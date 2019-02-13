@@ -22,18 +22,6 @@
                 (cl-conllu:write-conllu-to-stream (list s) out))))))))
 
 
-;; (defun conllus->xml (conllu-dir xmls)
-;;   (loop for xml in xmls do
-;;     (with-open-file (in xml)
-;;       (let ((root (plump:parse in)))
-;;         (loop for synset in (plump:child-elements (aref (plump:child-elements root) 0)) do
-;;           (let* ((synset-elems (plump:child-elements synset))
-;;                  (gloss-wsd-ix (position-if #'node-gloss-wsd? synset-elems))
-;;                  (gloss-wsd (aref synset-elems gloss-wsd-ix)))
-            
-;;             ))))))
-
-
 (defun sense-map->ht (in)
   (let ((map (make-hash-table :test #'equal :size 210000)))
     (loop for line = (read-line in nil 'eof)
@@ -74,47 +62,45 @@
     ;; 
     (assert (equal (plump:tag-name node) "synset"))
     (make-instance 'cl-conllu:sentence
-                   :meta (list (cons "sent_id" (or (plump:attribute node "id") (error "."))))
+                   :meta (list (cons "sent_id" (or (plump:attribute node "id")
+                                                   (error "."))))
                    :tokens (gloss-tokens (first (get-wsd-gloss node))))))
 
 (defun gloss-tokens (node)
   (labels
-      ((run (node)
+      ((run (nodes)
          (let* ((tks (mapcat-indexed #'make-token (mapcat #'expand-tokens
                                                           ;; wf, qf, mwf..
-                                                          (plump:child-elements node))))
+                                                          nodes)))
                 (fst (first tks))
                 (misc (cl-conllu:token-misc fst)))
-           (setf (cl-conllu:token-misc fst) (format nil "~a|desc=~a" misc
-                                                    (plump:tag-name node)))
+           (setf (cl-conllu:token-misc fst) (add-to-string-list misc "desc"
+                                                                (plump:tag-name node)))
            (cons fst (rest tks))))
 
        (expand-tokens (node)
-         (serapeum:string-case (plump:tag-name node)
-           (("cf" "wf") (list node))
-           (("mwf" "qf") (annotate-bounds
-                          (mapcat #'expand-tokens
-                                  (plump:child-elements node))
-                            node))))
+         (let ((tag (plump:tag-name node)))
+           (serapeum:string-case tag
+             (("cf" "wf")
+              (list (list node)))
+             ("qf"
+              (annotate "kind" (plump:attribute node "rend")
+                        (mapcat #'expand-tokens
+                                (plump:child-elements node))))
+             ("mwf"
+              (annotate "kind" tag
+                        (mapcat #'expand-tokens
+                                (plump:child-elements node))))
+             (("aux" "classif" "def" "ex")
+              (annotate "elem" tag
+                        (mapcat #'expand-tokens
+                                (plump:child-elements node)))))))
 
-       (annotate-bounds (nodes parent)
-         ;; so that we know where qf's and mwf's are
-         (labels
-             ((add (node parent id)
-                (let* ((orig (plump:attribute node "kind")) ; original value, if any
-                       (kind (plump:tag-name parent))
-                       (iden (if (equal kind "qf")
-                                 (format nil "~a-~a" id
-                                         (plump:attribute parent "rend"))
-                                 id)))
-                  (plump:set-attribute node "kind" (add-to-string-list orig kind iden))
-                  node)))
-           (let* ((f (first nodes))
-                  (fid (node-get-id f))
-                  (l (first (last nodes))))
-             (append (list (add f parent fid))
-                     (butlast (rest nodes))
-                     (list (add l parent fid))))))
+       (annotate (key val nodes)
+         (mapcar (lambda (n)
+                   (destructuring-bind (n . ps) n
+                     (cons n (cons (list key val) ps))))
+                 nodes))
 
        (add-to-string-list (orig k v)
          (cond
@@ -126,13 +112,14 @@
             (format nil "~a=~a" k v))))
 
        (make-token (node ix)
-         (serapeum:string-case (plump:tag-name node)
-           ("wf"
-            (list (make-conllu-token node (format nil "~a" ix))))
-           ("cf"
-            (cf-token node ix))))
+         (destructuring-bind (node . ps) node
+           (serapeum:string-case (plump:tag-name node)
+             ("wf"
+              (list (make-conllu-token node (format nil "~a" ix) ps)))
+             ("cf"
+              (cf-token node ix ps)))))
        
-       (make-conllu-token (node id)
+       (make-conllu-token (node id ps)
          ;; senses are always direct children of either wf or glob,
          ;; which call this function
          (let ((senses (node-get-senses node)))
@@ -143,10 +130,13 @@
                           :feats (when senses (format nil "s=~{~a~^,~}" senses))
                           :upostag (node-annotation-tag node)
                           :xpostag (node-coll node)
-                          :misc (add-to-string-list
-                                 (plump:attribute node "kind")
-                                 "id"
-                                 (node-get-id node)))))
+                          :misc (reduce (lambda (res p)
+                                          (add-to-string-list res
+                                                              (first p)
+                                                              (second p)))
+                                        ps
+                                        :initial-value (format nil "~a=~a" "id"
+                                                               (node-get-id node))))))
 
        (node-get-senses (node)
          (let ((ids (filter-child-elements
@@ -163,22 +153,21 @@
                        (sense-key->synset-id sk)))
                    ids)))
        
-       (cf-token (node ix)
+       (cf-token (node ix ps)
          (let ((globs (filter-child-elements node
                                              (lambda (n)
                                                (equal (plump:tag-name n) "glob")))))
            (cons
-            (make-conllu-token node (format nil "~a" ix))
+            (make-conllu-token node (format nil "~a" ix) ps)
             (loop for g in globs
                   for n from 0
                   collect (glob-token g ix n)))))
 
        (glob-token (node ix n)
-         (make-conllu-token node (format nil "~a.~a" ix n))))
+         (make-conllu-token node (format nil "~a.~a" ix n) nil)))
     ;; 
-    (mapcat #'run
-            ;; def, aux, ex, classif
-            (plump:child-elements node))))
+    (run ;; def, aux, ex, classif
+     (plump:child-elements node))))
 
 
 (defun node-gloss-wsd? (node)
