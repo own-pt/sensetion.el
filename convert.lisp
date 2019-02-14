@@ -87,6 +87,8 @@
               (annotate "kind" (plump:attribute node "rend")
                         (mapcat #'expand-tokens
                                 (plump:child-elements node))))
+             ;; TODO: add identifier to each  mwf and qf (or we won't know
+             ;; when they overlap
              ("mwf"
               (annotate "kind" tag
                         (mapcat #'expand-tokens
