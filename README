@@ -1,0 +1,67 @@
+# -*- mode:org -*-
+#+TITLE: Word-sense annotation in Emacs
+
+This project intends to finish the word-sense annotations of the
+[[http://wordnetcode.princeton.edu/glosstag.shtml][WordNet gloss corpus]], but can be used to sense-tag any corpus in the
+CoNLL-U derived format we have defined.
+
+* Usage
+You must set the directory where the files to be annotated are with
+=M-x customize-variable RET sensetion-annotation-dir=. (You can
+customize other stuff with =M-x customize-group RET sensetion=.)
+
+Use =M-x sensetion= to build the index. If this is the first time you
+call it, it might take some time (and freeze your emacs for this
+time).
+
+=M-x sensetion-annotate= will ask you for a lemma and a PoS tag and
+will build a buffer with instances of this lemma+pos that have not
+been annotated yet. You can navigate through taggable tokens with =<=
+and =>=. If you wish to annotate a token, press =/= on it. If you'd
+like to edit it manually, press =.= to be taken to a buffer with the
+annotation file open.
+
+You can move sentences up or down with =C-↑= and =C-↓=. Clustering
+tokens with the same sense together might be useful.
+
+* Installation
+- make sure you have MELPA set up, so that you can download
+  dependencies easily.
+- to make things easier, install =use-package= with =M-x
+  install-package RET use-package=.
+- clone this repository.
+- insert the following snippet in you =.emacs=:
+  #+BEGIN_SRC elisp
+    (use-package sensetion
+      :requires (s f conllu-mode hydra))
+  #+END_SRC
+
+
+* Annotation format
+Files to be annotated are syntactically the same to [[http://universaldependencies.org/format.html][CoNLL-U]] files, but
+we have re-purposed their fields like below:
+
+- LEMMA :: contains a pipe-separated (=|=) list of either lemmas or
+           lemma+synset-type. spaces are substituted for underlines
+           =_=, synset-types are integers encoding the lemma's PoS,
+           and are rendered with a percent sign for separation, as in
+           =living%3=.
+- UPOS :: contain the annotation status defined by the WN gloss corpus
+          (one of =ignore=, =auto=, =un=).
+- XPOS :: contains the one-character alphabetic key to a collocation;
+          all tokens in a collocation have the same key.
+- FEATS :: contains a list of synset pairs; the key for a synset is
+           =s=, and the synset is represented by a synset-id which is
+           the concatenation of the synset offset and the one-letter
+           PoS tag.
+
+** conversion from original XML
+The script that converts the original XML WN gloss corpus is at
+=convert.lisp=. The MISC field of the annotation files saves lots of
+information from the XML to preserve a mapping between them.
+
+
+* Status
+Under heavy development -- user interface is unstable, and the code is
+still to be generalized so that it can be made useful for annotation
+of other corpora (maybe even of other stuff).
