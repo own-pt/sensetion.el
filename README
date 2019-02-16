@@ -79,6 +79,21 @@ The script that converts the original XML WN gloss corpus is at
 =convert.lisp=. The MISC field of the annotation files saves lots of
 information from the XML to preserve a mapping between them.
 
+To re-run the conversion:
+
+- download the [[http://wordnetcode.princeton.edu/glosstag.shtml][WordNet gloss corpus]];
+- download the [[http://wordnetcode.princeton.edu/3.0/WNdb-3.0.tar.gz][WordNet 3.0 database files]];
+- download and setup [[http://www.sbcl.org/][sbcl]] (although any common lisp implementation
+  should work);
+- setup [[https://www.quicklisp.org/beta/][quicklisp]];
+- run:
+  #+BEGIN_SRC sh
+    sbcl --dynamic-space-size 7500Mb --load convert.lisp --load convert.lisp --eval '(time (xml->conllus (directory "merged/*.xml") "conllu/" "index.sense"))' --quit
+  #+END_SRC
+  where the =merged/= directory is from the gloss corpus archive, the
+  =conllu= directory is where you want to put the files, and the
+  =index.sense= file is from the WordNet database. (Use absolute paths
+  if you have problems with the command.)
 
 * Status
 Under heavy development -- user interface is unstable, and the code is
