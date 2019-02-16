@@ -31,18 +31,32 @@ You need both elisp libraries and the =wn= executable.
 ** elisp
 - make sure you have MELPA set up, so that you can download
   dependencies easily.
-# - to make things easier, install =use-package= with =M-x install-package RET use-package=.
+- to make things easier, install =use-package= with =M-x
+  install-package RET use-package=.
 - clone this repository.
 - clone [[http://github.com/odanoburu/conllu-mode][conllu-mode's repository]] (you may get it from MELPA, but it
   might be outdated.)
-- insert the following snippet in your =.emacs=, substituting the
-  paths to the appropriate ones:
+- add the following snippet to your user configuration file (usually
+  at =~/emacs.d/init.el=), substituting the paths to the appropriate
+  ones:
   #+BEGIN_SRC elisp
-    (add-to-list 'load-path "~/sites/conllu-mode/")
-    (require 'conllu-mode)
-    (add-to-list 'load-path "~/sites/sensetion.el/")
-    (require 'sensetion)
+    (use-package hydra :defer t :ensure t)
+    (use-package flycheck :defer t :ensure t)
+    (use-package s :defer t :ensure t)
+    (use-package f :defer t :ensure t)
+
+    (use-package conllu-mode
+      :mode "\\.conllu\\'"
+      :load-path "~/conllu-mode/"
+      :custom (conllu-flycheck-on? 'no))
+
+    (use-package sensetion
+      :commands sensetion
+      :load-path "~/sensetion.el/")
   #+END_SRC
+  this will ensure the dependencies are installed and that the
+  packages are properly loaded at the right time.
+- restart emacs (or reload or your init file).
 
 ** wn
 You may download the =wn= executable from your favorite package
@@ -94,6 +108,7 @@ To re-run the conversion:
   =conllu= directory is where you want to put the files, and the
   =index.sense= file is from the WordNet database. (Use absolute paths
   if you have problems with the command.)
+
 
 * Status
 Under heavy development -- user interface is unstable, and the code is
