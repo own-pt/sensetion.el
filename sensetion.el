@@ -93,8 +93,9 @@ Maps a lemma* to a list of lists of sentence-id and token-id.")
   (setq-local truncate-lines t)
   (setq buffer-read-only t))
 
-
+;;;###autoload
 (defun sensetion ()
+  (interactive)
   (unless sensetion--index
     (if (file-exists-p sensetion-index-file)
         (sensetion--read-index sensetion-index-file)
@@ -422,10 +423,6 @@ to where in the files they appear."
     (let ((lemma* (make-lemma* lemma st)))
       (let ((lemma-matches (gethash lemma sensetion--index nil))
             (lemma*-matches (gethash lemma* sensetion--index nil)))
-        (print tk-index)
-        (print st)
-        (print (length lemma*-matches))
-        (print (length (rm-from lemma*-matches)))
         (when lemma-matches
           (setf (gethash lemma sensetion--index) (rm-from lemma-matches)))
         (when lemma*-matches

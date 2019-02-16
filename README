@@ -24,17 +24,32 @@ annotation file open.
 You can move sentences up or down with =C-↑= and =C-↓=. Clustering
 tokens with the same sense together might be useful.
 
+
 * Installation
+You need both elisp libraries and the =wn= executable.
+
+** elisp
 - make sure you have MELPA set up, so that you can download
   dependencies easily.
-- to make things easier, install =use-package= with =M-x
-  install-package RET use-package=.
+# - to make things easier, install =use-package= with =M-x install-package RET use-package=.
 - clone this repository.
-- insert the following snippet in you =.emacs=:
+- clone [[http://github.com/odanoburu/conllu-mode][conllu-mode's repository]] (you may get it from MELPA, but it
+  might be outdated.)
+- insert the following snippet in your =.emacs=, substituting the
+  paths to the appropriate ones:
   #+BEGIN_SRC elisp
-    (use-package sensetion
-      :requires (s f conllu-mode hydra))
+    (add-to-list 'load-path "~/sites/conllu-mode/")
+    (require 'conllu-mode)
+    (add-to-list 'load-path "~/sites/sensetion.el/")
+    (require 'sensetion)
   #+END_SRC
+
+** wn
+You may download the =wn= executable from your favorite package
+manager. Be aware that package managers usually offer WordNet 3.1, and
+not WordNet 3.0, which is the WordNet we use to annotate the WN gloss
+corpus. If that is the case, download [[http://wordnetcode.princeton.edu/3.0/WNdb-3.0.tar.gz][WordNet 3.0 database files]], and
+move them to the corresponding directory of package you installed.
 
 
 * Annotation format
@@ -54,6 +69,10 @@ we have re-purposed their fields like below:
            =s=, and the synset is represented by a synset-id which is
            the concatenation of the synset offset and the one-letter
            PoS tag.
+
+Collocations are composed of their constituent tokens and an empty
+token after the head of the collocation with the actual sense
+annotation.
 
 ** conversion from original XML
 The script that converts the original XML WN gloss corpus is at
