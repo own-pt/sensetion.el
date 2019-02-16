@@ -8,6 +8,7 @@
 
 
 (defun xml->conllus (fps out-fp sensemap-fp)
+  (ensure-directories-exist out-fp)
   (with-open-file (in-map sensemap-fp)
     (setq *sense-map-ht* (sense-map->ht in-map))
     (loop
