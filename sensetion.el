@@ -5,6 +5,8 @@
 (require 'f)
 (require 'cl-lib)
 (require 'conllu-parse)
+(require 'conllu-edit)
+(require 'conllu-move)
 (require 'hydra)
 
 
@@ -99,9 +101,9 @@ Maps a lemma* to a list of lists of sentence-id and token-id.")
   (unless sensetion--index
     (if (file-exists-p sensetion-index-file)
         (sensetion--read-index sensetion-index-file)
-      (sensetion-make-index (sensetion--annotation-files))
-      ;; TODO: setup status window here
-      (call-interactively #'sensetion-annotate))))
+      (sensetion-make-index (sensetion--annotation-files)))
+    ;; TODO: setup status window here
+    (call-interactively #'sensetion-annotate)))
 
 
 (defun sensetion--annotation-files ()
@@ -332,15 +334,17 @@ to where in the files they appear."
                                   purecopy t data
                                   ("n" "nou" "v" "ver" "a" "adj" "r" "adv"))))
 
-       (parse-sense (line)
-                    (cl-assert (null (cl-rest line)))
-                    ;; TODO: don't use regexp (will fail when gloss
-                    ;; contains the regexp as a substring
-                    (let* ((sep-regexp (regexp-opt '(" {" "} ")))
-                           (fields     (s-split sep-regexp (cl-first line) t)))
-                      (seq-let (_ offset words-gloss) fields
-                        (list (concat pos1 offset)
-                              words-gloss)))))
+       (parse-sense (mline)
+                    (cl-assert (null (cl-rest mline)))
+                    (let* ((line (cl-first mline))
+                           (beg (1+ (cl-position (string-to-char "{")
+                                                 line :test #'char-equal)))
+                           (end (cl-position (string-to-char "}")
+                                             line :start beg :test #'char-equal))
+                           (offset (substring line beg end))
+                           (words-gloss (substring line (1+ end))))
+                      (list (concat pos1 offset)
+                            words-gloss))))
     ;;
     (let* ((command (format "wn '%s' -g -o -over" lemma))
            (result  (shell-command-to-string command)))
