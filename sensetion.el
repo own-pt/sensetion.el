@@ -3,6 +3,7 @@
 (require 'ido)
 (require 's)
 (require 'f)
+(eval-when-compile (require 'cl-lib))
 (require 'cl-lib)
 (require 'conllu-parse)
 (require 'conllu-edit)
@@ -11,7 +12,7 @@
 
 
 (defgroup sensetion nil
-  "Support for annotating senses in CoNLL-U files."
+  "Support for annotating word senses."
   :group 'data)
 
 
@@ -36,7 +37,7 @@
 
 
 (defcustom sensetion-annotation-file-type
-  "conllu"
+  "plist"
   "File type (extension) of annotation files."
   :group 'sensetion
   :type 'string)
@@ -92,8 +93,8 @@ Maps a lemma* to a list of lists of sentence-id and token-id.")
 (define-derived-mode sensetion-mode fundamental-mode "sensetion"
   "sensetion-mode is a major mode for annotating senses."
   (setq-local sentence-end ".$$") ;; to be able to use M-a and M-e to jump
-  (setq-local truncate-lines t)
-  (setq buffer-read-only t))
+  (setq buffer-read-only t)
+  (visual-line-mode 1))
 
 ;;;###autoload
 (defun sensetion ()
@@ -102,6 +103,9 @@ Maps a lemma* to a list of lists of sentence-id and token-id.")
     (if (file-exists-p sensetion-index-file)
         (sensetion--read-index sensetion-index-file)
       (sensetion-make-index (sensetion--annotation-files)))
+    (add-hook 'kill-emacs-hook
+              (lambda ()
+                (sensetion--write-index sensetion-index-file sensetion--index)))
     ;; TODO: setup status window here
     (call-interactively #'sensetion-annotate)))
 
@@ -114,11 +118,12 @@ Maps a lemma* to a list of lists of sentence-id and token-id.")
      (list (read-string "Lemma to annotate: ")
            (ido-completing-read "PoS tag?" '("a" "r" "v" "n" "any") nil t nil nil "any")))
     ;;
-    (let* ((lemmas (if (equal pos "any")
-                       (mapcar (apply-partially #'concat lemma) '("%1" "%2" "%3" "%4"))
-                     (list (concat lemma "%" (sensetion--pos->synset-type pos)))))
-           (matches (seq-mapcat (lambda (lemma) (gethash lemma sensetion--index)) lemmas))
-           (result-buffer (generate-new-buffer (sensetion--create-buffer-name lemma pos))))
+    (let* ((regexp (if (equal pos "any")
+                      (concat lemma "(%[1234])?")
+                    (concat lemma "(%" (sensetion--pos->synset-type pos) ")?")))
+           (matches (dictree-regexp-search sensetion--index regexp))
+           (result-buffer (generate-new-buffer
+                           (sensetion--create-buffer-name lemma pos))))
       (unless matches
         (if pos
             (user-error "No matches for lemma %s and PoS %s" lemma pos)
@@ -240,22 +245,6 @@ TOKEN-INDEX in sentence whose tokens start TOKENS-POINT."
   (get-char-property (line-end-position) 'sensetion-sent-id))
 
 
-(defun sensetion--write-index (index-file index)
-  "Write INDEX to INDEX-FILE."
-  (with-temp-file index-file
-    (prin1 index (current-buffer)))
-  "Index written")
-
-
-(defun sensetion--read-index (index-file)
-  "Read index from INDEX-FILE, and set `sensetion--index'."
-  (with-temp-buffer
-    (insert-file-contents index-file)
-    (goto-char (point-min))             ;is this needed?
-    (setq sensetion--index (read (current-buffer))))
-  "Index read")
-
-
 (defun sensetion-make-index (files)
   "Read annotated files and build index of lemmas* and their
 positions."
@@ -265,49 +254,69 @@ positions."
                           t
                           (concat "\\." sensetion-annotation-file-type "$"))))
 
-  (let ((index-ht (sensetion--make-index files)))
-    (setq sensetion--index index-ht)
-    (sensetion--write-index sensetion-index-file index-ht))
+  (let ((index (sensetion--make-index files)))
+    (setq sensetion--index index)
+    (sensetion--write-index sensetion-index-file index))
   "Index made")
 
 
 (defun sensetion--make-index (files)
   "Read annotated files and build hash-table associating lemmas*
 to where in the files they appear."
-  (let ((index-ht (make-hash-table :size 200000 :test #'equal)))
+  (let ((index (make-dictree nil nil nil nil #'< #'cons)))
     (cl-labels
         ((run (id f)
-              (let ((sent (conllu--string->sent (f-read-text f))))
+              (let ((sent (sensetion--plist->sent (read (f-read-text f)))))
                 (index-sent id sent)))
 
          (index-sent (id sent)
                      (mapc (apply-partially #'index-token id)
-                           (conllu-sent-tokens sent)))
+                           (sensetion--sent-tokens sent)))
+
+         (anno? (tk)
+                ;; annotatable?
+                (pcase (sensetion--tk-kind tk)
+                  (`(:coll . ,_)
+                   nil)
+                  ;; TODO: show auto? could they be wrongly lemmatized
+                  ;; and thus wrongly tagged?
+                  (_ (when (cl-member (sensetion--tk-status tk)
+                                      '("man" "un") :test #'equal)
+                       t))))
 
          (index-token (sent-id tk)
-                      (when (and
-                             ;; is to be annotated?
-                             (equal "un"
-                                    (conllu-token-upos tk))
-                             (or (equal "_" (conllu-token-form tk))
-                                 (equal "_" (conllu-token-xpos tk))))
-                        (mapc (lambda (lemma) (index-lemma sent-id
-                                                           (conllu--token-id->string
-                                                            (conllu-token-id tk))
-                                                           lemma))
-                              (s-split "|" (conllu-token-lemma tk)))))
+                      (when (anno? tk)
+                        (let ((lemma (sensetion--tk-lemma tk)))
+                          (unless lemma
+                            (user-error "No lemma for tk %s at %s"
+                                        (sensetion--tk-meta tk)
+                                        sent-id))
+                          (mapc (lambda (lemma)
+                                  (index-lemma sent-id
+                                               lemma))
+                                (s-split "|" lemma)))))
 
-         (index-lemma (sent-id tk-id lemma)
-                      (when (equal "_" lemma)
-                        (user-error "No lemma at %s %s" sent-id tk-id))
+         (index-lemma (sent-id lemma)
                       ;; lemmas* might be pure ("love") or have pos
                       ;; annotation ("love%2"), but we don't care
                       ;; about it here; when retrieving we gotta take
                       ;; care of this.
-                      (setf (gethash lemma index-ht) (cons (list sent-id tk-id) (gethash lemma index-ht nil)))))
+                      (dictree-insert index lemma sent-id)))
       ;;
       (mapc (lambda (f) (run (file-name-base f) f)) files)
-      index-ht)))
+      index)))
+
+
+(defun sensetion--write-index (index-file index)
+  "Write INDEX to INDEX-FILE."
+  (dictree-write index index-file t 'compiled)
+  "Index written")
+
+
+(defun sensetion--read-index (index-file)
+  "Read index from INDEX-FILE, and set `sensetion--index'."
+  (setq sensetion--index (dictree-load index-file))
+  "Index read")
 
 
 (defun sensetion--pos->synset-type (pos)
@@ -457,6 +466,34 @@ to where in the files they appear."
 (defmacro with-inhibiting-read-only (&rest body)
   `(let ((inhibit-read-only t))
      ,@body))
+
+
+(cl-defstruct (sensetion--tk (:constructor nil)
+                             (:constructor sensetion--make-tk))
+  form lemma status kind anno meta)
+
+
+(cl-defstruct (sensetion--sent (:constructor nil)
+                               (:constructor sensetion--make-sent))
+  id tokens)
+
+
+(defun sensetion--plist->sent (plist)
+  (sensetion--make-sent :id (plist-get plist :id)
+                        :tokens (mapcar #'sensetion--plist->tk
+                                        (plist-get plist :tokens))))
+
+
+(defun sensetion--plist->tk (plist)
+  (let ((form (plist-get plist :form))
+        (lemma (plist-get plist :lemma))
+        (status (plist-get plist :status))
+        (kind (plist-get plist :kind))
+        (anno (plist-get plist :anno))
+        (meta (plist-get plist :meta)))
+    (sensetion--make-tk :form form :lemma lemma
+                        :status status :kind kind
+                        :anno anno :meta meta)))
 
 
 (provide 'sensetion)
