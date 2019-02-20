@@ -3,13 +3,11 @@
 (require 'ido)
 (require 's)
 (require 'f)
+(require 'dash)
 (eval-when-compile (require 'cl-lib))
 (require 'cl-lib)
-(require 'conllu-parse)
-(require 'conllu-edit)
-(require 'conllu-move)
 (require 'hydra)
-
+(require 'trie)
 
 (defgroup sensetion nil
   "Support for annotating word senses."
@@ -54,7 +52,6 @@ Maps a lemma* to a list of lists of sentence-id and token-id.")
   (let ((map (make-sparse-keymap)))
     (define-key map "<" #'sensetion-previous-selected)
     (define-key map ">" #'sensetion-next-selected)
-    (define-key map "." #'sensetion-go-to-token)
     (define-key map "/" #'sensetion-edit)
     (define-key map [C-down] #'sensetion-move-line-down)
     (define-key map [C-up] #'sensetion-move-line-up)
@@ -62,16 +59,22 @@ Maps a lemma* to a list of lists of sentence-id and token-id.")
   "Keymap for `sensetion-mode'.")
 
 
-(defcustom sensetion-selected-token-colour-name
+(defcustom sensetion-unnanoted-colour
   "salmon"
   "Color to display the selected tokens in."
   :group 'sensetion
   :type 'color)
 
 
-(defcustom sensetion-tagged-token-colour-name
-  ;; TODO:have color depend on synset so that differently tagged
-  ;; tokens have different colors
+(defcustom sensetion-previously-annotated-colour
+  "green"
+  "Color to display the tokens who have been previously
+annotated."
+  :group 'sensetion
+  :type 'color)
+
+
+(defcustom sensetion-currently-annotated-colour
   "dodger blue"
   "Color to display the selected tokens in."
   :group 'sensetion
@@ -83,7 +86,7 @@ Maps a lemma* to a list of lists of sentence-id and token-id.")
    str
    #s(hash-table size 45 test equal rehash-size 1.5 rehash-threshold 0.8125
                  purecopy t data
-                 ("." t "," t ":" t "!" t "?" t "'" t "]" t ")" t "--" t "..." t "»" t))))
+                 ("." t "," t ":" t "!" t "?" t "'" t "]" t ")" t "..." t "»" t))))
 
 
 (defun sensetion--beginning-of-buffer ()
@@ -113,137 +116,150 @@ Maps a lemma* to a list of lists of sentence-id and token-id.")
 (defun sensetion--annotation-files ()
   (f-files sensetion-annotation-dir))
 
-  (defun sensetion-annotate (lemma &optional pos)
-    (interactive
-     (list (read-string "Lemma to annotate: ")
-           (ido-completing-read "PoS tag?" '("a" "r" "v" "n" "any") nil t nil nil "any")))
-    ;;
-    (let* ((regexp (if (equal pos "any")
-                      (concat lemma "(%[1234])?")
-                    (concat lemma "(%" (sensetion--pos->synset-type pos) ")?")))
-           (matches (dictree-regexp-search sensetion--index regexp))
-           (result-buffer (generate-new-buffer
-                           (sensetion--create-buffer-name lemma pos))))
-      (unless matches
-        (if pos
-            (user-error "No matches for lemma %s and PoS %s" lemma pos)
-          (user-error "No matches for lemma %s as any PoS." lemma)))
-      (sensetion--make-collocations matches result-buffer t)
-      (with-current-buffer result-buffer
-        (sensetion-mode)
-        (sensetion--beginning-of-buffer))
-      (pop-to-buffer result-buffer)))
+
+(defun sensetion-annotate (lemma &optional pos)
+  (interactive
+   (list (read-string "Lemma to annotate: ")
+         (ido-completing-read "PoS tag?" '("a" "r" "v" "n" "any") nil t nil nil "any")))
+  ;; using regexp just to get all pos combinations
+  (let* ((regexp (if (equal pos "any")
+                     (concat lemma "%?[1234]?")
+                   (concat lemma "%?" (sensetion--pos->synset-type pos) "?")))
+         (filter-fn (sensetion--regexp-search-filter-fn))
+         (matches (progn (trie-regexp-search sensetion--index regexp
+                                             nil nil nil filter-fn)
+                         (funcall filter-fn)))
+         (result-buffer (generate-new-buffer
+                         (sensetion--create-buffer-name lemma pos))))
+    (unless matches
+      (if pos
+          (user-error "No matches for lemma %s and PoS %s" lemma pos)
+        (user-error "No matches for lemma %s as any PoS." lemma)))
+    (sensetion--make-collocations lemma matches result-buffer)
+    (with-current-buffer result-buffer
+      (sensetion-mode)
+      (sensetion--beginning-of-buffer))
+    (pop-to-buffer result-buffer)))
+
+
+(defun safe-cons (car cdr)
+  (if (listp cdr)
+      (cons car cdr)
+    (cons car (list cdr))))
+
+
+(defun sensetion--regexp-search-filter-fn ()
+  "`trie-regexp-search' returns an alist of the keys and their
+  results. In our case the values might get repeated over several
+  keys, which we do not want. So we use `trie-regexp-search'
+  filterfn argument with this closure, which both builds a result
+  in a format we want, and prevents `trie-regexp-search' from
+  building its own result list.
+
+The result function uniquifies the match values and returns nil;
+when called without arguments will return a list of of two lists:
+one of them contains the unique keys of the matches, and the
+other the unique values."
+  (let ((uniq-vals (make-hash-table :test 'equal)))
+    (lambda (&optional key vals)
+      (if key
+          (progn
+            (mapc (lambda (val) (setf (gethash val uniq-vals) t)) vals)
+            nil)
+        (hash-table-keys uniq-vals)))))
 
 
 (defun sensetion--create-buffer-name (lemma pos)
   (format "*%s@%s@%s*" sensetion-output-buffer-name (or pos "") lemma))
 
 
-(defun sensetion--make-collocations (matches result-buffer show-meta?)
+(defun sensetion--make-collocations (lemma matches result-buffer)
   (cl-labels
       ((get-sent (sent-id)
-                 (with-temp-buffer
-                   (insert-file-contents (sensetion--sent-id->filename sent-id))
-                   (if-let ((id-str (format "sent_id = %s" sent-id))
-                            ;; moves to sentence point
-                            (found (search-forward id-str nil t))
-                            ;; get point of where tokens begin
-                            (tokens-point (progn (conllu-forward-to-token-line) (point)))
-                            (sent (conllu--parse-sent-at-point)))
-                       (list sent tokens-point)
-                     (unless found (user-error "No sentence with %s" id-str)))))
+                 (let* ((fp (sensetion--sent-id->filename sent-id))
+                        (text (f-read-text fp))
+                        (plist (read text)))
+                   (sensetion--plist->sent plist)))
 
-       (token-colloc (sel-tks tk tk-index)
-                     (unless (and (not show-meta?)
-                                  (conllu--token-meta? tk))
-                       (let* ((form-str  (conllu-token-form tk))
-                              (selected? (cl-member
-                                          (conllu--token-id->string (conllu-token-id tk))
-                                          sel-tks :test #'equal))
-                              (punct? (sensetion--punctuation? (conllu-token-form tk))))
-                         (concat
-                          (if punct? "" " ")
-                          (if selected?
-                              (propertize form-str
-                                          'sensetion-token-index tk-index
-                                          'sensetion-selected (conllu-token-form tk)
-                                          'face `(:foreground ,sensetion-selected-token-colour-name))
-                            (propertize form-str 'sensetion-token-index tk-index))))))
-
-       (sent-colloc (sent-id sent tk-id tokens-point)
+       (sent-colloc (sent-id)
                     (with-current-buffer result-buffer
-                      (let ((tokens-line (seq-map-indexed
-                                          (apply-partially #'token-colloc (list tk-id))
-                                          (conllu-sent-tokens sent))))
-                        (insert (substring (apply #'concat tokens-line) 1)
-                                (propertize "\n" 'sensetion-tokens-point tokens-point 'sensetion-sent-id sent-id)
-                                "\n"))))
+                      (let* ((sent (get-sent sent-id))
+                             (tokens-line (sensetion--sent-colloc lemma sent)))
+                        (insert tokens-line
+                                (propertize "\n" 'sensetion-sent sent)
+                                "\n")))))
+      ;;
+      (seq-do #'sent-colloc matches)))
 
-       (go (match)
-           (seq-let (sent-id tk-id) match
-             (seq-let (sent tokens-point) (get-sent sent-id)
-               (sent-colloc sent-id sent tk-id tokens-point)))))
-    ;;
-    (seq-do #'go matches)))
+
+(defun sensetion--sent-colloc (lemma sent)
+  (cl-labels
+      ((token-colloc (tk ix)
+                     (pcase (sensetion--tk-kind tk)
+                       (`(:glob . ,_) "")
+                       (_
+                        (let* ((form-str  (sensetion--tk-form tk))
+                               (lemma-str (sensetion--tk-lemma tk))
+                               (selected? (and lemma-str
+                                               (cl-member
+                                                lemma
+                                                (s-split "|" lemma-str t)
+                                                :test #'equal
+                                                :key #'lemma*->lemma)))
+                               (punct? (sensetion--punctuation? form-str)))
+                          (concat
+                           (if punct? "" " ")
+                           (apply #'propertize
+                                  form-str
+                                  'sensetion-token-ix ix
+                                  (when selected?
+                                    ;; TODO: add pos,sense-index,stuff
+                                    (list
+                                     ;; TODO: lemma could be buffer
+                                     ;; local variable
+                                     'sensetion-selected lemma
+                                     'face `(:foreground
+                                             ,(pcase (sensetion--tk-status tk)
+                                                ("man" sensetion-previously-annotated-colour)
+                                                ("un" sensetion-unnanoted-colour)
+                                                ("now" sensetion-currently-annotated-colour))))))))))))
+    ;; 
+    (let* ((tks (sensetion--sent-tokens sent))
+           (tks-colloc (seq-map-indexed #'token-colloc tks)))
+      (substring                        ; to remove starting space
+       (apply #'concat tks-colloc) 1))))
 
 
 (defun sensetion-previous-selected (point)
   (interactive (list (point)))
-  (goto-char
-   (previous-single-property-change point 'sensetion-selected nil (point-min))))
+  (let ((selected? (sensetion--selected? point)))
+    (goto-char
+     (previous-single-property-change point 'sensetion-selected nil (point-min)))
+    (when selected? (sensetion-previous-selected (point)))))
 
 
 (defun sensetion-next-selected (point)
   (interactive (list (point)))
-  (goto-char
-   (next-single-property-change point 'sensetion-selected nil (point-max))))
+  (let ((selected? (sensetion--selected? point)))
+    (goto-char
+     (next-single-property-change point 'sensetion-selected nil (point-max)))
+    (when selected? (sensetion-next-selected (point)))))
 
 
 (defun sensetion--selected? (point)
   (get-text-property point 'sensetion-selected))
 
 
-(cl-defun sensetion--token-index (&optional (point (point)))
-  (get-char-property point 'sensetion-token-index))
-
-
 (defun sensetion--sent-id->filename (sent-id)
-  (f-join sensetion-annotation-dir (concat sent-id ".conllu")))
+  (f-join sensetion-annotation-dir (concat sent-id ".plist")))
 
 
-(defun sensetion-go-to-token (token-index tokens-point filename)
-  "Go to line in CoNLL-U buffer where token at point is located.
-
-See `sensetion--go-to-token' for more details."
-  (interactive
-   (list (or (sensetion--token-index)
-             ;; if not at selected token, move to the next one and
-             ;; pick it
-             (and (sensetion-next-selected (point))
-                  (sensetion--token-index (1+ (point)))))
-         (sensetion--tokens-point-prop-at-point)
-         (sensetion--sent-id->filename (sensetion--sent-id-prop-at-point))))
-  ;;
-  (unless (and token-index tokens-point filename)
-    (user-error "No token at point."))
-  (find-file filename)
-  (sensetion--go-to-token token-index tokens-point))
+(defun sensetion--sent-prop-at-point ()
+  (get-char-property (line-end-position) 'sensetion-sent))
 
 
-(defun sensetion--go-to-token (token-index tokens-point)
-  "Go to line in CONLLU-BUFFER corresponding to the token of
-TOKEN-INDEX in sentence whose tokens start TOKENS-POINT."
-  (goto-char tokens-point)
-  (forward-line token-index))
-
-
-(defun sensetion--tokens-point-prop-at-point ()
-  (get-char-property (line-end-position) 'sensetion-tokens-point))
-
-
-(defun sensetion--sent-id-prop-at-point ()
-  (get-char-property (line-end-position) 'sensetion-sent-id))
-
+(defun sensetion--token-ix-prop-at-point ()
+  (get-char-property (point) 'sensetion-token-ix))
 
 (defun sensetion-make-index (files)
   "Read annotated files and build index of lemmas* and their
@@ -253,17 +269,27 @@ positions."
                               (read-file-name "Path to annotation directory: " nil nil t))
                           t
                           (concat "\\." sensetion-annotation-file-type "$"))))
-
   (let ((index (sensetion--make-index files)))
-    (setq sensetion--index index)
-    (sensetion--write-index sensetion-index-file index))
-  "Index made")
+    (setq sensetion--index index))
+  t)
+
+
+(defun sensetion--annotatable? (tk)
+  ;; TODO: make status keywords
+  (pcase (sensetion--tk-kind tk)
+    (`(:coll . ,_) nil)
+    (_ (let ((status (sensetion--tk-status tk)))
+         (when
+             (cl-member status
+                        '("man" "un")
+                        :test #'equal)
+           status)))))
 
 
 (defun sensetion--make-index (files)
   "Read annotated files and build hash-table associating lemmas*
 to where in the files they appear."
-  (let ((index (make-dictree nil nil nil nil #'< #'cons)))
+  (let ((index (make-trie #'<)))
     (cl-labels
         ((run (id f)
               (let ((sent (sensetion--plist->sent (read (f-read-text f)))))
@@ -273,50 +299,42 @@ to where in the files they appear."
                      (mapc (apply-partially #'index-token id)
                            (sensetion--sent-tokens sent)))
 
-         (anno? (tk)
-                ;; annotatable?
-                (pcase (sensetion--tk-kind tk)
-                  (`(:coll . ,_)
-                   nil)
-                  ;; TODO: show auto? could they be wrongly lemmatized
-                  ;; and thus wrongly tagged?
-                  (_ (when (cl-member (sensetion--tk-status tk)
-                                      '("man" "un") :test #'equal)
-                       t))))
-
          (index-token (sent-id tk)
-                      (when (anno? tk)
+                      (when (sensetion--annotatable? tk)
                         (let ((lemma (sensetion--tk-lemma tk)))
                           (unless lemma
                             (user-error "No lemma for tk %s at %s"
                                         (sensetion--tk-meta tk)
                                         sent-id))
                           (mapc (lambda (lemma)
-                                  (index-lemma sent-id
-                                               lemma))
+                                  (index-lemma sent-id lemma))
                                 (s-split "|" lemma)))))
-
+         
          (index-lemma (sent-id lemma)
                       ;; lemmas* might be pure ("love") or have pos
                       ;; annotation ("love%2"), but we don't care
                       ;; about it here; when retrieving we gotta take
                       ;; care of this.
-                      (dictree-insert index lemma sent-id)))
+                      (trie-insert index lemma sent-id #'safe-cons)))
       ;;
       (mapc (lambda (f) (run (file-name-base f) f)) files)
       index)))
 
-
 (defun sensetion--write-index (index-file index)
   "Write INDEX to INDEX-FILE."
-  (dictree-write index index-file t 'compiled)
-  "Index written")
+  (with-temp-file index-file
+    (prin1 index (current-buffer)))
+  t)
 
 
 (defun sensetion--read-index (index-file)
   "Read index from INDEX-FILE, and set `sensetion--index'."
-  (setq sensetion--index (dictree-load index-file))
-  "Index read")
+  ;; TODO:benchmark if f-read is faster (if needed)
+  (with-temp-buffer
+    (insert-file-contents index-file)
+    (goto-char (point-min))             ;is this needed?
+    (setq sensetion--index (read (current-buffer))))
+  t)
 
 
 (defun sensetion--pos->synset-type (pos)
@@ -370,31 +388,32 @@ to where in the files they appear."
           (mapcar #'parse-sense senses))))))
 
 
-(defun sensetion-edit (lemma pos tokens-point tk-index sent-id)
+(defun sensetion-edit (lemma pos ix sent)
   (interactive (list (or (get-char-property (point) 'sensetion-selected)
                          (user-error "No taggable token at point."))
                      (ido-completing-read "Token PoS tag: " '("a" "n" "r" "v" "other")
                                           nil t nil nil "other")
-                     (sensetion--tokens-point-prop-at-point)
-                     (sensetion--token-index)
-                     (sensetion--sent-id-prop-at-point)))
-  (unless (and lemma pos tokens-point tk-index sent-id)
+                     (sensetion--token-ix-prop-at-point)
+                     (sensetion--sent-prop-at-point)))
+  (unless (and lemma pos ix sent)
     "No taggable token at point.")
-  (sensetion--edit lemma pos tokens-point tk-index (sensetion--sent-id->filename sent-id))
-  (with-inhibiting-read-only
-   (apply (lambda (beg end)
-            (put-text-property beg end 'face
-                               `(:foreground ,sensetion-tagged-token-colour-name)))
-          (sensetion--token-points)))
-  (sensetion--remove-from-index lemma (sensetion--pos->synset-type pos)
-                                tk-index sent-id))
+  (let ((sent (sensetion--edit lemma pos ix sent)))
+    (with-inhibiting-read-only
+     (delete-region (line-beginning-position) (line-end-position))
+     (insert (sensetion--sent-colloc lemma sent))
+     ;; TODO: actually search for token index?
+     (sensetion-previous-selected))))
 
 
-(defun sensetion--edit (lemma pos1 tokens-point tk-index fp)
+(defun sensetion--edit (lemma pos1 ix sent)
   (let ((senses (sensetion--wordnet-lookup lemma pos1)))
-    ;; TODO: refactor hydra to function
     (call-interactively
-     (eval `(defhydra hydra-senses (:color blue)
+     (eval (sensetion--edit-hydra-maker lemma pos1 ix sent senses)))
+    sent))
+
+
+(defun sensetion--edit-hydra-maker (lemma pos1 tk-ix sent options)
+  `(defhydra hydra-senses (:color blue)
               ""
               ,@(seq-map-indexed
                  (lambda (x ix)
@@ -404,19 +423,16 @@ to where in the files they appear."
                                                        ,(sensetion--pos->synset-type
                                                          pos1)
                                                        ,(cl-first x)
-                                                       ,tokens-point
-                                                       ,tk-index ,fp))
+                                                       ,tk-ix
+                                                       ,sent))
                          (cl-second x) :column "Pick sense:"))
-                 senses))))))
+                 options)))
 
-;; TODO: refactor this triple as coordinate struct
-(defun sensetion--annotate-sense (lemma st sense tks-point tk-index fp)
-  (with-temp-file fp
-    (insert-file-contents fp)
-    (sensetion--go-to-token tk-index tks-point)
-    (conllu--edit-field-by-key '(:feat "s") (point) sense)
-    (conllu--edit-field-by-key :upos (point) "man")
-    (conllu--edit-field-by-key :lemma (point) (concat lemma "%" st))))
+
+(defun sensetion--annotate-sense (lemma st sense ix sent)
+  ;; TODO: change lemma
+  (setf (sensetion--tk-anno (elt (sensetion--sent-tokens sent) ix)) (list sense))
+  (setf (sensetion--tk-status (elt (sensetion--sent-tokens sent) ix)) "now"))
 
 
 (cl-defun sensetion--token-points (&optional (point (point)))
@@ -426,24 +442,12 @@ to where in the files they appear."
                                      nil (line-end-position))))
 
 
-(defun sensetion--remove-from-index (lemma st tk-index sent-id)
-  (cl-labels
-      ((rm-from (seq)
-                (seq-remove (lambda (x) (equal x (list sent-id
-                                                       (number-to-string tk-index))))
-                            seq)))
-
-    (let ((lemma* (make-lemma* lemma st)))
-      (let ((lemma-matches (gethash lemma sensetion--index nil))
-            (lemma*-matches (gethash lemma* sensetion--index nil)))
-        (when lemma-matches
-          (setf (gethash lemma sensetion--index) (rm-from lemma-matches)))
-        (when lemma*-matches
-          (setf (gethash lemma* sensetion--index) (rm-from lemma*-matches)))))))
-
-
 (defun make-lemma* (lemma synset-type)
   (concat lemma "%" synset-type))
+
+
+(defun lemma*->lemma (lemma*)
+  (substring lemma* 0 (- (length lemma*) 2)))
 
 
 (defun sensetion-move-line-up ()
