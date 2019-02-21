@@ -54,6 +54,8 @@ Maps a lemma* to a list of lists of sentence-id and token-id.")
     (define-key map ">" #'sensetion-next-selected)
     (define-key map "/" #'sensetion-edit)
     (define-key map "u" #'sensetion-unglob)
+    (define-key map "m" #'sensetion-mark-glob)
+    (define-key map "g" #'sensetion-glob)
     (define-key map [C-down] #'sensetion-move-line-down)
     (define-key map [C-up] #'sensetion-move-line-up)
     map)
@@ -178,21 +180,27 @@ other the unique values."
   (format "*%s@%s@%s*" sensetion-output-buffer-name (or pos "") lemma))
 
 
+(defun sensetion--get-sent (sent-id)
+  (let* ((fp (sensetion--sent-id->filename sent-id))
+         (text (f-read-text fp))
+         (plist (read text)))
+    (sensetion--plist->sent plist)))
+
+
+(defun sensetion--get-sent-at-point ()
+  (sensetion--get-sent (get-text-property (line-end-position) 'sensetion--sent-id)))
+
+
 (defun sensetion--make-collocations (matches)
   (cl-labels
-      ((get-sent (sent-id)
-                 (let* ((fp (sensetion--sent-id->filename sent-id))
-                        (text (f-read-text fp))
-                        (plist (read text)))
-                   (sensetion--plist->sent plist)))
-
-       (sent-colloc (sent-id)
-                    (let* ((sent (get-sent sent-id))
+      ((sent-colloc (sent-id)
+                    (let* ((sent        (sensetion--get-sent sent-id))
                            (tokens-line (sensetion--sent-colloc sent sensetion--lemma)))
                       (insert tokens-line
-                              (propertize "\n" 'sensetion-sent sent)
+                              ;; no need to add it all the time
+                              (propertize "\n" 'sensetion--sent-id sent-id)
                               "\n"))))
-      ;;
+    ;;
     (seq-do #'sent-colloc matches)))
 
 
@@ -202,6 +210,8 @@ other the unique values."
      tk)))
 
 
+;; TODO: unglobbing (or any kind of editing that calls sent-colloc)
+;; turns just annotated tokens into previously annotated tokens
 (defun sensetion-unglob (ix sent)
   "If token of index IX in SENT at point is part of collocation,
 unglob it and reinsert the sentence in the buffer.
@@ -210,7 +220,7 @@ Unglobbing means making all tokens in the collocation normal
 tokens, and removing the glob token corresponding to the
 collocation."
   (interactive (list (sensetion--tk-ix-prop-at-point)
-                     (sensetion--sent-prop-at-point)))
+                     (sensetion--get-sent-at-point)))
   (unless (and ix sent)
     (user-error "No token at point"))
   (cl-labels
@@ -230,7 +240,7 @@ collocation."
            (ck (sensetion--tk-coll-key tk)))
       (unless ck
         (user-error "Token is not part of a collocation"))
-      (sensetion--reinsert-sent (unglob ck sent)))))
+      (sensetion--reinsert-sent-at-point (unglob ck sent)))))
 
 
 (defun sensetion--tk-coll-key (tk)
@@ -238,12 +248,73 @@ collocation."
     (`(:coll . ,k) k)))
 
 
-(defun sensetion--reinsert-sent (sent)
-  ;; TODO: should this put the sent at the eol
-  "Delete current line, save SENT to its file, and insert SENT. "
+(defun sensetion-mark-glob (beg end)
+  "Marks token to be globbed with the `sensetion-glob' command."
+  (interactive (sensetion--tk-points))
+  (with-inhibiting-read-only
+   (put-text-property beg end
+                      'face '(:foreground "yellow"))
+   (let ((ix (get-text-property beg 'sensetion--tk-ix))
+         (marked (get-text-property (line-end-position) 'sensetion--to-glob)))
+     (put-text-property (line-end-position) (1+ (line-end-position))
+                        'sensetion--to-glob (cons ix marked)))))
+
+(defun sensetion-glob (lemma)
+  "Glob all tokens marked to be globbed, assigning it lemma
+LEMMA.
+
+You can mark tokens with `sensetion-mark-glob', or unmark them
+with `sensetion-unmark-glob'."
+  (interactive (list
+                (s-join "_"
+                        (s-split " "
+                                 (read-string "Lemma of glob: " nil nil "") t))))
+  (cl-labels
+      ((max-key (sent)
+                (apply #'max
+                       (cons (string-to-char "`")
+                             ;; in case there are no other globs, use
+                             ;; "`" (which results in "a" being the
+                             ;; key) , else get the maximum one
+                             (seq-mapcat (lambda (tk)
+                                           (when-let ((key (sensetion--tk-coll-key tk)))
+                                             (list (string-to-char key))))
+                                         (sensetion--sent-tokens sent)))))
+
+       (glob (sent ixs new-k)
+             (sensetion--make-sent
+              :id (sensetion--sent-id sent)
+              :tokens
+              (cons
+               (sensetion--make-tk :form nil :lemma lemma
+                                   :status "un" :kind '(:glob . new-k)
+                                   :anno nil :meta nil)
+               (cl-loop
+                for tk in (sensetion--sent-tokens sent)
+                for i from 0
+                collect (if (cl-member i ixs)
+                            (progn
+                              (setf (sensetion--tk-kind tk) (cons :coll new-k))
+                              tk)
+                          tk))))))
+    ;; 
+    (let* ((ixs   (reverse (get-text-property (line-end-position) 'sensetion--to-glob)))
+           (sent  (sensetion--get-sent-at-point))
+           (max-k (max-key sent))
+           (new-k (char-to-string (1+ max-k)))
+           (sent-w-glob (glob sent ixs new-k)))
+      (sensetion--reinsert-sent-at-point sent-w-glob)
+      (with-inhibiting-read-only
+       (put-text-property (line-end-position) (1+ (line-end-position))
+                          'sensetion--to-glob nil)))))
+
+
+(defun sensetion--reinsert-sent-at-point (sent)
+  "Delete current line, save SENT to its file, and insert SENT."
+  (sensetion--save-sent sent)
   (with-inhibiting-read-only
    (delete-region (line-beginning-position) (line-end-position))
-   (insert (sensetion--sent-colloc sent))))
+   (insert (sensetion--sent-colloc (sensetion--get-sent-at-point)))))
 
 
 (cl-defun sensetion--sent-colloc (sent &optional (lemma (buffer-local-value
@@ -274,7 +345,7 @@ collocation."
                           ;; form string
                           (apply #'propertize
                                  form-str
-                                 'sensetion-token-ix ix
+                                 'sensetion--tk-ix ix
                                  (when selected?
                                    ;; TODO: add pos,sense-index,stuff
                                    (list
@@ -319,12 +390,12 @@ collocation."
   (f-join sensetion-annotation-dir (concat sent-id "." sensetion-annotation-file-type)))
 
 
-(defun sensetion--sent-prop-at-point ()
-  (get-char-property (line-end-position) 'sensetion-sent))
+(defun sensetion--sent-id-prop-at-point ()
+  (get-char-property (line-end-position) 'sensetion--sent-id))
 
 
 (defun sensetion--tk-ix-prop-at-point ()
-  (get-char-property (point) 'sensetion-token-ix))
+  (get-char-property (point) 'sensetion--tk-ix))
 
 (defun sensetion-make-index (files)
   "Read annotated files and build index of lemmas* and their
@@ -459,7 +530,7 @@ to where in the files they appear."
                      (ido-completing-read "Token PoS tag: " '("a" "n" "r" "v" "other")
                                           nil t nil nil "other")
                      (sensetion--tk-ix-prop-at-point)
-                     (sensetion--sent-prop-at-point)))
+                     (sensetion--get-sent-at-point)))
   (unless (and lemma pos ix sent)
     "No taggable token at point.")
   (sensetion--edit lemma pos ix sent))
@@ -496,12 +567,9 @@ to where in the files they appear."
         (list sense)
         (sensetion--tk-status (elt (sensetion--sent-tokens sent) ix))
         "now")
-  (with-inhibiting-read-only
-   (delete-region (line-beginning-position) (line-end-position))
-   (insert (sensetion--sent-colloc sent lemma))
-   ;; TODO: actually search for token index?
-   (sensetion-previous-selected (point))
-   (sensetion--save-sent sent)))
+  (sensetion--reinsert-sent-at-point sent)
+  ;; TODO: actually search for token index?
+  (sensetion-previous-selected (point)))
 
 
 (defun sensetion--save-sent (sent)
@@ -511,10 +579,10 @@ to where in the files they appear."
 
 
 ;; TODO: refactor prop names as variables
-(cl-defun sensetion--token-points (&optional (point (point)))
-  (list (previous-single-property-change point 'sensetion-token-ix
+(cl-defun sensetion--tk-points (&optional (point (point)))
+  (list (previous-single-property-change point 'sensetion--tk-ix
                                          nil (line-beginning-position))
-        (next-single-property-change point 'sensetion-token-ix
+        (next-single-property-change point 'sensetion--tk-ix
                                      nil (line-end-position))))
 
 
