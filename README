@@ -3,23 +3,26 @@
 
 This project intends to finish the word-sense annotations of the
 [[http://wordnetcode.princeton.edu/glosstag.shtml][WordNet gloss corpus]], but can be used to sense-tag any corpus in the
-CoNLL-U derived format we have defined.
+S-expression-based format we have defined.
 
 * Usage
 You must set the directory where the files to be annotated are with
 =M-x customize-variable RET sensetion-annotation-dir=. (You can
 customize other stuff with =M-x customize-group RET sensetion=.)
 
-Use =M-x sensetion= to build the index. If this is the first time you
-call it, it might take some time (and freeze your emacs for this
+Use =M-x sensetion= to start annotating. If this is the first time you
+call it, it might take some time to index the files (and freeze your emacs for this
 time).
 
 =M-x sensetion-annotate= will ask you for a lemma and a PoS tag and
 will build a buffer with instances of this lemma+pos that have not
 been annotated yet. You can navigate through taggable tokens with =<=
 and =>=. If you wish to annotate a token, press =/= on it. If you'd
-like to edit it manually, press =.= to be taken to a buffer with the
-annotation file open.
+
+There is support for word collocations, such as phrasal verbs. The tokens part
+of a collocation are united by a key, which is shown in their bottom left corner.
+You can unglob a collocation by pressing =u= in any token of the collocation.
+To glob tokens, you mark them with =m= and finally press =g= to create the collocation.
 
 You can move sentences up or down with =C-↑= and =C-↓=. Clustering
 tokens with the same sense together might be useful.
@@ -34,8 +37,8 @@ You need both elisp libraries and the =wn= executable.
 - to make things easier, install =use-package= with =M-x
   install-package RET use-package=.
 - clone this repository.
-- clone [[http://github.com/odanoburu/conllu-mode][conllu-mode's repository]] (you may get it from MELPA, but it
-  might be outdated.)
+
+
 - add the following snippet to your user configuration file (usually
   at =~/emacs.d/init.el=), substituting the paths to the appropriate
   ones:
@@ -48,7 +51,7 @@ You need both elisp libraries and the =wn= executable.
     (use-package conllu-mode
       :mode "\\.conllu\\'"
       :load-path "~/conllu-mode/"
-      :custom (conllu-flycheck-on? 'no))
+
 
     (use-package sensetion
       :commands sensetion
@@ -67,6 +70,7 @@ move them to the corresponding directory of package you installed.
 
 
 * Annotation format
+- update this section
 Files to be annotated are syntactically the same to [[http://universaldependencies.org/format.html][CoNLL-U]] files, but
 we have re-purposed their fields like below:
 
