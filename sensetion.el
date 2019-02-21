@@ -251,7 +251,7 @@ other the unique values."
 
 
 (defun sensetion--sent-id->filename (sent-id)
-  (f-join sensetion-annotation-dir (concat sent-id ".plist")))
+  (f-join sensetion-annotation-dir (concat sent-id "." sensetion-annotation-file-type)))
 
 
 (defun sensetion--sent-prop-at-point ()
@@ -397,19 +397,13 @@ to where in the files they appear."
                      (sensetion--sent-prop-at-point)))
   (unless (and lemma pos ix sent)
     "No taggable token at point.")
-  (let ((sent (sensetion--edit lemma pos ix sent)))
-    (with-inhibiting-read-only
-     (delete-region (line-beginning-position) (line-end-position))
-     (insert (sensetion--sent-colloc lemma sent))
-     ;; TODO: actually search for token index?
-     (sensetion-previous-selected))))
+  (sensetion--edit lemma pos ix sent))
 
 
 (defun sensetion--edit (lemma pos1 ix sent)
   (let ((senses (sensetion--wordnet-lookup lemma pos1)))
     (call-interactively
-     (eval (sensetion--edit-hydra-maker lemma pos1 ix sent senses)))
-    sent))
+     (eval (sensetion--edit-hydra-maker lemma pos1 ix sent senses)))))
 
 
 (defun sensetion--edit-hydra-maker (lemma pos1 tk-ix sent options)
@@ -430,19 +424,36 @@ to where in the files they appear."
 
 
 (defun sensetion--annotate-sense (lemma st sense ix sent)
-  ;; TODO: change lemma
-  (setf (sensetion--tk-anno (elt (sensetion--sent-tokens sent) ix)) (list sense))
-  (setf (sensetion--tk-status (elt (sensetion--sent-tokens sent) ix)) "now"))
+  (setf (sensetion--tk-lemma (elt (sensetion--sent-tokens sent) ix))
+        (sensetion--make-lemma* lemma st)
+        (sensetion--tk-anno (elt (sensetion--sent-tokens sent) ix))
+        ;; TODO:should this be list?
+        (list sense)
+        (sensetion--tk-status (elt (sensetion--sent-tokens sent) ix))
+        "now")
+  (with-inhibiting-read-only
+   (delete-region (line-beginning-position) (line-end-position))
+   (insert (sensetion--sent-colloc lemma sent))
+   ;; TODO: actually search for token index?
+   (sensetion-previous-selected (point))
+   (sensetion--save-sent sent)))
 
 
+(defun sensetion--save-sent (sent)
+  (f-write (pp-to-string (sensetion--sent->plist sent))
+           'utf-8
+           (sensetion--sent-id->filename (sensetion--sent-id sent))))
+
+
+;; TODO: refactor prop names as variables
 (cl-defun sensetion--token-points (&optional (point (point)))
-  (list (previous-single-property-change point 'sensetion-token-index
+  (list (previous-single-property-change point 'sensetion-token-ix
                                          nil (line-beginning-position))
-        (next-single-property-change point 'sensetion-token-index
+        (next-single-property-change point 'sensetion-token-ix
                                      nil (line-end-position))))
 
 
-(defun make-lemma* (lemma synset-type)
+(defun sensetion--make-lemma* (lemma synset-type)
   (concat lemma "%" synset-type))
 
 
@@ -498,6 +509,23 @@ to where in the files they appear."
     (sensetion--make-tk :form form :lemma lemma
                         :status status :kind kind
                         :anno anno :meta meta)))
+
+(defun sensetion--sent->plist (sent)
+  (list :id (sensetion--sent-id sent)
+        :tokens (mapcar #'sensetion--tk->plist (sensetion--sent-tokens sent))))
+
+
+(defun sensetion--tk->plist (tk)
+  (cl-mapcan #'list '(:form :lemma :status :kind :anno :meta)
+             (list (sensetion--tk-form tk)
+                   (sensetion--tk-lemma tk)
+                   (let ((st (sensetion--tk-status tk)))
+                     (if (equal st "now")
+                         "man"
+                       st)) 
+                   (sensetion--tk-kind tk)
+                   (sensetion--tk-anno tk)
+                   (sensetion--tk-meta tk))))
 
 
 (provide 'sensetion)
