@@ -12,21 +12,26 @@ You must set the directory where the files to be annotated are with
 customize other stuff with =M-x customize-group RET sensetion=.)
 
 Use =M-x sensetion= to start annotating. If this is the first time you
-call it, it might take some time to index the files (and freeze your emacs for this
-time).
+call it, it might take some time to index the files (and freeze your
+emacs for this time).
 
-=M-x sensetion-annotate= will ask you for a lemma and a PoS tag and
-will build a buffer with instances of this lemma+pos that have not
-been annotated yet. You can navigate through taggable tokens with =<=
-and =>=. If you wish to annotate a token, press =/= on it. If you'd
+=M-x sensetion-annotate= will ask you for a lemma and a PoS tag. You
+can press =TAB= for completion of the lemma. This will build a buffer
+with instances of this lemma+pos that have not been annotated yet. You
+can navigate through taggable tokens with =<= and =>=. If you wish to
+annotate a token, press =/= on it.
 
-There is support for word collocations, such as phrasal verbs. The tokens part
-of a collocation are united by a key, which is shown in their bottom left corner.
-You can unglob a collocation by pressing =u= in any token of the collocation.
-To glob tokens, you mark them with =m= and finally press =g= to create the collocation.
+There is support for word collocations, such as phrasal verbs. The
+tokens part of a collocation are united by a key, which is shown in
+their bottom left corner.  You can unglob a collocation by pressing
+=u= in any token of the collocation.  To glob tokens, you mark them
+with =m= and finally press =g= to create the collocation.
 
 You can move sentences up or down with =C-↑= and =C-↓=. Clustering
 tokens with the same sense together might be useful.
+
+If the index goes out of sync, you can force a new indexation with
+=M-x sensetion-make-state=.
 
 
 * Report bugs

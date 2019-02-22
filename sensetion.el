@@ -182,7 +182,6 @@ annotated."
   (add-hook 'kill-emacs-hook
             (lambda ()
               (sensetion--write-state)))
-  ;; TODO: setup status window here
   (call-interactively #'sensetion-annotate))
 
 
@@ -204,7 +203,7 @@ annotated."
 (defun sensetion-annotate (lemma &optional pos)
   (interactive
    (list (completing-read "Lemma to annotate: " sensetion--completion-function)
-         (ido-completing-read "PoS tag?" '("a" "r" "v" "n" "any") nil t nil nil "any")))
+         (ido-completing-read "PoS tag? " '("a" "r" "v" "n" "any") nil t nil nil "any")))
   (unless lemma (user-error "Must provide lemma"))
   ;; using regexp just to get all pos combinations
   (let* ((regexp (if (equal pos "any")
@@ -318,8 +317,14 @@ collocation."
                 :tokens
                 (cl-loop
                  for tk in (sensetion--sent-tokens sent)
-                 ;; TODO: handle status update when glob was tagged
-                 unless (equal ck (sensetion--tk-glob? tk))
+                 unless (when (equal ck (sensetion--tk-glob? tk))
+                          ;; handle status update when glob was tagged
+                          (when (sensetion--tk-annotated? tk)
+                            (cl-incf (car sensetion--global-status) -1)
+                            (cl-incf (cdr sensetion--global-status) -1)
+                            (when (equal sensetion--lemma (sensetion--tk-lemma tk))
+                              (cl-incf (car sensetion--local-status) -1)
+                              (cl-incf (cdr sensetion--local-status) -1))))
                  collect (progn
                            (when (equal ck (sensetion--tk-coll-key tk))
                              (setf (sensetion--tk-kind tk) :wf))
@@ -507,9 +512,10 @@ positions, plus global status."
                               (read-file-name "Path to annotation directory: " nil nil t))
                           t
                           (concat "\\." sensetion-annotation-file-type "$"))))
-  (seq-let (index status) (sensetion--make-state files)
-    (setq sensetion--index index)
-    (setq sensetion--global-status status))
+  (with-temp-message "Indexing files..."
+    (seq-let (index status) (sensetion--make-state files)
+      (setq sensetion--index index)
+      (setq sensetion--global-status status)))
   t)
 
 
@@ -579,11 +585,12 @@ builds the status (how many tokens have been annotated so far)."
 `sensetion--index'. Read status from `sensetion-status-file' and
 set `sensetion--global-status'. "
   ;; TODO:benchmark if f-read is faster (if needed)
-  (with-temp-buffer
-    (insert-file-contents sensetion-index-file)
-    (goto-char (point-min))             ;is this needed?
-    (setq sensetion--index (read (current-buffer))))
-  (setq sensetion--global-status (read (f-read-text sensetion-status-file)))
+  (with-temp-message "Reading index"
+    (with-temp-buffer
+      (insert-file-contents sensetion-index-file)
+      (goto-char (point-min))           ;is this needed?
+      (setq sensetion--index (read (current-buffer))))
+    (setq sensetion--global-status (read (f-read-text sensetion-status-file))))
   t)
 
 
@@ -647,6 +654,7 @@ set `sensetion--global-status'. "
                          (or (buffer-local-value 'sensetion--lemma (current-buffer))
                              (error "No local sensetion--lemma"))
                        (user-error "No taggable token at point"))
+                     ;; TODO: handle "other"
                      (ido-completing-read "Token PoS tag: " '("a" "n" "r" "v" "other")
                                           nil t nil nil "other")
                      (sensetion--tk-ix-prop-at-point)
