@@ -5,6 +5,7 @@ This project intends to finish the word-sense annotations of the
 [[http://wordnetcode.princeton.edu/glosstag.shtml][WordNet gloss corpus]], but can be used to sense-tag any corpus in the
 S-expression-based format we have defined.
 
+
 * Usage
 You must set the directory where the files to be annotated are with
 =M-x customize-variable RET sensetion-annotation-dir=. (You can
@@ -27,18 +28,15 @@ To glob tokens, you mark them with =m= and finally press =g= to create the collo
 You can move sentences up or down with =C-↑= and =C-↓=. Clustering
 tokens with the same sense together might be useful.
 
-
 * Installation
 You need both elisp libraries and the =wn= executable.
 
 ** elisp
-- make sure you have MELPA set up, so that you can download
+- make sure you have ELPA and [[https://melpa.org/#/getting-started][MELPA]] set up, so that you can download
   dependencies easily.
 - to make things easier, install =use-package= with =M-x
   install-package RET use-package=.
 - clone this repository.
-
-
 - add the following snippet to your user configuration file (usually
   at =~/emacs.d/init.el=), substituting the paths to the appropriate
   ones:
@@ -47,15 +45,12 @@ You need both elisp libraries and the =wn= executable.
     (use-package flycheck :defer t :ensure t)
     (use-package s :defer t :ensure t)
     (use-package f :defer t :ensure t)
-
-    (use-package conllu-mode
-      :mode "\\.conllu\\'"
-      :load-path "~/conllu-mode/"
-
+    (use-package trie :defer t :ensure t)
 
     (use-package sensetion
       :commands sensetion
-      :load-path "~/sensetion.el/")
+      :load-path "~/sensetion.el/"
+      :custom (sensetion-annotation-dir "~/path/to/annotation/files"))
   #+END_SRC
   this will ensure the dependencies are installed and that the
   packages are properly loaded at the right time.
@@ -70,27 +65,7 @@ move them to the corresponding directory of package you installed.
 
 
 * Annotation format
-- update this section
-Files to be annotated are syntactically the same to [[http://universaldependencies.org/format.html][CoNLL-U]] files, but
-we have re-purposed their fields like below:
-
-- LEMMA :: contains a pipe-separated (=|=) list of either lemmas or
-           lemma+synset-type. spaces are substituted for underlines
-           =_=, synset-types are integers encoding the lemma's PoS,
-           and are rendered with a percent sign for separation, as in
-           =living%3=.
-- UPOS :: contain the annotation status defined by the WN gloss corpus
-          (one of =ignore=, =auto=, =un=).
-- XPOS :: contains the one-character alphabetic key to a collocation;
-          all tokens in a collocation have the same key.
-- FEATS :: contains a list of synset pairs; the key for a synset is
-           =s=, and the synset is represented by a synset-id which is
-           the concatenation of the synset offset and the one-letter
-           PoS tag.
-
-Collocations are composed of their constituent tokens and an empty
-token after the head of the collocation with the actual sense
-annotation.
+We convert the original XML files to property lists.
 
 ** conversion from original XML
 The script that converts the original XML WN gloss corpus is at

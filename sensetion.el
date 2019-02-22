@@ -3,7 +3,6 @@
 (require 'ido)
 (require 's)
 (require 'f)
-(require 'dash)
 (eval-when-compile (require 'cl-lib))
 (require 'cl-lib)
 (require 'hydra)
@@ -182,8 +181,9 @@ annotated."
 
 (defun sensetion-annotate (lemma &optional pos)
   (interactive
-   (list (s-trim (read-string "Lemma to annotate: "))
+   (list (completing-read "Lemma to annotate: " sensetion--completion-function)
          (ido-completing-read "PoS tag?" '("a" "r" "v" "n" "any") nil t nil nil "any")))
+  (unless lemma (user-error "Must provide lemma"))
   ;; using regexp just to get all pos combinations
   (let* ((regexp (if (equal pos "any")
                      (concat lemma "%?[1234]?")
@@ -760,6 +760,22 @@ set `sensetion--global-status'. "
                    (sensetion--tk-kind tk)
                    (sensetion--tk-anno tk)
                    (sensetion--tk-meta tk))))
+
+
+(defcustom sensetion-number-completions
+  7
+  "Number of completions to show."
+  :group 'sensetion
+  :type  'integer)
+
+
+(defvar sensetion--completion-function
+  (completion-table-dynamic
+   (lambda (prefix)
+     ;; TODO: randomize completion so that stuff like completing a to
+     ;; a_ doesn't happen (as often)
+     (trie-complete sensetion--index prefix nil sensetion-number-completions nil nil
+                    (lambda (k v) (substring k 0 (- (length k) 2)))))))
 
 
 (provide 'sensetion)
