@@ -3,6 +3,7 @@
 (require 'ido)
 (require 's)
 (require 'f)
+(require 'async)
 (eval-when-compile (require 'cl-lib))
 (require 'cl-lib)
 (require 'hydra)
@@ -61,7 +62,7 @@
      ;; TODO: randomize completion so that stuff like completing a to
      ;; a_ doesn't happen (as often)
      (trie-complete sensetion--index prefix nil sensetion-number-completions nil nil
-                    (lambda (k v) (substring k 0 (- (length k) 2)))))))
+                    (lambda (k _) (substring k 0 (- (length k) 2)))))))
 
 
 (defvar sensetion--index
@@ -91,7 +92,7 @@ A cons cell in the same format as `sensetion--global-status'.")
     (define-key map ">" #'sensetion-next-selected)
     (define-key map "/" #'sensetion-edit)
     (define-key map "u" #'sensetion-unglob)
-    (define-key map "m" #'sensetion-mark-glob)
+    (define-key map "m" #'sensetion-toggle-glob-mark)
     (define-key map "g" #'sensetion-glob)
     (define-key map [C-down] #'sensetion-move-line-down)
     (define-key map [C-up] #'sensetion-move-line-up)
@@ -175,14 +176,17 @@ annotated."
 ;;;###autoload
 (defun sensetion ()
   (interactive)
-  (unless sensetion--index
-    (if (file-exists-p sensetion-index-file)
-        (sensetion--read-state)
-      (sensetion-make-state (sensetion--annotation-files))))
   (add-hook 'kill-emacs-hook
             (lambda ()
               (sensetion--write-state)))
-  (call-interactively #'sensetion-annotate))
+  (unless sensetion--index
+    (if (file-exists-p sensetion-index-file)
+        (progn
+          (sensetion--read-state)
+          (call-interactively #'sensetion-annotate))
+      (sensetion-make-state (sensetion--annotation-files)
+                            (lambda (_)
+                              (call-interactively #'sensetion-annotate))))))
 
 
 ;; (defun sensetion--setup-status-window ()
@@ -342,22 +346,44 @@ collocation."
     (`(:coll . ,k) k)))
 
 
-(defun sensetion-mark-glob (beg end)
+(defun sensetion--mark-glob (beg end ix marked)
   "Marks token to be globbed with the `sensetion-glob' command."
-  (interactive (sensetion--tk-points))
   (with-inhibiting-read-only
    (put-text-property beg end
                       'face '(:foreground "yellow"))
-   (let ((ix (get-text-property beg 'sensetion--tk-ix))
-         (marked (get-text-property (line-end-position) 'sensetion--to-glob)))
-     (put-text-property (line-end-position) (1+ (line-end-position))
-                        'sensetion--to-glob (cons ix marked)))))
+   (put-text-property (line-end-position) (1+ (line-end-position))
+                      'sensetion--to-glob (cons ix marked))))
+
+
+(defun sensetion--tks-to-glob-prop ()
+  (get-text-property (line-end-position) 'sensetion--to-glob))
+
+
+(defun sensetion--unmark-glob (beg end ix marked)
+  (with-inhibiting-read-only
+   (put-text-property (line-end-position) (1+ (line-end-position))
+                      'sensetion--to-glob (cl-remove ix marked))
+   (remove-text-properties beg end '(face nil))))
+
+
+(defun sensetion-toggle-glob-mark (beg end)
+  "Mark or unmark token to be globbed with the `sensetion-glob'
+command."
+  (interactive (sensetion--tk-points))
+  (unless (and beg end)
+    (user-error "No token at point"))
+  (let* ((ix (sensetion--tk-ix-prop-at-point beg))
+         (marked (sensetion--tks-to-glob-prop))
+         (marked? (cl-member ix marked)))
+    (if marked?
+        (sensetion--unmark-glob beg end ix marked)
+      (sensetion--mark-glob beg end ix marked))))
 
 (defun sensetion-glob (lemma)
   "Glob all tokens marked to be globbed, assigning it lemma
 LEMMA.
 
-You can mark tokens with `sensetion-mark-glob', or unmark them
+You can mark tokens with `sensetion-toggle-glob-mark', or unmark them
 with `sensetion-unmark-glob'."
   (interactive (list
                 (s-join "_"
@@ -408,7 +434,7 @@ with `sensetion-unmark-glob'."
   (sensetion--save-sent sent)
   (with-inhibiting-read-only
    (delete-region (line-beginning-position) (line-end-position))
-   (seq-let (line *) (sensetion--sent-colloc (sensetion--get-sent-at-point))
+   (seq-let (line _) (sensetion--sent-colloc sent)
      (insert line))))
 
 
@@ -501,34 +527,23 @@ number of selected tokens."
   (get-char-property (line-end-position) 'sensetion--sent-id))
 
 
-(defun sensetion--tk-ix-prop-at-point ()
-  (get-char-property (point) 'sensetion--tk-ix))
+(cl-defun sensetion--tk-ix-prop-at-point (&optional (point (point)))
+  (get-char-property point 'sensetion--tk-ix))
 
-(defun sensetion-make-state (files)
+(defun sensetion-make-state (files callback)
   "Read annotated files and build index of lemmas* and their
 positions, plus global status."
   (interactive
    (list (directory-files (or sensetion-annotation-dir
                               (read-file-name "Path to annotation directory: " nil nil t))
                           t
-                          (concat "\\." sensetion-annotation-file-type "$"))))
-  (with-temp-message "Indexing files..."
-    (seq-let (index status) (sensetion--make-state files)
-      (setq sensetion--index index)
-      (setq sensetion--global-status status)))
-  t)
-
-
-(defun sensetion--tk-annotatable? (tk)
-  ;; TODO: make status keywords
-  (pcase (sensetion--tk-kind tk)
-    (`(:coll . ,_) nil)
-    (_ (let ((status (sensetion--tk-status tk)))
-         (when
-             (cl-member status
-                        '("man" "un" "auto")
-                        :test #'equal)
-           status)))))
+                          (concat "\\." sensetion-annotation-file-type "$"))
+         (lambda (_) (message "Done indexing files"))))
+  (with-temp-message "Indexing files.."
+    (async-start `(lambda ()
+                    ,(async-inject-variables "\\sensetion-")
+                    (sensetion--make-state files))
+                 callback)))
 
 
 (defun sensetion--make-state (files)
@@ -569,7 +584,22 @@ builds the status (how many tokens have been annotated so far)."
                       (trie-insert index lemma sent-id #'safe-cons)))
       ;;
       (mapc (lambda (f) (run (file-name-base f) f)) files)
-      (list index (cons annotated annotatable)))))
+      (setq sensetion--index index)
+      (setq sensetion--global-status (cons annotated annotatable))
+      t)))
+
+
+(defun sensetion--tk-annotatable? (tk)
+  ;; TODO: make status keywords
+  (pcase (sensetion--tk-kind tk)
+    (`(:coll . ,_) nil)
+    (_ (let ((status (sensetion--tk-status tk)))
+         (when
+             (cl-member status
+                        '("man" "un" "auto")
+                        :test #'equal)
+           status)))))
+
 
 (defun sensetion--write-state ()
   (with-temp-file sensetion-index-file

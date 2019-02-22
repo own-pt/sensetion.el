@@ -19,13 +19,17 @@ emacs for this time).
 can press =TAB= for completion of the lemma. This will build a buffer
 with instances of this lemma+pos that have not been annotated yet. You
 can navigate through taggable tokens with =<= and =>=. If you wish to
-annotate a token, press =/= on it.
+annotate a token, press =/= on it. You can see how many tokens still
+need to be annotated in the mode-line, next to the =sensetion=
+indicator.
 
 There is support for word collocations, such as phrasal verbs. The
 tokens part of a collocation are united by a key, which is shown in
 their bottom left corner.  You can unglob a collocation by pressing
 =u= in any token of the collocation.  To glob tokens, you mark them
-with =m= and finally press =g= to create the collocation.
+with =m= and finally press =g= to create the collocation. If you
+marked a token by mistake, you can unmark tokens by pressing =m=
+again.
 
 You can move sentences up or down with =C-↑= and =C-↓=. Clustering
 tokens with the same sense together might be useful.
@@ -58,6 +62,7 @@ You need both elisp libraries and the =wn= executable.
     (use-package s :defer t :ensure t)
     (use-package f :defer t :ensure t)
     (use-package trie :defer t :ensure t)
+    (use-package async :defer t :ensure t)
 
     (use-package sensetion
       :commands sensetion
