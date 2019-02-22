@@ -48,6 +48,22 @@
   :type 'string)
 
 
+(defcustom sensetion-number-completions
+  15
+  "Number of completions to show."
+  :group 'sensetion
+  :type  'integer)
+
+
+(defvar sensetion--completion-function
+  (completion-table-dynamic
+   (lambda (prefix)
+     ;; TODO: randomize completion so that stuff like completing a to
+     ;; a_ doesn't happen (as often)
+     (trie-complete sensetion--index prefix nil sensetion-number-completions nil nil
+                    (lambda (k v) (substring k 0 (- (length k) 2)))))))
+
+
 (defvar sensetion--index
   nil
   "Index.
@@ -62,7 +78,7 @@ A cons cell where the car is the number of tokens annotated so
 far, and the cdr is the total number of unnanotated tokens.")
 
 
-(defvar sensetion--local-status
+(defvar-local sensetion--local-status
   nil
   "Local status.
 
@@ -108,6 +124,12 @@ annotated."
 (defvar-local sensetion--lemma
   nil
   "Lemma being annotated in the buffer.")
+
+
+(defvar-local sensetion--synset-cache
+  nil
+  "Should be an alist associating pos1 with the possible synsets
+  for a lemma")
 
 
 (defun sensetion--punctuation? (str)
@@ -201,8 +223,9 @@ annotated."
     (with-current-buffer result-buffer
       (sensetion-mode)
       (with-inhibiting-read-only
-       (setq sensetion--lemma lemma) ;no idea why doesn't work with setq
-       (setq sensetion--local-status (sensetion--make-collocations matches)))
+       (setq sensetion--lemma lemma)
+       (setq sensetion--local-status (sensetion--make-collocations matches))
+       (setq sensetion--synset-cache (sensetion--wordnet-lookup lemma)))
       (sensetion--beginning-of-buffer))
     (pop-to-buffer result-buffer)))
 
@@ -301,7 +324,7 @@ collocation."
                            (when (equal ck (sensetion--tk-coll-key tk))
                              (setf (sensetion--tk-kind tk) :wf))
                            tk)))))
-    ;; 
+    ;;
     (let* ((tk (elt (sensetion--sent-tokens sent) ix))
            (ck (sensetion--tk-coll-key tk)))
       (unless ck
@@ -363,7 +386,7 @@ with `sensetion-unmark-glob'."
                               (setf (sensetion--tk-kind tk) (cons :coll new-k))
                               tk)
                           tk))))))
-    ;; 
+    ;;
     (let* ((ixs   (reverse (get-text-property (line-end-position) 'sensetion--to-glob)))
            (sent  (sensetion--get-sent-at-point))
            (max-k (max-key sent))
@@ -436,7 +459,7 @@ number of selected tokens."
                                                  ("now"
                                                   sensetion-currently-annotated-colour)
                                                  (_ (error "%s" tk))))))))))))
-      ;; 
+      ;;
       (let* ((tks (sensetion--sent-tokens sent))
              (tks-colloc (seq-map-indexed #'token-colloc tks)))
         (list
@@ -531,7 +554,7 @@ builds the status (how many tokens have been annotated so far)."
                                 (s-split "|" lemma)))
                         (when (sensetion--tk-annotated? tk)
                           (cl-incf annotated))))
-         
+
          (index-lemma (sent-id lemma)
                       ;; lemmas* might be pure ("love") or have pos
                       ;; annotation ("love%2"), but we don't care
@@ -579,16 +602,17 @@ set `sensetion--global-status'. "
                  ("1" "n" "2" "v" "3" "a" "4" "r"))))
 
 
-(defun sensetion--wordnet-lookup (lemma pos1)
+(defun sensetion--wordnet-lookup (lemma)
   (cl-labels
-      ((pos1->pos3 (pos1)
+      ((pos3->pos1 (pos3)
                    (gethash
-                    pos1
-                    #s(hash-table size 5 test equal rehash-size 1.5 rehash-threshold 0.8125
+                    pos3
+                    #s(hash-table size 5 test equal
+                                  rehash-size 1.5 rehash-threshold 0.8125
                                   purecopy t data
-                                  ("n" "nou" "v" "ver" "a" "adj" "r" "adv"))))
+                                  ("nou" "n" "ver" "v" "adj" "a" "adv" "r"))))
 
-       (parse-sense (mline)
+       (parse-sense (pos1 mline)
                     (cl-assert (null (cl-rest mline)))
                     (let* ((line (cl-first mline))
                            (beg (1+ (cl-position (string-to-char "{")
@@ -602,17 +626,20 @@ set `sensetion--global-status'. "
     ;;
     (let* ((command (format "wn '%s' -g -o -over" lemma))
            (result  (shell-command-to-string command)))
-      (if (equal result "")
-          (user-error "No senses found for lemma %s." lemma)
-        (let* ((chunks  (s-split "\nOverview of " result t))
-               ;; easier to analyse first 3 characters
-               (poses   (mapcar (lambda (c) (substring c 0 3)) chunks))
-               (pos3    (pos1->pos3 pos1))
-               (pos-ix  (seq-position poses (or pos3
-                                                (error "Can't map %s to PoS tag." pos1))))
-               (chunk   (elt chunks pos-ix))
-               (senses  (s-match-strings-all "^[0-9].*$" chunk)))
-          (mapcar #'parse-sense senses))))))
+      (when (equal (s-trim result) "")
+        (user-error "No senses found for lemma %s." lemma))
+      (let* ((chunks  (s-split "\nOverview of " result t))
+             ;; easier to analyse first 3 characters
+             (chunk-by-pos (-group-by (lambda (c) (pos3->pos1 (substring c 0 3)))
+                                      chunks))
+             (senses  (mapcar
+                       (lambda (pair)
+                         (list (cl-first pair)
+                               (mapcar (apply-partially #'parse-sense (cl-first pair))
+                                       (s-match-strings-all "^[0-9].*$"
+                                                            (cl-second pair)))))
+                       chunk-by-pos)))
+        senses))))
 
 
 (defun sensetion-edit (lemma pos ix sent)
@@ -630,26 +657,33 @@ set `sensetion--global-status'. "
 
 
 (defun sensetion--edit (lemma pos1 ix sent)
-  (let ((senses (sensetion--wordnet-lookup lemma pos1)))
+  (let ((senses (cl-second (assoc pos1 sensetion--synset-cache))))
+    (unless senses
+      (user-error "No senses for lemma %s with pos %s" lemma pos1))
     (call-interactively
      (eval (sensetion--edit-hydra-maker lemma pos1 ix sent senses)))))
 
 
 (defun sensetion--edit-hydra-maker (lemma pos1 tk-ix sent options)
   `(defhydra hydra-senses (:color blue)
-              ""
-              ,@(seq-map-indexed
-                 (lambda (x ix)
-                   (list (format "%s" ix)
-                         `(lambda () (interactive)
-                            (sensetion--annotate-sense ,lemma
-                                                       ,(sensetion--pos->synset-type
-                                                         pos1)
-                                                       ,(cl-first x)
-                                                       ,tk-ix
-                                                       ,sent))
-                         (cl-second x) :column "Pick sense:"))
-                 options)))
+     ""
+     ,@(seq-map-indexed
+        (lambda (x ix)
+          (list (format "%s" (if (< ix 10)
+                                 ;; handling more than 10 senses: will
+                                 ;; list from 0 to 9, then alphabetic
+                                 ;; characters, which start at 97 ('a')
+                                 ix
+                               (char-to-string (+ ix 87))))
+                `(lambda () (interactive)
+                   (sensetion--annotate-sense ,lemma
+                                              ,(sensetion--pos->synset-type
+                                                pos1)
+                                              ,(cl-first x)
+                                              ,tk-ix
+                                              ,sent))
+                (cl-second x) :column "Pick sense:"))
+        options)))
 
 
 (defun sensetion--annotate-sense (lemma st sense ix sent)
@@ -756,26 +790,10 @@ set `sensetion--global-status'. "
                    (let ((st (sensetion--tk-status tk)))
                      (if (equal st "now")
                          "man"
-                       st)) 
+                       st))
                    (sensetion--tk-kind tk)
                    (sensetion--tk-anno tk)
                    (sensetion--tk-meta tk))))
-
-
-(defcustom sensetion-number-completions
-  7
-  "Number of completions to show."
-  :group 'sensetion
-  :type  'integer)
-
-
-(defvar sensetion--completion-function
-  (completion-table-dynamic
-   (lambda (prefix)
-     ;; TODO: randomize completion so that stuff like completing a to
-     ;; a_ doesn't happen (as often)
-     (trie-complete sensetion--index prefix nil sensetion-number-completions nil nil
-                    (lambda (k v) (substring k 0 (- (length k) 2)))))))
 
 
 (provide 'sensetion)

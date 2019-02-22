@@ -28,6 +28,13 @@ To glob tokens, you mark them with =m= and finally press =g= to create the collo
 You can move sentences up or down with =C-↑= and =C-↓=. Clustering
 tokens with the same sense together might be useful.
 
+
+* Report bugs
+- Give clear instructions to reproduce the bug;
+- Call =M-x toggle-debug-on-error=, reproduce the bug, and send the
+  backtrace with your report.
+
+
 * Installation
 You need both elisp libraries and the =wn= executable.
 
