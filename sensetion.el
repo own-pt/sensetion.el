@@ -541,9 +541,14 @@ positions, plus global status."
          (lambda (_) (message "Done indexing files"))))
   (with-temp-message "Indexing files.."
     (async-start `(lambda ()
-                    ,(async-inject-variables "\\sensetion-")
-                    (sensetion--make-state files))
-                 callback)))
+                    ,(async-inject-variables "\\`load-path\\'")
+                    (require 'sensetion)
+                    (sensetion--make-state ',files))
+                 (lambda (res)
+                   (seq-let (index status) res
+                     (setq sensetion--index index
+                           sensetion--global-status status)
+                     (funcall callback t))))))
 
 
 (defun sensetion--make-state (files)
@@ -584,9 +589,7 @@ builds the status (how many tokens have been annotated so far)."
                       (trie-insert index lemma sent-id #'safe-cons)))
       ;;
       (mapc (lambda (f) (run (file-name-base f) f)) files)
-      (setq sensetion--index index)
-      (setq sensetion--global-status (cons annotated annotatable))
-      t)))
+      (list index (cons annotated annotatable)))))
 
 
 (defun sensetion--tk-annotatable? (tk)
