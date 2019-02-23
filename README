@@ -67,11 +67,14 @@ You need both elisp libraries and the =wn= executable.
     (use-package sensetion
       :commands sensetion
       :load-path "~/sensetion.el/"
+      :bind (:map sensetion-mode-map
+                  ("e" . sensetion-edit))
       :custom (sensetion-annotation-dir "~/path/to/annotation/files"))
   #+END_SRC
   this will ensure the dependencies are installed and that the
   packages are properly loaded at the right time.
 - restart emacs (or reload or your init file).
+
 
 ** wn
 You may download the =wn= executable from your favorite package

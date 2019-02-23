@@ -1,8 +1,10 @@
 ;;; -*- lexical-binding: t; -*-
 (require 'seq)
 (require 'ido)
+(require 'gv)
 (require 's)
 (require 'f)
+(require 'subr-x)
 (require 'async)
 (eval-when-compile (require 'cl-lib))
 (require 'cl-lib)
@@ -185,8 +187,7 @@ annotated."
           (sensetion--read-state)
           (call-interactively #'sensetion-annotate))
       (sensetion-make-state (sensetion--annotation-files)
-                            (lambda (_)
-                              (call-interactively #'sensetion-annotate))))))
+                            (sensetion--done-indexing-messager)))))
 
 
 ;; (defun sensetion--setup-status-window ()
@@ -200,8 +201,9 @@ annotated."
 ;;               display-buffer-alist)))
 
 
-(defun sensetion--annotation-files ()
-  (f-files sensetion-annotation-dir))
+(cl-defun sensetion--annotation-files (&optional (anno-dir sensetion-annotation-dir))
+  (f-files anno-dir
+           (lambda (f) (equal (f-ext f) sensetion-annotation-file-type))))
 
 
 (defun sensetion-annotate (lemma &optional pos)
@@ -534,21 +536,25 @@ number of selected tokens."
   "Read annotated files and build index of lemmas* and their
 positions, plus global status."
   (interactive
-   (list (directory-files (or sensetion-annotation-dir
-                              (read-file-name "Path to annotation directory: " nil nil t))
-                          t
-                          (concat "\\." sensetion-annotation-file-type "$"))
-         (lambda (_) (message "Done indexing files"))))
+   (list (sensetion--annotation-files
+          (or sensetion-annotation-dir
+              (read-file-name "Path to annotation directory: " nil nil t)))
+         (sensetion--done-indexing-messager)))
   (with-temp-message "Indexing files.."
     (async-start `(lambda ()
                     ,(async-inject-variables "\\`load-path\\'")
                     (require 'sensetion)
-                    (sensetion--make-state ',files))
-                 (lambda (res)
-                   (seq-let (index status) res
-                     (setq sensetion--index index
-                           sensetion--global-status status)
-                     (funcall callback t))))))
+                    (seq-let (index status) (sensetion--make-state ',files)
+                      (sensetion--write-state :index index :status status)
+                      t))
+                 (lambda (_)
+                   (sensetion--read-state)
+                   (funcall callback t)))))
+
+
+(defun sensetion--done-indexing-messager ()
+  (lambda (_)
+    (message-box "Done indexing files. You may call `sensetion-annotate' now")))
 
 
 (defun sensetion--make-state (files)
@@ -604,10 +610,10 @@ builds the status (how many tokens have been annotated so far)."
            status)))))
 
 
-(defun sensetion--write-state ()
+(cl-defun sensetion--write-state (&key (index sensetion--index) (status sensetion--global-status))
   (with-temp-file sensetion-index-file
-    (prin1 sensetion--index (current-buffer)))
-  (f-write (with-output-to-string (prin1 sensetion--global-status))
+    (prin1 index (current-buffer)))
+  (f-write (with-output-to-string (prin1 status))
            'utf-8
            sensetion-status-file)
   t)
@@ -730,11 +736,11 @@ set `sensetion--global-status'. "
 (defun sensetion--annotate-sense (lemma st sense ix sent)
   (let ((annotated? (sensetion--tk-annotated? (elt (sensetion--sent-tokens sent) ix))))
     (setf (sensetion--tk-lemma (elt (sensetion--sent-tokens sent) ix))
-          (sensetion--make-lemma* lemma st)
-          (sensetion--tk-anno (elt (sensetion--sent-tokens sent) ix))
+          (sensetion--make-lemma* lemma st))
+    (setf (sensetion--tk-anno (elt (sensetion--sent-tokens sent) ix))
           ;; TODO:should this be list?
-          (list sense)
-          (sensetion--tk-status (elt (sensetion--sent-tokens sent) ix))
+          (list sense))
+    (setf (sensetion--tk-status (elt (sensetion--sent-tokens sent) ix))
           "now")
     (sensetion--reinsert-sent-at-point sent)
     ;; TODO: actually search for token index?
