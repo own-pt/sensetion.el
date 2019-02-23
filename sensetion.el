@@ -534,6 +534,8 @@ number of selected tokens."
 (cl-defun sensetion--tk-ix-prop-at-point (&optional (point (point)))
   (get-char-property point 'sensetion--tk-ix))
 
+
+;; TODO: get files asyncly too, since it takes some time..
 (defun sensetion-make-state (files callback)
   "Read annotated files and build index of lemmas* and their
 positions, plus global status."
@@ -542,16 +544,16 @@ positions, plus global status."
           (or sensetion-annotation-dir
               (read-file-name "Path to annotation directory: " nil nil t)))
          (sensetion--done-indexing-messager)))
-  (with-temp-message "Indexing files.."
+  (with-temp-message "Indexing files, better go grab a cup of coffee..."
     (async-start `(lambda ()
                     ,(async-inject-variables "\\`load-path\\'")
                     (require 'sensetion)
                     (seq-let (index status) (sensetion--make-state ',files)
                       (sensetion--write-state :index index :status status)
                       t))
-                 (lambda (_)
+                 (lambda (x)
                    (sensetion--read-state)
-                   (funcall callback t)))))
+                   (funcall callback x)))))
 
 
 (defun sensetion--done-indexing-messager ()
@@ -613,8 +615,9 @@ builds the status (how many tokens have been annotated so far)."
 
 
 (cl-defun sensetion--write-state (&key (index sensetion--index) (status sensetion--global-status))
-  (with-temp-file sensetion-index-file
-    (prin1 index (current-buffer)))
+  (let ((print-circle t))
+    (with-temp-file sensetion-index-file
+      (prin1 index (current-buffer))))
   (f-write (with-output-to-string (prin1 status))
            'utf-8
            sensetion-status-file)
