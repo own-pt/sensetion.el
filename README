@@ -68,6 +68,9 @@ You need both elisp libraries and the =wn= executable.
       :commands sensetion
       :load-path "~/sensetion.el/"
       :bind (:map sensetion-mode-map
+                  ;; here you can customize the standard command names; we
+                  ;; don't like to use '/' to invoke sensetion-edit, so we
+                  ;; bind it to 'e'
                   ("e" . sensetion-edit))
       :custom (sensetion-annotation-dir "~/path/to/annotation/files"))
   #+END_SRC

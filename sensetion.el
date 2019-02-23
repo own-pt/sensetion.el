@@ -1,10 +1,10 @@
 ;;; -*- lexical-binding: t; -*-
 (require 'seq)
+(require 'subr-x)
 (require 'ido)
-(require 'gv)
 (require 's)
 (require 'f)
-(require 'subr-x)
+(require 'sensetion-data)
 (require 'async)
 (eval-when-compile (require 'cl-lib))
 (require 'cl-lib)
@@ -25,14 +25,16 @@
 
 (defcustom sensetion-index-file
   (expand-file-name "~/.sensetion-index")
-  "Path to index file."
+  "Path to index file. Don't customize this for now."
   :group 'sensetion
   :type 'file)
 
 
 (defcustom sensetion-status-file
   (expand-file-name "~/.sensetion-status")
-  "Path to status file."
+  ;; TODO: inject these variables in the async make-index command, or
+  ;; it might write the status to the wrong file
+  "Path to status file. Don't customize this for now."
   :group 'sensetion
   :type 'file)
 
@@ -796,51 +798,6 @@ set `sensetion--global-status'. "
 (defmacro with-inhibiting-read-only (&rest body)
   `(let ((inhibit-read-only t))
      ,@body))
-
-
-(cl-defstruct (sensetion--tk (:constructor nil)
-                             (:constructor sensetion--make-tk))
-  form lemma status kind anno meta)
-
-
-(cl-defstruct (sensetion--sent (:constructor nil)
-                               (:constructor sensetion--make-sent))
-  id tokens)
-
-
-(defun sensetion--plist->sent (plist)
-  (sensetion--make-sent :id (plist-get plist :id)
-                        :tokens (mapcar #'sensetion--plist->tk
-                                        (plist-get plist :tokens))))
-
-
-(defun sensetion--plist->tk (plist)
-  (let ((form (plist-get plist :form))
-        (lemma (plist-get plist :lemma))
-        (status (plist-get plist :status))
-        (kind (plist-get plist :kind))
-        (anno (plist-get plist :anno))
-        (meta (plist-get plist :meta)))
-    (sensetion--make-tk :form form :lemma lemma
-                        :status status :kind kind
-                        :anno anno :meta meta)))
-
-(defun sensetion--sent->plist (sent)
-  (list :id (sensetion--sent-id sent)
-        :tokens (mapcar #'sensetion--tk->plist (sensetion--sent-tokens sent))))
-
-
-(defun sensetion--tk->plist (tk)
-  (cl-mapcan #'list '(:form :lemma :status :kind :anno :meta)
-             (list (sensetion--tk-form tk)
-                   (sensetion--tk-lemma tk)
-                   (let ((st (sensetion--tk-status tk)))
-                     (if (equal st "now")
-                         "man"
-                       st))
-                   (sensetion--tk-kind tk)
-                   (sensetion--tk-anno tk)
-                   (sensetion--tk-meta tk))))
 
 
 (provide 'sensetion)
