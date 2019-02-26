@@ -34,16 +34,14 @@
 
 (defcustom sensetion-index-file
   (expand-file-name "~/.sensetion-index")
-  "Path to index file. Don't customize this for now."
+  "Path to index file."
   :group 'sensetion
   :type 'file)
 
 
 (defcustom sensetion-status-file
   (expand-file-name "~/.sensetion-status")
-  ;; TODO: inject these variables in the async make-index command, or
-  ;; it might write the status to the wrong file
-  "Path to status file. Don't customize this for now."
+  "Path to status file."
   :group 'sensetion
   :type 'file)
 
@@ -105,6 +103,7 @@ A cons cell in the same format as `sensetion--global-status'.")
     (define-key map ">" #'sensetion-next-selected)
     (define-key map "/" #'sensetion-edit)
     (define-key map "u" #'sensetion-unglob)
+    (define-key map "l" #'sensetion-edit-lemma)
     (define-key map "m" #'sensetion-toggle-glob-mark)
     (define-key map "g" #'sensetion-glob)
     (define-key map [C-down] #'sensetion-move-line-down)
@@ -197,7 +196,7 @@ annotated."
         (progn
           (sensetion--read-state)
           (call-interactively #'sensetion-annotate))
-      (sensetion-make-state (sensetion--annotation-files)
+      (sensetion-make-state sensetion-annotation-dir
                             (sensetion--done-indexing-messager)))))
 
 
@@ -481,7 +480,7 @@ number of selected tokens."
                                  (when-let ((key (sensetion--tk-glob? tk)))
                                    (list 'sensetion--glob-ix
                                          ix))))
-         
+
          (token-colloc (tk ix)
                        (let* ((form-str  (sensetion--tk-form tk))
                               (lemma-str (sensetion--tk-lemma tk))
@@ -589,25 +588,24 @@ synset and they have different pos1, return nil."
   (get-char-property point 'sensetion--tk-ix))
 
 
-;; TODO: get files asyncly too, since it takes some time..
-(defun sensetion-make-state (files callback)
+(defun sensetion-make-state (anno-dir callback)
   "Read annotated files and build index of lemmas* and their
 positions, plus global status."
   (interactive
-   (list (sensetion--annotation-files
-          (or sensetion-annotation-dir
-              (read-file-name "Path to annotation directory: " nil nil t)))
+   (list (or sensetion-annotation-dir
+             (read-file-name "Path to annotation directory: " nil nil t))
          (sensetion--done-indexing-messager)))
-  (with-temp-message "Indexing files, better go grab a cup of coffee..."
-    (async-start `(lambda ()
-                    ,(async-inject-variables "\\`load-path\\'")
-                    (require 'sensetion)
-                    (seq-let (index status) (sensetion--make-state ',files)
-                      (sensetion--write-state :index index :status status)
-                      t))
-                 (lambda (x)
-                   (sensetion--read-state)
-                   (funcall callback x)))))
+  (message "Plese wait while we index files; a box will pop when finished.")
+  (async-start `(lambda ()
+                  ,(async-inject-variables (regexp-opt '("load-path" "sensetion-index-file" "sensetion-status-file" "sensetion-annotation-file-type")))
+                  (require 'sensetion)
+                  (seq-let (index status)
+                      (sensetion--make-state (sensetion--annotation-files ,anno-dir))
+                    (sensetion--write-state :index index :status status)
+                    t))
+               (lambda (x)
+                 (sensetion--read-state)
+                 (funcall callback x))))
 
 
 (defun sensetion--done-indexing-messager ()
@@ -640,7 +638,7 @@ builds the status (how many tokens have been annotated so far)."
                                         (sensetion--tk-meta tk)
                                         sent-id))
                           (mapc (lambda (lemma)
-                                  (sensetion--index-lemma sent-id lemma))
+                                  (sensetion--index-lemma index lemma sent-id))
                                 (s-split "|" lemma)))
                         (when (sensetion--tk-annotated? tk)
                           (cl-incf annotated)))))
@@ -683,7 +681,7 @@ builds the status (how many tokens have been annotated so far)."
   "Read index from `sensetion-index-file', and set
 `sensetion--index'. Read status from `sensetion-status-file' and
 set `sensetion--global-status'. "
-  ;; TODO:benchmark if f-read is faster (if needed)
+  ;; TODO: benchmark if f-read is faster (if needed)
   (with-temp-message "Reading index"
     (with-temp-buffer
       (insert-file-contents sensetion-index-file)
@@ -826,6 +824,9 @@ edit hydra) and the second is the gloss string."
 
 
 (defun sensetion-edit-lemma (tk-ix sent)
+  ;; TODO: if lemma changes, synset chosen doesn't make any sense
+  ;; anymore; how much sense does it make to not postag at the same
+  ;; time?
   (interactive (list (sensetion--tk-ix-prop-at-point)
                      (sensetion--get-sent-at-point)))
   (let* ((orig (sensetion--tk-lemma (elt (sensetion--sent-tokens sent) tk-ix)))
@@ -864,6 +865,12 @@ edit hydra) and the second is the gloss string."
 
 (defun lemma*->lemma (lemma*)
   (substring lemma* 0 (- (length lemma*) 2)))
+
+
+(defun lemma*->st (lemma*)
+  (let ((len (length lemma*)))
+    (when (= (elt lemma* (- len 2)) (string-to-char "%"))
+      (substring lemma* (1- len)))))
 
 
 (defun sensetion-move-line-up ()
