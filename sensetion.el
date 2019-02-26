@@ -523,10 +523,10 @@ number of selected tokens."
                               ""))))))
       ;;
       (let* ((tks (sensetion--sent-tokens sent))
-             (tks-colloc (seq-map-indexed #'token-colloc tks)))
+             (tks-colloc (seq-map-indexed #'token-colloc tks))
+             (terms (sensetion--sent-terms sent)))
         (list
-         (substring                     ; to remove starting space
-          (apply #'concat tks-colloc) 1)
+         (apply #'concat (s-join "," terms) " |" tks-colloc)
          (cons done total))))))
 
 
