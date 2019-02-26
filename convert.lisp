@@ -63,6 +63,7 @@
     ;;
     (assert (equal (plump:tag-name node) "synset"))
     (list :id (or (plump:attribute node "id") (error "."))
+          :terms (gloss-terms node)
           :tokens (gloss-tokens (first (get-wsd-gloss node))))))
 
 (defun gloss-tokens (node)
@@ -96,6 +97,7 @@
          (let ((senses (node-get-senses node)))
            (list :form (node-form node)
                  :lemma (node-lemma node)
+                 :pos (node-pos node)
                  :anno senses
                  :status (alexandria:if-let ((st (node-annotation-tag node)))
                            (if (and (equal st "man") (null senses))
@@ -163,11 +165,23 @@
   (plump:attribute node "coll"))
 
 
+(defun node-pos (node)
+  (plump:attribute node "pos"))
+
+
 (defun node-get-id (node)
   (second
    (serapeum:split-sequence #\_
                             (plump:attribute node "id")
                             :remove-empty-subseqs t)))
+
+(defun gloss-terms (node)
+  (let* ((terms-node (first
+                      (filter-child-elements node
+                                             (lambda (n) (equal (plump:tag-name n) "terms")))))
+         (terms (filter-child-elements terms-node
+                                       (lambda (n) (equal (plump:tag-name n) "term")))))
+    (mapcar #'plump:render-text terms)))
 
 
 (defun filter-child-elements (node p)

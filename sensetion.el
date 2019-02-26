@@ -12,6 +12,15 @@
 (require 'trie)
 
 
+;; TODO: benchmark stuff with
+;; https://emacs.stackexchange.com/questions/539/how-do-i-measure-performance-of-elisp-code
+
+;; TODO: test the print-circle thing: see size of index of non-noun
+;; synsets with and without it (I recall it being 42MB, but now it is
+;; 32 WITH the noun synsets! also check if performance improves with
+;; byte-compilation; it took almost 3 minutes to index and write all
+;; synsets
+
 (defgroup sensetion nil
   "Support for annotating word senses."
   :group 'data)
@@ -493,7 +502,14 @@ number of selected tokens."
                                                   sensetion-unnanoted-colour)
                                                  ("now"
                                                   sensetion-currently-annotated-colour)
-                                                 (_ (error "%s" tk))))))))))))
+                                                 (_ (error "%s" tk)))))))
+                            (if-let ((_ selected?)
+                                     (pos (or (sensetion--tk-synset-pos tk)
+                                              (sensetion--tk-pos tk))))
+                                (propertize pos
+                                            'display '(raise 0.3)
+                                            'face '(:height 0.6))
+                              ""))))))
       ;;
       (let* ((tks (sensetion--sent-tokens sent))
              (tks-colloc (seq-map-indexed #'token-colloc tks)))
@@ -501,6 +517,15 @@ number of selected tokens."
          (substring                     ; to remove starting space
           (apply #'concat tks-colloc) 1)
          (cons done total))))))
+
+
+(defun sensetion--tk-synset-pos (tk)
+  "Get pos1 of synsets assigned to TK. If there is more than one
+synset and they have different pos1, return nil."
+  (let ((senses (sensetion--tk-anno tk)))
+    (when-let ((1pos  (elt (cl-first senses) 0))
+               (same? (seq-every-p (lambda (s) (eql (elt s 0) 1pos)) senses)))
+      (char-to-string 1pos))))
 
 
 (defun sensetion-previous-selected (point)
