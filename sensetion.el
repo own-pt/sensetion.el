@@ -640,20 +640,20 @@ builds the status (how many tokens have been annotated so far)."
                                         (sensetion--tk-meta tk)
                                         sent-id))
                           (mapc (lambda (lemma)
-                                  (index-lemma sent-id lemma))
+                                  (sensetion--index-lemma sent-id lemma))
                                 (s-split "|" lemma)))
                         (when (sensetion--tk-annotated? tk)
-                          (cl-incf annotated))))
-
-         (index-lemma (sent-id lemma)
-                      ;; lemmas* might be pure ("love") or have pos
-                      ;; annotation ("love%2"), but we don't care
-                      ;; about it here; when retrieving we gotta take
-                      ;; care of this.
-                      (trie-insert index lemma sent-id #'safe-cons)))
+                          (cl-incf annotated)))))
       ;;
       (mapc (lambda (f) (run (file-name-base f) f)) files)
       (list index (cons annotated annotatable)))))
+
+
+(defun sensetion--index-lemma (index lemma sent-id)
+  ;; lemmas* might be pure ("love") or have pos annotation ("love%2"),
+  ;; but we don't care about it here; when retrieving we gotta take
+  ;; care of this.
+  (trie-insert index lemma sent-id #'safe-cons))
 
 
 (defun sensetion--tk-annotatable? (tk)
@@ -823,6 +823,21 @@ edit hydra) and the second is the gloss string."
     (unless annotated?
       (cl-incf (car sensetion--global-status))
       (cl-incf (car sensetion--local-status)))))
+
+
+(defun sensetion-edit-lemma (tk-ix sent)
+  (interactive (list (sensetion--tk-ix-prop-at-point)
+                     (sensetion--get-sent-at-point)))
+  (let* ((orig (sensetion--tk-lemma (elt (sensetion--sent-tokens sent) tk-ix)))
+         (lemma (read-string "Assign lemma to token: " (cons orig (1+ (length orig))))))
+    (sensetion--edit-lemma lemma tk-ix sent)))
+
+
+(defun sensetion--edit-lemma (lemma tk-ix sent)
+  (setf (sensetion--tk-lemma (elt (sensetion--sent-tokens sent) tk-ix))
+        lemma)
+  (sensetion--reinsert-sent-at-point sent)
+  (sensetion--index-lemma sensetion--index lemma (sensetion--sent-id sent)))
 
 
 (defalias 'sensetion--tk-annotated? 'sensetion--tk-anno
