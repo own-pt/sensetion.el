@@ -240,8 +240,8 @@ annotated."
       (sensetion-mode)
       (with-inhibiting-read-only
        (setq sensetion--lemma lemma)
-       (setq sensetion--local-status (sensetion--make-collocations matches))
-       (setq sensetion--synset-cache (sensetion--wordnet-lookup lemma)))
+       (setq sensetion--synset-cache (sensetion--wordnet-lookup lemma))
+       (setq sensetion--local-status (sensetion--make-collocations matches)))
       (sensetion--beginning-of-buffer))
     (pop-to-buffer result-buffer)))
 
@@ -457,6 +457,7 @@ representing SENT's tokens for display in sensetion buffer, and
 whose second element is a status pair, whose car is the number of
 selected tokens already annotated and whose cdr is the total
 number of selected tokens."
+  ;; TODO: refactor this, it's too big
   (let ((done 0)
         (total 0))
     (cl-labels
@@ -507,9 +508,18 @@ number of selected tokens."
                                      (pos (or (sensetion--tk-synset-pos tk)
                                               (sensetion--tk-pos tk))))
                                 (propertize pos
-                                            'display '(raise 0.3)
+                                            'display '(raise 0.4)
                                             'face '(:height 0.6))
-                              ""))))))
+                              "")
+                            (if-let ((_ selected?)
+                                     (sids (sensetion--tk-anno tk)))
+                                (propertize (s-join ","
+                                                    (mapcar (lambda (s)
+                                                              (cl-first
+                                                               (gethash s sensetion--synset-cache)))
+                                                            sids))
+                                            'display '(raise 0.4)
+                                            'face '(:height 0.6))))))))
       ;;
       (let* ((tks (sensetion--sent-tokens sent))
              (tks-colloc (seq-map-indexed #'token-colloc tks)))
@@ -639,7 +649,8 @@ builds the status (how many tokens have been annotated so far)."
            status)))))
 
 
-(cl-defun sensetion--write-state (&key (index sensetion--index) (status sensetion--global-status))
+(cl-defun sensetion--write-state (&key (index sensetion--index)
+                                       (status sensetion--global-status))
   (let ((print-circle t))
     (with-temp-file sensetion-index-file
       (prin1 index (current-buffer))))
@@ -679,43 +690,58 @@ set `sensetion--global-status'. "
 
 
 (defun sensetion--wordnet-lookup (lemma)
-  (cl-labels
-      ((pos3->pos1 (pos3)
-                   (gethash
-                    pos3
-                    #s(hash-table size 5 test equal
-                                  rehash-size 1.5 rehash-threshold 0.8125
-                                  purecopy t data
-                                  ("nou" "n" "ver" "v" "adj" "a" "adv" "r"))))
+  "Return hash-table where the keys are synset ids and the values
+are a list where the first element is the key (as shown in the
+edit hydra) and the second is the gloss string."
+  (let ((senses (make-hash-table :test 'equal)))
+    (cl-labels
+        ((pos3->pos1 (pos3)
+                     (gethash
+                      pos3
+                      #s(hash-table size 5 test equal
+                                    rehash-size 1.5 rehash-threshold 0.8125
+                                    purecopy t data
+                                    ("nou" "n" "ver" "v" "adj" "a" "adv" "r"))))
 
-       (parse-sense (pos1 mline)
-                    (cl-assert (null (cl-rest mline)))
-                    (let* ((line (cl-first mline))
-                           (beg (1+ (cl-position (string-to-char "{")
-                                                 line :test #'char-equal)))
-                           (end (cl-position (string-to-char "}")
-                                             line :start beg :test #'char-equal))
-                           (offset (substring line beg end))
-                           (words-gloss (substring line (1+ end))))
-                      (list (concat pos1 offset)
-                            words-gloss))))
-    ;;
-    (let* ((command (format "wn '%s' -g -o -over" lemma))
-           (result  (shell-command-to-string command)))
-      (when (equal (s-trim result) "")
-        (user-error "No senses found for lemma %s." lemma))
-      (let* ((chunks  (s-split "\nOverview of " result t))
-             ;; easier to analyse first 3 characters
-             (chunk-by-pos (-group-by (lambda (c) (pos3->pos1 (substring c 0 3)))
-                                      chunks))
-             (senses  (mapcar
-                       (lambda (pair)
-                         (list (cl-first pair)
-                               (mapcar (apply-partially #'parse-sense (cl-first pair))
-                                       (s-match-strings-all "^[0-9].*$"
-                                                            (cl-second pair)))))
-                       chunk-by-pos)))
-        senses))))
+         (parse-sense (pos1 mline ix)
+                      (cl-assert (null (cl-rest mline)))
+                      (let* ((line (cl-first mline))
+                             (beg (1+ (cl-position (string-to-char "{")
+                                                   line :test #'char-equal)))
+                             (end (cl-position (string-to-char "}")
+                                               line :start beg :test #'char-equal))
+                             (offset (substring line beg end))
+                             (words-gloss (substring line (1+ end))))
+                        (setf (gethash (concat pos1 offset) senses)
+                              (list
+                               (format "%s"
+                                       (if (< ix 9)
+                                           ;; handling more than 10
+                                           ;; senses: will list from 1
+                                           ;; to 9, then alphabetic
+                                           ;; characters, which start
+                                           ;; at 97 ('a') reserved 0
+                                           ;; for no sense
+                                           (1+ ix)
+                                         (char-to-string (+ ix 88))))
+                               words-gloss)))))
+      ;;
+      (let* ((command (format "wn '%s' -g -o -over" lemma))
+             (result  (shell-command-to-string command)))
+        (when (equal (s-trim result) "")
+          (user-error "No senses found for lemma %s." lemma))
+        (let* ((chunks  (s-split "\nOverview of " result t))
+               ;; easier to analyse first 3 characters
+               (chunk-by-pos (-group-by (lambda (c) (pos3->pos1 (substring c 0 3)))
+                                        chunks))
+               (_  (mapc
+                    (lambda (pair)
+                      (seq-map-indexed
+                       (apply-partially #'parse-sense (cl-first pair))
+                       (s-match-strings-all "^[0-9].*$"
+                                            (cl-second pair))))
+                    chunk-by-pos)))
+          senses)))))
 
 
 (defun sensetion-edit (lemma pos ix sent)
@@ -734,7 +760,10 @@ set `sensetion--global-status'. "
 
 
 (defun sensetion--edit (lemma pos1 ix sent)
-  (let ((senses (cl-second (assoc pos1 sensetion--synset-cache))))
+  (let ((senses (cl-loop for k being the hash-keys of sensetion--synset-cache
+                         using (hash-values v)
+                         when (equal (substring k 0 1) pos1)
+                         collect (cons k v))))
     (unless senses
       (user-error "No senses for lemma %s with pos %s" lemma pos1))
     (call-interactively
@@ -744,22 +773,19 @@ set `sensetion--global-status'. "
 (defun sensetion--edit-hydra-maker (lemma pos1 tk-ix sent options)
   `(defhydra hydra-senses (:color blue)
      ""
-     ,@(seq-map-indexed
-        (lambda (x ix)
-          (list (format "%s" (if (< ix 10)
-                                 ;; handling more than 10 senses: will
-                                 ;; list from 0 to 9, then alphabetic
-                                 ;; characters, which start at 97 ('a')
-                                 ix
-                               (char-to-string (+ ix 87))))
-                `(lambda () (interactive)
-                   (sensetion--annotate-sense ,lemma
-                                              ,(sensetion--pos->synset-type
-                                                pos1)
-                                              ,(cl-first x)
-                                              ,tk-ix
-                                              ,sent))
-                (cl-second x) :column "Pick sense:"))
+     ,@(mapcar
+        (lambda (s)
+          (cl-destructuring-bind (sid key sense-text) s
+            (list key
+                  `(lambda () (interactive)
+                     (sensetion--annotate-sense ,lemma
+                                                ,(sensetion--pos->synset-type
+                                                  pos1)
+                                                ,sid
+                                                ,tk-ix
+                                                ,sent))
+                  sense-text
+                  :column "Pick sense:")))
         options)))
 
 
@@ -768,7 +794,6 @@ set `sensetion--global-status'. "
     (setf (sensetion--tk-lemma (elt (sensetion--sent-tokens sent) ix))
           (sensetion--make-lemma* lemma st))
     (setf (sensetion--tk-anno (elt (sensetion--sent-tokens sent) ix))
-          ;; TODO:should this be list?
           (list sense))
     (setf (sensetion--tk-status (elt (sensetion--sent-tokens sent) ix))
           "now")
