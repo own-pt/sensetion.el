@@ -489,7 +489,6 @@ number of selected tokens."
                                                lemma
                                                (s-split "|" lemma-str t)
                                                :test #'equal
-                                               ;; TODO: not always a lemma*
                                                :key #'lemma*->lemma)))
                               (ckey (sensetion--tk-coll-key tk))
                               (glob-selected? (gethash ckey sel-keys))
@@ -864,12 +863,15 @@ edit hydra) and the second is the gloss string."
 
 
 (defun lemma*->lemma (lemma*)
-  (substring lemma* 0 (- (length lemma*) 2)))
+  (let ((st (lemma*->st lemma*)))
+    (if st
+        (substring lemma* 0 (- (length lemma*) 2))
+      lemma*)))
 
 
 (defun lemma*->st (lemma*)
   (let ((len (length lemma*)))
-    (when (= (elt lemma* (- len 2)) (string-to-char "%"))
+    (when (and (> len 1) (= (elt lemma* (- len 2)) (string-to-char "%")))
       (substring lemma* (1- len)))))
 
 

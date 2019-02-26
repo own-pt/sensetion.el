@@ -7,13 +7,13 @@ S-expression-based format we have defined.
 
 
 * Usage
-You must set the directory where the files to be annotated are with
+You should set the directory where the files to be annotated are with
 =M-x customize-variable RET sensetion-annotation-dir=. (You can
 customize other stuff with =M-x customize-group RET sensetion=.)
 
 Use =M-x sensetion= to start annotating. If this is the first time you
-call it, it might take some time to index the files (and freeze your
-emacs for this time).
+call it, it might take some time to index the files (you can do other
+stuff on Emacs while it works).
 
 =M-x sensetion-annotate= will ask you for a lemma and a PoS tag. You
 can press =TAB= for completion of the lemma. This will build a buffer
