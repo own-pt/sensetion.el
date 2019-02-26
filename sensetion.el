@@ -419,7 +419,7 @@ with `sensetion-unmark-glob'."
               :id (sensetion--sent-id sent)
               :tokens
               (cons
-               (sensetion--make-tk :form nil :lemma lemma
+               (sensetion--make-tk :form nil :lemma lemma :pos nil
                                    :status "un" :kind '(:glob . new-k)
                                    :anno nil :meta nil)
                (cl-loop
@@ -519,7 +519,8 @@ number of selected tokens."
                                                                (gethash s sensetion--synset-cache)))
                                                             sids))
                                             'display '(raise 0.4)
-                                            'face '(:height 0.6))))))))
+                                            'face '(:height 0.6))
+                              ""))))))
       ;;
       (let* ((tks (sensetion--sent-tokens sent))
              (tks-colloc (seq-map-indexed #'token-colloc tks)))
@@ -724,7 +725,7 @@ edit hydra) and the second is the gloss string."
                                            ;; for no sense
                                            (1+ ix)
                                          (char-to-string (+ ix 88))))
-                               words-gloss)))))
+                               (s-trim words-gloss))))))
       ;;
       (let* ((command (format "wn '%s' -g -o -over" lemma))
              (result  (shell-command-to-string command)))
@@ -786,7 +787,7 @@ edit hydra) and the second is the gloss string."
                                                 ,sent))
                   sense-text
                   :column "Pick sense:")))
-        options)))
+        (cons (list nil "0" "No sense in WordNet") options))))
 
 
 (defun sensetion--annotate-sense (lemma st sense ix sent)
@@ -794,7 +795,7 @@ edit hydra) and the second is the gloss string."
     (setf (sensetion--tk-lemma (elt (sensetion--sent-tokens sent) ix))
           (sensetion--make-lemma* lemma st))
     (setf (sensetion--tk-anno (elt (sensetion--sent-tokens sent) ix))
-          (list sense))
+          (and sense (list sense)))
     (setf (sensetion--tk-status (elt (sensetion--sent-tokens sent) ix))
           "now")
     (sensetion--reinsert-sent-at-point sent)
