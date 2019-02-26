@@ -128,10 +128,10 @@
          (let ((globs (filter-child-elements node
                                              (lambda (n)
                                                (equal (plump:tag-name n) "glob")))))
-           (cons
-            (make-token-plist node :coll)
+           (append
             (loop for g in globs
-                  collect (glob-token g)))))
+                  collect (glob-token g))
+            (list (make-token-plist node :coll)))))
 
        (glob-token (node)
          (make-token-plist node :glob)))
