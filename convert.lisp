@@ -2,24 +2,7 @@
 (ql:quickload :serapeum)
 (ql:quickload :alexandria)
 
-
 (defparameter *sense-map-ht* nil)
-
-
-(defun xml->conllus (fps out-fp sensemap-fp)
-  (ensure-directories-exist out-fp)
-  (with-open-file (in-map sensemap-fp)
-    (setq *sense-map-ht* (sense-map->ht in-map))
-    (loop
-      for fp in fps do
-        (with-open-file (in fp)
-          (let ((sents (wordnet-sentences (aref (plump:child-elements (plump:parse in)) 0))))
-            (loop for s in sents do
-              (with-open-file (out (make-pathname :name (getf s :id)
-                                                  :type "plist" :defaults out-fp)
-                                   :direction :output :if-exists :supersede
-                                   :if-does-not-exist :create)
-                (write s :case :downcase :stream out))))))))
 
 
 (defun sense-map->ht (in)
@@ -193,3 +176,21 @@
 (defun mapcat (f vec)
   (loop for x across vec
         append (funcall f x)))
+
+
+
+(defun main (glosstag-fp out-fp sensemap-fp &key (*sense-map-ht* *sense-map-ht*))
+  (ensure-directories-exist out-fp)
+  (with-open-file (in-map sensemap-fp)
+    (let ((*sense-map-ht* (sense-map->ht in-map))
+	  (in-files (directory (make-pathname :defaults glosstag-fp :name :wild :type "xml"))))
+      (format t "Input Files: ~a~%Output Directory: ~a~%Sense Index: ~a~%" in-files out-fp sensemap-fp)
+      (loop for fp in in-files
+	    do (with-open-file (in fp)
+		 (let ((sents (wordnet-sentences (aref (plump:child-elements (plump:parse in)) 0))))
+		   (loop for s in sents
+			 do (with-open-file (out (make-pathname :name (getf s :id)
+								:type "plist" :defaults out-fp)
+						 :direction :output :if-exists :supersede
+						 :if-does-not-exist :create)
+			      (write s :case :downcase :stream out)))))))))
