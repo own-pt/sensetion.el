@@ -112,12 +112,10 @@ To re-run the conversion:
   should work);
 - setup [[https://www.quicklisp.org/beta/][quicklisp]];
 - run:
-  #+BEGIN_SRC sh
-    sbcl --dynamic-space-size 7500Mb --load convert.lisp --load convert.lisp --eval '(time (xml->conllus (directory "merged/*.xml") "conllu/" "index.sense"))' --quit
-  #+END_SRC
-  where the =merged/= directory is from the gloss corpus archive, the
-  =conllu= directory is where you want to put the files, and the
-  =index.sense= file is from the WordNet database. (Use absolute paths
+  : ./convert.sh ~/WordNet-3.0/glosstag/merged/ ~/WordNet-3.0/dict/index.sense glosstag/
+  where the first parameter is a directory is from the gloss corpus archive, the
+  last parameter is the directory is where you want to put the files, and the
+  second parameter is the index.sense file from the WordNet database. (Use absolute paths
   if you have problems with the command.)
 
 
