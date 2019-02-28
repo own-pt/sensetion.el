@@ -17,11 +17,14 @@ stuff on Emacs while it works).
 
 =M-x sensetion-annotate= will ask you for a lemma and a PoS tag. You
 can press =TAB= for completion of the lemma. This will build a buffer
-with instances of this lemma+pos that have not been annotated yet. You
-can navigate through taggable tokens with =<= and =>=. If you wish to
-annotate a token, press =/= on it. You can see how many tokens still
-need to be annotated in the mode-line, next to the =sensetion=
-indicator.
+with instances of this lemma+pos that have not been annotated
+yet. Unannotated words will show as red/pink, while
+previously-annotated tokens will show as green, and newly-annotated
+tokens will show as blue (all these colors can be customized by the
+user). You can navigate through taggable tokens with =<= and =>=. If
+you wish to annotate a token, press =/= on it. You can see how many
+tokens still need to be annotated in the mode-line, next to the
+=sensetion= indicator.
 
 There is support for word collocations, such as phrasal verbs. The
 tokens part of a collocation are united by a key, which is shown in
@@ -36,6 +39,12 @@ tokens with the same sense together might be useful.
 
 If the index goes out of sync, you can force a new indexation with
 =M-x sensetion-make-state=.
+
+** Saving your work
+
+Any annotations are saved to their files at the moment they are
+done. The updated index and status will be saved when you quit emacs
+gracefully (that's why it hangs a little).
 
 
 * Report bugs
