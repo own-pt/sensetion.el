@@ -171,6 +171,9 @@ annotated."
   (setq-local buffer-read-only t)
   (visual-line-mode 1)
   (setq-local minor-mode-alist nil)
+  (aset (or buffer-display-table
+            (setq buffer-display-table (make-display-table)))
+        ?\n [?\n?\n])
   (setq-local mode-name '(:eval (sensetion--mode-line-status-text))))
 
 
@@ -304,8 +307,7 @@ other the unique values."
                             (sensetion--sent-colloc sent sensetion--lemma)
                           (insert tokens-line
                                   ;; no need to add it all the time
-                                  (propertize "\n" 'sensetion--sent-id sent-id)
-                                  "\n")
+                                  (propertize "\n" 'sensetion--sent-id sent-id))
                           (cl-incf done (car status))
                           (cl-incf total (cdr status))))))
       ;;
