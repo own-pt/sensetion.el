@@ -106,6 +106,7 @@ A cons cell in the same format as `sensetion--global-status'.")
     (define-key map "l" #'sensetion-edit-lemma)
     (define-key map "m" #'sensetion-toggle-glob-mark)
     (define-key map "g" #'sensetion-glob)
+    (define-key map "." #'sensetion-go-to-source)
     (define-key map [C-down] #'sensetion-move-line-down)
     (define-key map [C-up] #'sensetion-move-line-up)
     map)
@@ -289,7 +290,7 @@ other the unique values."
      (user-error "Not at sentence line"))
    (sensetion--get-sent sent-id)
    where
-   (sent-id (get-text-property (line-end-position) 'sensetion--sent-id))))
+   (sent-id (sensetion--sent-id-prop-at-point))))
 
 
 (defun sensetion--make-collocations (matches)
@@ -896,6 +897,17 @@ edit hydra) and the second is the gloss string."
    (forward-line 1)
    (transpose-lines 1)
    (forward-line -1)))
+
+(defun sensetion-go-to-source (id)
+  (interactive (list (sensetion--sent-id-prop-at-point)))
+  (sensetion-is
+   (unless sent-buff
+     (error "No sentence found; please report bug"))
+   (pop-to-buffer sent-buff nil t)
+   where
+   (sent-buff (find-file-noselect sent-fp))
+   (sent-fp   (sensetion--sent-id->filename sent-id))
+   (sent-id   (sensetion--sent-id-prop-at-point))))
 
 
 (defmacro with-inhibiting-read-only (&rest body)
