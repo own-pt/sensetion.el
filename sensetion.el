@@ -544,9 +544,10 @@ number of selected tokens."
       ;;
       (let* ((tks (sensetion--sent-tokens sent))
              (tks-colloc (seq-map-indexed #'token-colloc tks))
-             (terms (sensetion--sent-terms sent)))
+             (terms (sensetion--sent-terms sent))
+             (pos   (substring (sensetion--sent-id sent) 0 1)))
         (list
-         (apply #'concat (s-join "," terms) " |" tks-colloc)
+         (apply #'concat "(" pos ") " (s-join "," terms) " |" tks-colloc)
          (cons done total))))))
 
 
@@ -808,7 +809,7 @@ edit hydra) and the second is the gloss string."
                                                 ,sid
                                                 ,tk-ix
                                                 ,sent))
-                  sense-text
+                  (s-word-wrap (- (frame-width) 5) sense-text)
                   :column "Pick sense:")))
         (cons (list nil "0" "No sense in WordNet") options))))
 
