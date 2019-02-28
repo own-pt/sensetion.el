@@ -284,7 +284,12 @@ other the unique values."
 
 
 (defun sensetion--get-sent-at-point ()
-  (sensetion--get-sent (get-text-property (line-end-position) 'sensetion--sent-id)))
+  (sensetion-is
+   (unless sent-id
+     (user-error "Not at sentence line"))
+   (sensetion--get-sent sent-id)
+   where
+   (sent-id (get-text-property (line-end-position) 'sensetion--sent-id))))
 
 
 (defun sensetion--make-collocations (matches)
@@ -324,8 +329,6 @@ tokens, and removing the glob token corresponding to the
 collocation."
   (interactive (list (sensetion--tk-ix-prop-at-point)
                      (sensetion--get-sent-at-point)))
-  (unless (and ix sent)
-    (user-error "No token at point"))
   (cl-labels
       ((unglob (ck sent)
                (sensetion--make-sent
@@ -584,7 +587,11 @@ synset and they have different pos1, return nil."
 
 
 (cl-defun sensetion--tk-ix-prop-at-point (&optional (point (point)))
-  (get-char-property point 'sensetion--tk-ix))
+  (sensetion-is
+   (or ix
+       (user-error "No token at point"))
+   where
+   (ix (get-char-property point 'sensetion--tk-ix))))
 
 
 (defun sensetion-make-state (anno-dir callback)
@@ -760,19 +767,18 @@ edit hydra) and the second is the gloss string."
           senses)))))
 
 
-(defun sensetion-edit (lemma pos ix sent)
-  (interactive (list (if (sensetion--selected? (point))
-                         (or (buffer-local-value 'sensetion--lemma (current-buffer))
-                             (error "No local sensetion--lemma"))
-                       (user-error "No taggable token at point"))
+(defun sensetion-edit (lemma ix pos sent)
+  (interactive (list (buffer-local-value 'sensetion--lemma (current-buffer))
                      ;; TODO: handle "other"
-                     (ido-completing-read "Token PoS tag: " '("a" "n" "r" "v" "other")
-                                          nil t nil nil "other")
                      (or (get-char-property (point) 'sensetion--glob-ix)
                          (sensetion--tk-ix-prop-at-point))
+                     (ido-completing-read "Token PoS tag: " '("n" "v" "a" "r" "other")
+                                          nil t nil nil)
                      (sensetion--get-sent-at-point)))
-  (unless (and lemma pos ix sent)
-    "No taggable token at point.")
+  (unless (sensetion--selected? (point))
+    (user-error "Token at point not selected for annotation"))
+  (unless lemma
+    (error "No local sensetion--lemma; please report bug"))
   (sensetion--edit lemma pos ix sent))
 
 
@@ -895,6 +901,24 @@ edit hydra) and the second is the gloss string."
 (defmacro with-inhibiting-read-only (&rest body)
   `(let ((inhibit-read-only t))
      ,@body))
+
+
+(defmacro sensetion-is (&rest body)
+  (seq-let (body wclauses)
+      (-split-when (lambda (c) (eq 'where c)) body)
+    (let ((body
+           (-reduce-from
+            (lambda (bd cl)
+              (pcase cl
+                (`(,var ,val)
+                 `((let ((,var ,val))
+                     ,@bd)))
+                (`(,name ,arglist . ,body)
+                 `((cl-labels ((,name ,arglist ,@body))
+                     ,@bd)))))
+            body
+            wclauses)))
+      (cl-first body))))
 
 
 (provide 'sensetion)
