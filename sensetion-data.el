@@ -10,12 +10,13 @@
 
 (cl-defstruct (sensetion--sent (:constructor nil)
                                (:constructor sensetion--make-sent))
-  id terms tokens)
+  id terms text tokens)
 
 
 (defun sensetion--plist->sent (plist)
   (sensetion--make-sent :id (plist-get plist :id)
                         :terms (plist-get plist :terms)
+                        :text (plist-get plist :text)
                         :tokens (mapcar #'sensetion--plist->tk
                                         (plist-get plist :tokens))))
 
@@ -25,9 +26,12 @@
 
 
 (defun sensetion--sent->plist (sent)
-  (list :id (sensetion--sent-id sent)
-        :terms (sensetion--sent-terms sent)
-        :tokens (mapcar #'sensetion--tk->plist (sensetion--sent-tokens sent))))
+  (pcase sent
+    ((cl-struct sensetion--sent id terms text tokens)
+     (list :id id
+           :terms terms
+           :text text
+           :tokens (mapcar #'sensetion--tk->plist tokens)))))
 
 
 (defun sensetion--tk->plist (tk)

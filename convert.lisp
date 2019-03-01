@@ -47,6 +47,7 @@
     (assert (equal (plump:tag-name node) "synset"))
     (list :id (or (plump:attribute node "id") (error "."))
           :terms (gloss-terms node)
+          :text (gloss-text node)
           :tokens (gloss-tokens (first (get-wsd-gloss node))))))
 
 (defun gloss-tokens (node)
@@ -172,6 +173,15 @@
          (terms (filter-child-elements terms-node
                                        (lambda (n) (equal (plump:tag-name n) "term")))))
     (mapcar #'plump:render-text terms)))
+
+(defun gloss-text (node)
+  (let* ((text-node (first
+                     (filter-child-elements node
+                                            (lambda (n)
+                                              (and (equal (plump:tag-name n) "gloss")
+                                                   (equal (plump:attribute n "desc")
+                                                          "orig")))))))
+    (plump:render-text text-node)))
 
 
 (defun filter-child-elements (node p)
