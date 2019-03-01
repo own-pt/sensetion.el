@@ -344,10 +344,11 @@ collocation."
 
    (unglob (ck sent)
            (pcase sent
-             ((cl-struct sensetion--sent id terms tokens)
+             ((cl-struct sensetion--sent id terms tokens text)
               (sensetion--make-sent
                :id id
                :terms terms
+               :text text
                :tokens
                (cl-loop
                 for tk in tokens
@@ -433,10 +434,11 @@ with `sensetion-unmark-glob'."
    where
    
    (globbed-sent (pcase sent
-                   ((cl-struct sensetion--sent id terms)
+                   ((cl-struct sensetion--sent id terms text)
                     (sensetion--make-sent
                      :id id
                      :terms terms
+                     :text text
                      :tokens globbed-tks))))
    (globbed-tks (cl-loop
                       for tk in (sensetion--sent-tokens sent)
@@ -578,7 +580,7 @@ number of selected tokens."
          (cons done total))))))
 
 
-(cl-defun sensetion--lemma-selected? (tk &optional (lemma sensetion--lemma))
+(cl-defun sensetion--tk-has-lemma? (tk &optional (lemma sensetion--lemma))
   (sensetion-is
         (cl-member lemma
                    tk-lemmas
@@ -591,7 +593,7 @@ number of selected tokens."
 
 (cl-defun sensetion--to-annotate? (tk &optional (lemma sensetion--lemma))
   (and (sensetion--tk-annotatable? tk)
-       (sensetion--lemma-selected? tk lemma)))
+       (sensetion--tk-has-lemma? tk lemma)))
 
 
 (defun sensetion--tk-synset-pos (tk)
@@ -688,9 +690,7 @@ builds the status (how many tokens have been annotated so far)."
                             (user-error "No lemma for tk %s at %s"
                                         (sensetion--tk-meta tk)
                                         sent-id))
-                          (mapc (lambda (lemma)
-                                  (sensetion--index-lemma index lemma sent-id))
-                                (s-split "|" lemma)))
+                          (sensetion--index-lemmas index lemma sent-id))
                         (when (sensetion--tk-annotated? tk)
                           (cl-incf annotated)))))
       ;;
@@ -698,15 +698,28 @@ builds the status (how many tokens have been annotated so far)."
       (list index (cons annotated annotatable)))))
 
 
-(defun sensetion--index-lemma (index lemma sent-id)
+(defun sensetion--index-lemmas (index lemmas-str sent-id)
   ;; lemmas* might be pure ("love") or have pos annotation ("love%2"),
   ;; but we don't care about it here; when retrieving we gotta take
   ;; care of this.
-  (trie-insert index lemma sent-id #'safe-cons))
+  (mapc (lambda (lemma)
+          (trie-insert index lemma sent-id #'safe-cons))
+        (s-split "|" lemmas-str)))
 
 
-(defun sensetion--remove-lemma (index lemma sent)
-  (trie-insert index lemma sent))
+(defun sensetion--remove-lemmas (index old-lemma-str sent)
+  (sensetion-is
+   (mapc (apply-partially #'remove-lemma tokens) old-lemmas)
+   where
+   (tokens (sensetion--sent-tokens sent))
+   (old-lemmas (s-split "|" old-lemma-str t))
+   (remove-lemma (tokens old-lemma)
+                 (unless (seq-some (lambda (tk)
+                                     (sensetion--tk-has-lemma? tk old-lemma))
+                                   tokens)
+                   (trie-insert index old-lemma nil
+                                (lambda (_ old-data) (remove sent-id old-data)))))
+   (sent-id (sensetion--sent-id sent))))
 
 
 (defun sensetion--tk-annotatable? (tk)
@@ -880,17 +893,17 @@ edit hydra) and the second is the gloss string."
   ;; time?
   (interactive (list (sensetion--tk-ix-prop-at-point)
                      (sensetion--get-sent-at-point)))
-  (let* ((orig (sensetion--tk-lemma (elt (sensetion--sent-tokens sent) tk-ix)))
-         (lemma (read-string "Assign lemma to token: " (cons orig (1+ (length orig))))))
-    (sensetion--edit-lemma orig lemma tk-ix sent)))
+  (let* ((old   (sensetion--tk-lemma (elt (sensetion--sent-tokens sent) tk-ix)))
+         (lemma (read-string "Assign lemma to token: " (cons old (1+ (length old))))))
+    (sensetion--edit-lemma old lemma tk-ix sent)))
 
 
-(defun sensetion--edit-lemma (orig lemma tk-ix sent)
+(defun sensetion--edit-lemma (old-lemma lemma tk-ix sent)
   (setf (sensetion--tk-lemma (elt (sensetion--sent-tokens sent) tk-ix))
         lemma)
-  ;; TODO: remove orig from index if no other instance remains
+  (sensetion--remove-lemmas sensetion--index old-lemma sent)
   (sensetion--reinsert-sent-at-point sent)
-  (sensetion--index-lemma sensetion--index lemma (sensetion--sent-id sent)))
+  (sensetion--index-lemmas sensetion--index lemma (sensetion--sent-id sent)))
 
 
 (defalias 'sensetion--tk-annotated? 'sensetion--tk-anno
