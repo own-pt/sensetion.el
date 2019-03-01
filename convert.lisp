@@ -87,9 +87,12 @@
                                "skip"
                                st)
                            st)
-                 :kind (alexandria:if-let ((coll (node-coll node)))
-                         (cons kind coll)
-                         kind)
+                 :kind (let ((coll-keys (node-coll node)))
+                         (case kind
+                           (:coll (cons kind coll-keys))
+                           (:glob (assert (null (cdr coll-keys)))
+                            (cons kind (first coll-keys)))
+                           (otherwise kind)))
                  :meta (list (list :id (node-get-id node))))))
 
        (node-get-senses (node)
@@ -145,7 +148,11 @@
 
 
 (defun node-coll (node)
-  (plump:attribute node "coll"))
+  (let ((coll-keys (plump:attribute node "coll")))
+    (when coll-keys
+      (serapeum:split-sequence #\,
+                               coll-keys
+                               :remove-empty-subseqs t))))
 
 
 (defun node-pos (node)
