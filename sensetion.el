@@ -816,10 +816,9 @@ edit hydra) and the second is the gloss string."
 
 (defun sensetion-edit (lemma ix pos sent)
   (interactive (list (buffer-local-value 'sensetion--lemma (current-buffer))
-                     ;; TODO: handle "other"
                      (or (get-char-property (point) 'sensetion--glob-ix)
                          (sensetion--tk-ix-prop-at-point))
-                     (ido-completing-read "Token PoS tag: " '("n" "v" "a" "r" "other")
+                     (ido-completing-read "Token PoS tag: " '("n" "v" "a" "r")
                                           nil t nil nil)
                      (sensetion--get-sent-at-point)))
   (unless (sensetion--selected? (point))
