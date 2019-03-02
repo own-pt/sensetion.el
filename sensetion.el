@@ -587,7 +587,14 @@ number of selected tokens."
                    :test #'equal
                    :key #'lemma*->lemma)
    where
-   (tk-lemmas (and lemma-str (s-split "|" lemma-str t)))
+   (tk-lemmas (sensetion--tk-lemmas tk))))
+
+
+(defun sensetion--tk-lemmas (tk)
+  (sensetion-is
+   (when lemma-str
+     (s-split "|" lemma-str t))
+   where
    (lemma-str (sensetion--tk-lemma tk))))
 
 
@@ -704,7 +711,7 @@ builds the status (how many tokens have been annotated so far)."
   ;; care of this.
   (mapc (lambda (lemma)
           (trie-insert index lemma sent-id #'safe-cons))
-        (s-split "|" lemmas-str)))
+        (s-split "|" lemmas-str t)))
 
 
 (defun sensetion--remove-lemmas (index old-lemma-str sent)
@@ -848,43 +855,71 @@ edit hydra) and the second is the gloss string."
                          collect (cons k v))))
     (unless senses
       (user-error "No senses for lemma %s with pos %s" lemma pos1))
-    (call-interactively
-     (eval (sensetion--edit-hydra-maker lemma pos1 ix sent senses)))))
+    (sensetion--call-hydra lemma (sensetion--pos->synset-type pos1)
+                           ix sent senses)))
 
 
-(defun sensetion--edit-hydra-maker (lemma pos1 tk-ix sent options)
-  `(defhydra hydra-senses (:color blue)
-     ""
-     ,@(mapcar
-        (lambda (s)
-          (cl-destructuring-bind (sid key sense-text) s
-            (list key
-                  `(lambda () (interactive)
-                     (sensetion--annotate-sense ,lemma
-                                                ,(sensetion--pos->synset-type
-                                                  pos1)
-                                                ,sid
-                                                ,tk-ix
-                                                ,sent))
-                  (s-word-wrap (- (frame-width) 5) sense-text)
-                  :column "Pick sense:")))
-        (cons (list nil "0" "No sense in WordNet") options))))
+(defun sensetion--call-hydra (lemma st tk-ix sent options)
+  (call-interactively
+   (eval (sensetion--edit-hydra-maker lemma st tk-ix sent options))))
 
 
-(defun sensetion--annotate-sense (lemma st sense ix sent)
-  (let ((annotated? (sensetion--tk-annotated? (elt (sensetion--sent-tokens sent) ix))))
-    (setf (sensetion--tk-lemma (elt (sensetion--sent-tokens sent) ix))
-          (sensetion--make-lemma* lemma st))
-    (setf (sensetion--tk-anno (elt (sensetion--sent-tokens sent) ix))
-          (and sense (list sense)))
-    (setf (sensetion--tk-status (elt (sensetion--sent-tokens sent) ix))
-          "now")
-    (sensetion--reinsert-sent-at-point sent)
-    ;; TODO: actually search for token index?
-    (sensetion-previous-selected (point))
-    (unless annotated?
-      (cl-incf (car sensetion--global-status))
-      (cl-incf (car sensetion--local-status)))))
+(defun sensetion--edit-hydra-maker (lemma st tk-ix sent options)
+  (sensetion-is
+   `(defhydra hydra-senses (:color blue)
+      ""
+      ("q" nil nil)
+      ("0" ,no-sense-function "No sense in Wordnet" :column "Pick sense:")
+      ,@(mapcar
+         (lambda (s)
+           (cl-destructuring-bind (sid key sense-text) s
+             (list key
+                   `(lambda () (interactive)
+                      (sensetion--annotate-sense ,lemma
+                                                 ,st
+                                                 ,tk
+                                                 ,sid
+                                                 ,tk-ix
+                                                 ,sent
+                                                 ',options))
+                   (concat (sense-chosen-ind sid)
+                           (s-word-wrap (- (frame-width) 5) sense-text))
+                   :column "Pick sense:")))
+         options))
+   where
+   (sense-chosen-ind (sid) (if (member sid pres-senses) "+ " ""))
+   (no-sense-function
+    (lambda ()
+      (interactive)
+      (sensetion--annotate-sense nil nil tk nil tk-ix sent nil)))
+   (pres-senses (sensetion--tk-anno tk))
+   (tk (elt (sensetion--sent-tokens sent) tk-ix))))
+
+
+(defun sensetion--annotate-sense (lemma st tk sense ix sent options)
+  (sensetion-is
+   (when lemma
+     (setf (sensetion--tk-lemma (elt (sensetion--sent-tokens sent) ix))
+           lemma-str))
+   (setf (sensetion--tk-anno (elt (sensetion--sent-tokens sent) ix))
+         senses)
+   (setf (sensetion--tk-status (elt (sensetion--sent-tokens sent) ix))
+         "now")
+   (sensetion--reinsert-sent-at-point sent)
+   ;; TODO: actually search for token index?
+   (sensetion-previous-selected (point))
+   (unless annotated?
+     (cl-incf (car sensetion--global-status) delta)
+     (cl-incf (car sensetion--local-status) delta))
+   (when lemma
+     (sensetion--call-hydra lemma st ix sent options))
+   where
+   (lemma-str (s-join "|" lemmas))
+   (lemmas (seq-uniq (cons (sensetion--make-lemma* lemma st) old-lemmas)))
+   (old-lemmas (seq-filter #'lemma*->st (sensetion--tk-lemmas tk))) ;rm lemmas without synset type
+   (delta (if sense 1 -1))
+   (senses (when sense (seq-uniq (cons sense (sensetion--tk-anno tk)))))
+   (annotated? (sensetion--tk-annotated? tk))))
 
 
 (defun sensetion-edit-lemma (tk-ix sent)
