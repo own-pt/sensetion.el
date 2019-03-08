@@ -367,7 +367,8 @@ collocation."
                            (cl-incf (cdr sensetion--global-status) -1)
                            (when (sensetion--to-annotate? tk)
                              (cl-incf (car sensetion--local-status) -1)
-                             (cl-incf (cdr sensetion--local-status) -1))))
+                             (cl-incf (cdr sensetion--local-status) -1)))
+                         t)
                 collect (let ((tk-keys (sensetion--tk-coll-keys tk)))
                           (cond
                            ((equal (list ck) tk-keys)
@@ -432,6 +433,7 @@ with `sensetion-unmark-glob'."
                 (s-join "_"
                         (s-split " "
                                  (read-string "Lemma of glob: " nil nil "") t))))
+  (sensetion--index-lemmas sensetion--index lemma (sensetion--sent-id-prop-at-point))
   (sensetion-is
    (sensetion--reinsert-sent-at-point globbed-sent)
    (with-inhibiting-read-only
@@ -448,17 +450,17 @@ with `sensetion-unmark-glob'."
                      :text text
                      :tokens globbed-tks))))
    (globbed-tks (cl-loop
-                      for tk in (sensetion--sent-tokens sent)
-                      for i from 0
-                      append (cond
-                              ((equal i (cl-first ixs))
-                               ;; insert glob before first token in the
-                               ;; collocation
-                               (list new-glob (glob-tk tk new-k)))
-                              ((cl-member i ixs)
-                               (list (glob-tk tk new-k)))
-                              (t
-                               (list tk)))))
+                 for tk in (sensetion--sent-tokens sent)
+                 for i from 0
+                 append (cond
+                         ((equal i (cl-first ixs))
+                          ;; insert glob before first token in the
+                          ;; collocation
+                          (list new-glob (glob-tk tk new-k)))
+                         ((cl-member i ixs)
+                          (list (glob-tk tk new-k)))
+                         (t
+                          (list tk)))))
    (glob-tk (tk key)
             (let ((cks (sensetion--tk-coll-keys tk)))
               (setf (sensetion--tk-kind tk)
