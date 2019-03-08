@@ -4,12 +4,13 @@
 (require 'ido)
 (require 's)
 (require 'f)
-(require 'sensetion-data)
 (require 'async)
 (eval-when-compile (require 'cl-lib))
 (require 'cl-lib)
 (require 'hydra)
 (require 'trie)
+(require 'sensetion-data)
+(require 'sensetion-edit)
 
 
 ;; TODO: benchmark stuff with
@@ -131,6 +132,12 @@ annotated."
 (defcustom sensetion-currently-annotated-colour
   "dodger blue"
   "Color to display the selected tokens in."
+  :group 'sensetion
+  :type 'color)
+
+(defcustom sensetion-unsure-colour
+  "yellow"
+  "Color to display the tokens whose annotation is unsure."
   :group 'sensetion
   :type 'color)
 
@@ -444,7 +451,7 @@ with `sensetion-unmark-glob'."
                       for tk in (sensetion--sent-tokens sent)
                       for i from 0
                       append (cond
-                              ((equal i (first ixs))
+                              ((equal i (cl-first ixs))
                                ;; insert glob before first token in the
                                ;; collocation
                                (list new-glob (glob-tk tk new-k)))
@@ -509,6 +516,8 @@ number of selected tokens."
                                              sensetion-previously-annotated-colour)
                                             ("un"
                                              sensetion-unnanoted-colour)
+                                            ("unsure"
+                                             sensetion-unsure-colour)
                                             ("now"
                                              sensetion-currently-annotated-colour)
                                             (_ (error "%s" tk))))
@@ -735,7 +744,7 @@ builds the status (how many tokens have been annotated so far)."
     (`(:coll . ,_) nil)
     (_ (let ((status (sensetion--tk-status tk)))
          (when (member status
-                       '("man" "un" "auto" "now"))
+                       '("man" "un" "unsure" "auto" "now"))
            status)))))
 
 
@@ -834,92 +843,7 @@ edit hydra) and the second is the gloss string."
           senses)))))
 
 
-(defun sensetion-edit (lemma ix pos sent)
-  (interactive (list (buffer-local-value 'sensetion--lemma (current-buffer))
-                     (or (get-char-property (point) 'sensetion--glob-ix)
-                         (sensetion--tk-ix-prop-at-point))
-                     (ido-completing-read "Token PoS tag: " '("n" "v" "a" "r")
-                                          nil t nil nil)
-                     (sensetion--get-sent-at-point)))
-  (unless (sensetion--selected? (point))
-    (user-error "Token at point not selected for annotation"))
-  (unless lemma
-    (error "No local sensetion--lemma; please report bug"))
-  (sensetion--edit lemma pos ix sent))
 
-
-(defun sensetion--edit (lemma pos1 ix sent)
-  (let ((senses (cl-loop for k being the hash-keys of sensetion--synset-cache
-                         using (hash-values v)
-                         when (equal (substring k 0 1) pos1)
-                         collect (cons k v))))
-    (unless senses
-      (user-error "No senses for lemma %s with pos %s" lemma pos1))
-    (sensetion--call-hydra lemma (sensetion--pos->synset-type pos1)
-                           ix sent senses)))
-
-
-(defun sensetion--call-hydra (lemma st tk-ix sent options)
-  (call-interactively
-   (eval (sensetion--edit-hydra-maker lemma st tk-ix sent options))))
-
-
-(defun sensetion--edit-hydra-maker (lemma st tk-ix sent options)
-  (sensetion-is
-   `(defhydra hydra-senses (:color blue)
-      ""
-      ("q" nil nil)
-      ("0" ,no-sense-function "No sense in Wordnet" :column "Pick sense:")
-      ,@(mapcar
-         (lambda (s)
-           (cl-destructuring-bind (sid key sense-text) s
-             (list key
-                   `(lambda () (interactive)
-                      (sensetion--annotate-sense ,lemma
-                                                 ,st
-                                                 ,tk
-                                                 ,sid
-                                                 ,tk-ix
-                                                 ,sent
-                                                 ',options))
-                   (concat (sense-chosen-ind sid)
-                           (s-word-wrap (- (frame-width) 5) sense-text))
-                   :column "Pick sense:")))
-         options))
-   where
-   (sense-chosen-ind (sid) (if (member sid pres-senses) "+ " ""))
-   (no-sense-function
-    (lambda ()
-      (interactive)
-      (sensetion--annotate-sense nil nil tk nil tk-ix sent nil)))
-   (pres-senses (sensetion--tk-anno tk))
-   (tk (elt (sensetion--sent-tokens sent) tk-ix))))
-
-
-(defun sensetion--annotate-sense (lemma st tk sense ix sent options)
-  (sensetion-is
-   (when lemma
-     (setf (sensetion--tk-lemma (elt (sensetion--sent-tokens sent) ix))
-           lemma-str))
-   (setf (sensetion--tk-anno (elt (sensetion--sent-tokens sent) ix))
-         senses)
-   (setf (sensetion--tk-status (elt (sensetion--sent-tokens sent) ix))
-         "now")
-   (sensetion--reinsert-sent-at-point sent)
-   ;; TODO: actually search for token index?
-   (sensetion-previous-selected (point))
-   (unless annotated?
-     (cl-incf (car sensetion--global-status) delta)
-     (cl-incf (car sensetion--local-status) delta))
-   (when lemma
-     (sensetion--call-hydra lemma st ix sent options))
-   where
-   (lemma-str (s-join "|" lemmas))
-   (lemmas (seq-uniq (cons (sensetion--make-lemma* lemma st) old-lemmas)))
-   (old-lemmas (seq-filter #'lemma*->st (sensetion--tk-lemmas tk))) ;rm lemmas without synset type
-   (delta (if sense 1 -1))
-   (senses (when sense (seq-uniq (cons sense (sensetion--tk-anno tk)))))
-   (annotated? (sensetion--tk-annotated? tk))))
 
 
 (defun sensetion-edit-lemma (tk-ix sent)
