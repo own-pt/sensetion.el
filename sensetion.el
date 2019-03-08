@@ -726,6 +726,8 @@ builds the status (how many tokens have been annotated so far)."
 
 
 (defun sensetion--remove-lemmas (index old-lemma-str sent)
+  "Remove lemmas in OLD-LEMMA-STR from INDEX if they are not
+present in SENT's tokens."
   (sensetion-is
    (mapc (apply-partially #'remove-lemma tokens) old-lemmas)
    where
@@ -867,8 +869,8 @@ edit hydra) and the second is the gloss string."
   (sensetion--index-lemmas sensetion--index lemma (sensetion--sent-id sent)))
 
 
-(defalias 'sensetion--tk-annotated? 'sensetion--tk-anno
-  "Return t if token has annotation.")
+(defun sensetion--tk-annotated? (tk)
+  (member (sensetion--tk-status tk) '("man" "auto" "unsure" "now")))
 
 
 (defun sensetion--save-sent (sent)
