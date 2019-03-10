@@ -5,6 +5,28 @@
 (defparameter *sense-map-ht* nil)
 
 
+(defmacro with-open-files (args &body body)
+  (case (length args)
+    ((0)
+     `(progn ,@body))
+    ((1)
+     `(with-open-file ,(first args) ,@body))
+    (t `(with-open-file ,(first args)
+	  (with-open-files
+	      ,(rest args) ,@body)))))
+
+
+
+(defun mapcat (f vec)
+  (loop for x across vec
+        append (funcall f x)))
+
+(defun node-get-id (node)
+  (second (serapeum:split-sequence #\_
+				   (plump:attribute node "id")
+				   :remove-empty-subseqs t)))
+
+
 (defun sense-map->ht (in)
   "IN is the stream for a txt file mapping sense keys to synset-ids."
   (let ((map (make-hash-table :test #'equal :size 210000)))
@@ -156,15 +178,18 @@
                                :remove-empty-subseqs t))))
 
 
+(defun filter-child-elements (node p)
+  (loop for c across (plump:child-elements node)
+        when (funcall p c)
+          collect c))
+
+
+
 (defun node-pos (node)
   (plump:attribute node "pos"))
 
 
-(defun node-get-id (node)
-  (second
-   (serapeum:split-sequence #\_
-                            (plump:attribute node "id")
-                            :remove-empty-subseqs t)))
+
 
 (defun gloss-terms (node)
   (let* ((terms-node (first
@@ -184,18 +209,6 @@
     (plump:render-text text-node)))
 
 
-(defun filter-child-elements (node p)
-  (loop for c across (plump:child-elements node)
-        when (funcall p c)
-          collect c))
-
-
-(defun mapcat (f vec)
-  (loop for x across vec
-        append (funcall f x)))
-
-
-
 (defun main (glosstag-fp out-fp sensemap-fp &key (*sense-map-ht* *sense-map-ht*))
   (ensure-directories-exist out-fp)
   (with-open-file (in-map sensemap-fp)
@@ -211,3 +224,11 @@
 						 :direction :output :if-exists :supersede
 						 :if-does-not-exist :create)
 			      (write s :case :downcase :stream out)))))))))
+
+
+(defun identation (file-in file-out)
+  (with-open-files ((in file-in)
+		    (out file-out :direction :output :if-exists :supersede))
+    (write (read in) :case :downcase :stream out)))
+
+

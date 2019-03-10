@@ -103,9 +103,11 @@ move them to the corresponding directory of package you installed.
 
 
 * Annotation format
+
 We convert the original XML files to property lists.
 
 ** conversion from original XML
+
 The script that converts the original XML WN gloss corpus is at
 =convert.lisp=. The MISC field of the annotation files saves lots of
 information from the XML to preserve a mapping between them.
@@ -124,8 +126,16 @@ To re-run the conversion:
   second parameter is the index.sense file from the WordNet database. (Use absolute paths
   if you have problems with the command.)
 
+** identation 
+
+The elisp identation differ from CL identation of plists. If data is
+kept in a git repository, it can be useful to run the code below in
+the data directory before commit:
+
+: for f in `git ls-files -m`; do ~/sensetion.el/identation.sh $f $f.tmp; mv $f.tmp $f; done
 
 * Status
+
 Under heavy development -- user interface is unstable, and the code is
 still to be generalized so that it can be made useful for annotation
 of other corpora (maybe even of other stuff).
