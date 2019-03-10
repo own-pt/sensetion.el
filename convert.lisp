@@ -21,10 +21,50 @@
   (loop for x across vec
         append (funcall f x)))
 
+
 (defun node-get-id (node)
   (second (serapeum:split-sequence #\_
 				   (plump:attribute node "id")
 				   :remove-empty-subseqs t)))
+
+(defun node-gloss-wsd? (node)
+  (and (equal (plump:tag-name node) "gloss")
+       (equal (plump:attribute node "desc")
+              "wsd")))
+
+
+(defun node-form (node)
+  (let ((form (plump:render-text (plump:strip node))))
+    (if (equal form "")
+        nil
+        form)))
+
+(defun node-lemma (node)
+  (plump:attribute node "lemma"))
+
+
+(defun node-annotation-tag (node)
+  (plump:attribute node "tag"))
+
+
+(defun node-coll (node)
+  (let ((coll-keys (plump:attribute node "coll")))
+    (when coll-keys
+      (serapeum:split-sequence #\,
+                               coll-keys
+                               :remove-empty-subseqs t))))
+
+
+(defun node-pos (node)
+  (plump:attribute node "pos"))
+
+
+(defun posn->pos (posn)
+  (gethash posn
+           (alexandria:alist-hash-table
+            '((#\1 . "n") (#\2 . "v") (#\3 . "a") (#\4 . "r") (#\5 . "a"))
+            :test #'eql)
+           "#|#"))
 
 
 (defun sense-map->ht (in)
@@ -49,28 +89,30 @@
   (gethash sk *sense-map-ht* "|#|"))
 
 
-(defun posn->pos (posn)
-  (gethash posn
-           (alexandria:alist-hash-table
-            '((#\1 . "n") (#\2 . "v") (#\3 . "a") (#\4 . "r") (#\5 . "a"))
-            :test #'eql)
-           "#|#"))
+(defun filter-child-elements (node p)
+  (loop for c across (plump:child-elements node)
+        when (funcall p c)
+        collect c))
 
 
-(defun wordnet-sentences (node)
-  (assert (equal (plump:tag-name node) "wordnet"))
-  (map 'list #'gloss-sentence (plump:child-elements node)))
+(defun gloss-text (node)
+  (let* ((text-node (first
+                     (filter-child-elements node
+                                            (lambda (n)
+                                              (and (equal (plump:tag-name n) "gloss")
+                                                   (equal (plump:attribute n "desc")
+                                                          "orig")))))))
+    (plump:render-text text-node)))
 
 
-(defun gloss-sentence (node)
-  (labels ((get-wsd-gloss (node)
-             (filter-child-elements node #'node-gloss-wsd?)))
-    ;;
-    (assert (equal (plump:tag-name node) "synset"))
-    (list :id (or (plump:attribute node "id") (error "."))
-          :terms (gloss-terms node)
-          :text (gloss-text node)
-          :tokens (gloss-tokens (first (get-wsd-gloss node))))))
+(defun gloss-terms (node)
+  (let* ((terms-node (first
+                      (filter-child-elements node
+                                             (lambda (n) (equal (plump:tag-name n) "terms")))))
+         (terms (filter-child-elements terms-node
+                                       (lambda (n) (equal (plump:tag-name n) "term")))))
+    (mapcar #'plump:render-text terms)))
+
 
 (defun gloss-tokens (node)
   (labels
@@ -149,64 +191,20 @@
      (plump:child-elements node))))
 
 
-(defun node-gloss-wsd? (node)
-  (and (equal (plump:tag-name node) "gloss")
-       (equal (plump:attribute node "desc")
-              "wsd")))
+(defun gloss-sentence (node)
+  (labels ((get-wsd-gloss (node)
+             (filter-child-elements node #'node-gloss-wsd?)))
+    ;;
+    (assert (equal (plump:tag-name node) "synset"))
+    (list :id (or (plump:attribute node "id") (error "."))
+          :terms (gloss-terms node)
+          :text (gloss-text node)
+          :tokens (gloss-tokens (first (get-wsd-gloss node))))))
 
 
-(defun node-form (node)
-  (let ((form (plump:render-text (plump:strip node))))
-    (if (equal form "")
-        nil
-        form)))
-
-
-(defun node-lemma (node)
-  (plump:attribute node "lemma"))
-
-
-(defun node-annotation-tag (node)
-  (plump:attribute node "tag"))
-
-
-(defun node-coll (node)
-  (let ((coll-keys (plump:attribute node "coll")))
-    (when coll-keys
-      (serapeum:split-sequence #\,
-                               coll-keys
-                               :remove-empty-subseqs t))))
-
-
-(defun filter-child-elements (node p)
-  (loop for c across (plump:child-elements node)
-        when (funcall p c)
-          collect c))
-
-
-
-(defun node-pos (node)
-  (plump:attribute node "pos"))
-
-
-
-
-(defun gloss-terms (node)
-  (let* ((terms-node (first
-                      (filter-child-elements node
-                                             (lambda (n) (equal (plump:tag-name n) "terms")))))
-         (terms (filter-child-elements terms-node
-                                       (lambda (n) (equal (plump:tag-name n) "term")))))
-    (mapcar #'plump:render-text terms)))
-
-(defun gloss-text (node)
-  (let* ((text-node (first
-                     (filter-child-elements node
-                                            (lambda (n)
-                                              (and (equal (plump:tag-name n) "gloss")
-                                                   (equal (plump:attribute n "desc")
-                                                          "orig")))))))
-    (plump:render-text text-node)))
+(defun wordnet-sentences (node)
+  (assert (equal (plump:tag-name node) "wordnet"))
+  (map 'list #'gloss-sentence (plump:child-elements node)))
 
 
 (defun main (glosstag-fp out-fp sensemap-fp &key (*sense-map-ht* *sense-map-ht*))
