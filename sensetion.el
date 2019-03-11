@@ -153,6 +153,9 @@ annotated."
   for a lemma")
 
 
+(defvar sensetion--index-lock nil "set to t when indexing process is working.")
+
+
 (defun sensetion--punctuation? (str)
   (gethash
    str
@@ -658,6 +661,7 @@ synset and they have different pos1, return nil."
    where
    (ix (get-char-property point 'sensetion--tk-ix))))
 
+(defalias 'sensetion-make-index #'sensetion-make-state)
 
 (defun sensetion-make-state (anno-dir callback)
   "Read annotated files and build index of lemmas* and their
@@ -666,17 +670,21 @@ positions, plus global status."
    (list (or sensetion-annotation-dir
              (read-file-name "Path to annotation directory: " nil nil t))
          (sensetion--done-indexing-messager)))
-  (message "Plese wait while we index files; a box will pop when finished.")
-  (async-start `(lambda ()
-                  ,(async-inject-variables (regexp-opt '("load-path" "sensetion-index-file" "sensetion-status-file" "sensetion-annotation-file-type")))
-                  (require 'sensetion)
-                  (seq-let (index status)
-                      (sensetion--make-state (sensetion--annotation-files ,anno-dir))
-                    (sensetion--write-state :index index :status status)
-                    t))
-               (lambda (x)
-                 (sensetion--read-state)
-                 (funcall callback x))))
+  (if sensetion--index-lock
+      (user-error "Indexing process already started; please wait while it finishes")
+    (message "Plese wait while we index files; a box will pop when finished.")
+    (setq sensetion--index-lock t)
+    (async-start `(lambda ()
+                    ,(async-inject-variables (regexp-opt '("load-path" "sensetion-index-file" "sensetion-status-file" "sensetion-annotation-file-type")))
+                    (require 'sensetion)
+                    (seq-let (index status)
+                        (sensetion--make-state (sensetion--annotation-files ,anno-dir))
+                      (sensetion--write-state :index index :status status)
+                      t))
+                 (lambda (x)
+                   (sensetion--read-state)
+                   (setq sensetion--index-lock nil)
+                   (funcall callback x)))))
 
 
 (defun sensetion--done-indexing-messager ()
@@ -721,7 +729,7 @@ builds the status (how many tokens have been annotated so far)."
   ;; but we don't care about it here; when retrieving we gotta take
   ;; care of this.
   (mapc (lambda (lemma)
-          (trie-insert index lemma sent-id #'safe-cons))
+          (trie-insert index lemma (list sent-id) #'append))
         (s-split "|" lemmas-str t)))
 
 

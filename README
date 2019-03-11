@@ -40,7 +40,7 @@ tokens with the same sense together might be useful.
 
 ** Indexing
 If the index goes out of sync, you can force a new indexation with
-=M-x sensetion-make-state=. This will happen when you change a token's
+=M-x sensetion-make-index=. This will happen when you change a token's
 lemma, for example; the new lemma will be added to the index, but the
 old one will not be removed.
 
