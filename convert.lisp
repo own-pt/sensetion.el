@@ -2,6 +2,7 @@
 (ql:quickload :serapeum)
 (ql:quickload :alexandria)
 (ql:quickload :ironclad)
+(ql:quickload :cxml)
 
 (defparameter *sense-map-ht* nil)
 
@@ -203,9 +204,9 @@
           :tokens (gloss-tokens (first (get-wsd-gloss node))))))
 
 
-(defun wordnet-sentences (node)
-  (assert (equal (plump:tag-name node) "wordnet"))
-  (map 'list #'gloss-sentence (plump:child-elements node)))
+;; (defun wordnet-sentences (node)
+;;   (assert (equal (plump:tag-name node) "wordnet"))
+;;   (map 'list #'gloss-sentence (plump:child-elements node)))
 
 
 (defun checksum (str)
@@ -213,8 +214,17 @@
           (mod
            (parse-integer
             (ironclad:byte-array-to-hex-string
-             (ironclad:digest-sequence 'ironclad:sha224 (string-to-octets str))) :start 40 :radix 16)
+             (ironclad:digest-sequence 'ironclad:sha224 (string-to-octets str))) :start 50 :radix 16)
            100)))
+
+
+(defun save-sent (s out-fp)
+  (with-open-file (out (make-pathname :name (checksum (getf s :id))
+                                      :type "plist" :defaults out-fp)
+                       :direction :output :if-exists :append
+                       :if-does-not-exist :create)
+    (write s :pretty nil :case :downcase :stream out)
+    (terpri out)))
 
 
 (defun main (glosstag-fp out-fp sensemap-fp &key (*sense-map-ht* *sense-map-ht*))
@@ -224,13 +234,12 @@
 	  (in-files (directory (make-pathname :defaults glosstag-fp :name :wild :type "xml"))))
       (format t "Input Files: ~a~%Output Directory: ~a~%Sense Index: ~a~%" in-files out-fp sensemap-fp)
       (loop for fp in in-files
-	    do (with-open-file (in fp)
-		 (let ((sents (wordnet-sentences (aref (plump:child-elements (plump:parse in)) 0))))
-		   (loop for s in sents
-			 do (with-open-file (out (make-pathname :name (checksum (getf s :id))
-								:type "plist" :defaults out-fp)
-						 :direction :output :if-exists :append
-						 :if-does-not-exist :create)
-			      (write s :pretty nil :case :downcase :stream out)))))))))
+	    do (klacks:with-open-source (in (cxml:make-source fp))
+		 (let ((f (lambda (s-xml)
+                            (save-sent (gloss-sentence
+                                        (aref (plump:child-elements (plump:parse s-xml)) 0))
+                                       out-fp))))
+                   (loop while (klacks:find-element in "synset")
+                         do (funcall f (klacks:serialize-element in (cxml:make-string-sink))))))))))
 
 

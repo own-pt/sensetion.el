@@ -13,7 +13,9 @@ customize other stuff with =M-x customize-group RET sensetion=.)
 
 Use =M-x sensetion= to start annotating. If this is the first time you
 call it, it might take some time to index the files (you can do other
-stuff on Emacs while it works).
+stuff on Emacs while it works); else it'll read the index files (which
+lie by default in your home directory, prefixed by =.sensetion-=), and
+start the annotation process.
 
 =M-x sensetion-annotate= will ask you for a lemma and a PoS tag. You
 can press =TAB= for completion of the lemma. This will build a buffer
@@ -40,9 +42,7 @@ tokens with the same sense together might be useful.
 
 ** Indexing
 If the index goes out of sync, you can force a new indexation with
-=M-x sensetion-make-index=. This will happen when you change a token's
-lemma, for example; the new lemma will be added to the index, but the
-old one will not be removed.
+=M-x sensetion-make-index=.
 
 
 ** Saving your work
@@ -99,7 +99,11 @@ You may download the =wn= executable from your favorite package
 manager. Be aware that package managers usually offer WordNet 3.1, and
 not WordNet 3.0, which is the WordNet we use to annotate the WN gloss
 corpus. If that is the case, download [[http://wordnetcode.princeton.edu/3.0/WNdb-3.0.tar.gz][WordNet 3.0 database files]], and
-move them to the corresponding directory of package you installed.
+either:
+
+- move them to the corresponding directory of package you installed;
+- or set the =WNSEARCHDIR= variable to the directory of the WordNet
+  3.0 database files.
 
 
 * Annotation format
@@ -125,15 +129,6 @@ To re-run the conversion:
   last parameter is the directory is where you want to put the files, and the
   second parameter is the index.sense file from the WordNet database. (Use absolute paths
   if you have problems with the command.)
-
-
-** indentation 
-
-The elisp indentation of plists differs from the Common Lisp
-indentation. If data is kept in a git repository, it can be useful to
-run the code below in the data directory before commiting:
-
-: for f in `git ls-files -m`; do ~/sensetion.el/identation.sh $f $f.tmp; mv $f.tmp $f; done
 
 
 * Status

@@ -37,6 +37,7 @@
    `(defhydra hydra-senses (:color blue)
       ""
       ("q" nil nil)
+      ("RET" nil nil)
       ("0" ,no-sense-function "No sense in Wordnet" :column "Pick sense:")
       ,@(mapcar
          (lambda (s)
@@ -50,7 +51,7 @@
                                             ,tk-ix
                                             ,sent)
                       (sensetion--edit-reinsert-state-call
-                         ,tk-ix ,sent ,lemma ,st ',options))
+                       ,tk-ix ,sent ,lemma ,st ',options))
                    (sense-help-text sid sense-text)
                    :column "Pick sense:")))
          options)
