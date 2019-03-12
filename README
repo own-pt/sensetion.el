@@ -126,13 +126,15 @@ To re-run the conversion:
   second parameter is the index.sense file from the WordNet database. (Use absolute paths
   if you have problems with the command.)
 
-** identation 
 
-The elisp identation differ from CL identation of plists. If data is
-kept in a git repository, it can be useful to run the code below in
-the data directory before commit:
+** indentation 
+
+The elisp indentation of plists differs from the Common Lisp
+indentation. If data is kept in a git repository, it can be useful to
+run the code below in the data directory before commiting:
 
 : for f in `git ls-files -m`; do ~/sensetion.el/identation.sh $f $f.tmp; mv $f.tmp $f; done
+
 
 * Status
 

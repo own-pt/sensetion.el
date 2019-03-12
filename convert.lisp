@@ -1,6 +1,7 @@
 (ql:quickload :plump)
 (ql:quickload :serapeum)
 (ql:quickload :alexandria)
+(ql:quickload :ironclad)
 
 (defparameter *sense-map-ht* nil)
 
@@ -146,7 +147,6 @@
            (list :form (node-form node)
                  :lemma (node-lemma node)
                  :pos (node-pos node)
-                 :anno senses
                  :status (alexandria:if-let ((st (node-annotation-tag node)))
                            (if (and (equal st "man") (null senses))
                                "skip"
@@ -158,6 +158,7 @@
                            (:glob (assert (null (cdr coll-keys)))
                             (cons kind (first coll-keys)))
                            (otherwise kind)))
+                 :anno senses
                  :meta (list (list :id (node-get-id node))))))
 
        (node-get-senses (node)
@@ -207,6 +208,15 @@
   (map 'list #'gloss-sentence (plump:child-elements node)))
 
 
+(defun checksum (str)
+  (format nil "~a"
+          (mod
+           (parse-integer
+            (ironclad:byte-array-to-hex-string
+             (ironclad:digest-sequence 'ironclad:sha224 (string-to-octets str))) :start 40 :radix 16)
+           100)))
+
+
 (defun main (glosstag-fp out-fp sensemap-fp &key (*sense-map-ht* *sense-map-ht*))
   (ensure-directories-exist out-fp)
   (with-open-file (in-map sensemap-fp)
@@ -217,16 +227,10 @@
 	    do (with-open-file (in fp)
 		 (let ((sents (wordnet-sentences (aref (plump:child-elements (plump:parse in)) 0))))
 		   (loop for s in sents
-			 do (with-open-file (out (make-pathname :name (getf s :id)
+			 do (with-open-file (out (make-pathname :name (checksum (getf s :id))
 								:type "plist" :defaults out-fp)
-						 :direction :output :if-exists :supersede
+						 :direction :output :if-exists :append
 						 :if-does-not-exist :create)
-			      (write s :case :downcase :stream out)))))))))
-
-
-(defun identation (file-in file-out)
-  (with-open-files ((in file-in)
-		    (out file-out :direction :output :if-exists :supersede))
-    (write (read in) :case :downcase :stream out)))
+			      (write s :pretty nil :case :downcase :stream out)))))))))
 
 
