@@ -215,7 +215,7 @@
            (parse-integer
             (ironclad:byte-array-to-hex-string
              (ironclad:digest-sequence 'ironclad:sha224 (string-to-octets str))) :start 50 :radix 16)
-           100)))
+           1000)))
 
 
 (defun save-sent (s out-fp)

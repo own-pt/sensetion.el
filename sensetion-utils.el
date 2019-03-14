@@ -15,16 +15,18 @@
 (defun sensetion--map-lines (file f)
   "Apply F to each line of FILE.
 
-F must take as argument the point where the line begins and the
-line string itself."
+F must take as argument the line number and the line string
+itself."
   (with-temp-buffer
     (insert-file-contents file)
-    (let (res)
+    (let (res
+          (counter 0))
       (while (not (eobp))
         (setf res
               (cons 
-               (funcall f (point) (thing-at-point 'line t))
+               (funcall f counter (thing-at-point 'line t))
                res))
+        (cl-incf counter)
         (forward-line 1))
       res)))
 
@@ -58,5 +60,12 @@ line string itself."
 ;;   `(defun ,name ,arglist
 ;;      (sensetion-is
 ;;       ,@body)))
+
+
+(defun sensetion--goto-line (line &optional start-line)
+  (unless start-line
+    (goto-char (point-min)))
+  (let ((sl (or start-line 0)))
+    (forward-line (- line sl))))
 
 (provide 'sensetion-utils)
