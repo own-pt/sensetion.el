@@ -46,11 +46,11 @@
              (list key
                    `(lambda () (interactive)
                       (sensetion--add-sense ,lemma
-                                            ,st
-                                            ,tk
-                                            ,sid
-                                            ,tk-ix
-                                            ,sent)
+                                   ,st
+                                   ,tk
+                                   ,sid
+                                   ,tk-ix
+                                   ,sent)
                       (sensetion--edit-reinsert-state-call
                        ,tk-ix ,sent ,lemma ,st ',options))
                    (sense-help-text sid sense-text)

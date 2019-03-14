@@ -562,8 +562,11 @@ number of selected tokens."
                                             'display '(raise 0.4)
                                             'face '(:height 0.6))
                               "")
-                            (if-let ((_ selected?)
-                                     (sids (sensetion--tk-anno tk)))
+                            (if-let ((_ (or selected?
+                                            glob-selected?))
+                                     (sids (if selected?
+                                               (sensetion--tk-anno tk)
+                                             (sensetion--tk-anno (cdr glob-selected?)))))
                                 (propertize (s-join ","
                                                     (mapcar (lambda (s)
                                                               (cl-first
