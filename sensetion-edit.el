@@ -144,4 +144,5 @@
   (add-hook 'kill-buffer-hook 'sensetion--save-edit nil t)
   (setq-local write-contents-functions (list (lambda () (sensetion--save-edit t)))))
 
+
 (provide 'sensetion-edit)

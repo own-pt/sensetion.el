@@ -179,7 +179,8 @@ annotated."
   (aset (or buffer-display-table
             (setq buffer-display-table (make-display-table)))
         ?\n [?\n?\n])
-  (setq-local mode-name '(:eval (sensetion--mode-line-status-text))))
+  (setq-local mode-name '(:eval (sensetion--mode-line-status-text)))
+  (setq-local write-contents-functions (list (lambda () t))))
 
 
 (defun sensetion--mode-line-status-text ()

@@ -24,9 +24,13 @@ yet. Unannotated words will show as red/pink, while
 previously-annotated tokens will show as green, and newly-annotated
 tokens will show as blue (all these colors can be customized by the
 user). You can navigate through taggable tokens with =<= and =>=. If
-you wish to annotate a token, press =/= on it. You can see how many
-tokens still need to be annotated in the mode-line, next to the
-=sensetion= indicator.
+you wish to annotate a token, press =/= on it. Select one of the
+options with the appropriate keyboard key; when satisfied, press
+enter/return. If you'd like to quit, press =q=; note that quitting
+does not undo anything (if you selected an option and then quit, its
+effects were carried out and saved). You can see how many tokens still
+need to be annotated in the mode-line, next to the =sensetion=
+indicator.
 
 There is support for word collocations, such as phrasal verbs. The
 tokens part of a collocation are united by a key, which is shown in
@@ -51,6 +55,14 @@ If the index goes out of sync, you can force a new indexation with
 - The updated index is saved by default to your home directory in
   =.sensetion-index= when you quit emacs gracefully (that's why it
   hangs a little). This path is customizable.
+
+
+** Seeing your work
+We recommend setting up a git repository for the annotation files (see
+any git tutorial if you are unfamiliar with it). Use
+: git diff --color-words=.
+(note the period =.=) to see the changes you made after the previous
+commit.
 
 
 * Report bugs
@@ -125,10 +137,11 @@ To re-run the conversion:
 - setup [[https://www.quicklisp.org/beta/][quicklisp]];
 - run:
   : ./convert.sh ~/WordNet-3.0/glosstag/merged/ ~/WordNet-3.0/dict/index.sense glosstag/
-  where the first parameter is a directory is from the gloss corpus archive, the
-  last parameter is the directory is where you want to put the files, and the
-  second parameter is the index.sense file from the WordNet database. (Use absolute paths
-  if you have problems with the command.)
+  where the first parameter is a directory is from the gloss corpus
+  archive, the last parameter is the directory is where you want to
+  put the files, and the second parameter is the index.sense file from
+  the WordNet database. (Use absolute paths if you have problems with
+  the command.)
 
 
 * Status
