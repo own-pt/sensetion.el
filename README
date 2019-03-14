@@ -13,7 +13,9 @@ customize other stuff with =M-x customize-group RET sensetion=.)
 
 Use =M-x sensetion= to start annotating. If this is the first time you
 call it, it might take some time to index the files (you can do other
-stuff on Emacs while it works).
+stuff on Emacs while it works); else it'll read the index files (which
+lie by default in your home directory, prefixed by =.sensetion-=), and
+start the annotation process.
 
 =M-x sensetion-annotate= will ask you for a lemma and a PoS tag. You
 can press =TAB= for completion of the lemma. This will build a buffer
@@ -22,9 +24,13 @@ yet. Unannotated words will show as red/pink, while
 previously-annotated tokens will show as green, and newly-annotated
 tokens will show as blue (all these colors can be customized by the
 user). You can navigate through taggable tokens with =<= and =>=. If
-you wish to annotate a token, press =/= on it. You can see how many
-tokens still need to be annotated in the mode-line, next to the
-=sensetion= indicator.
+you wish to annotate a token, press =/= on it. Select one of the
+options with the appropriate keyboard key; when satisfied, press
+enter/return. If you'd like to quit, press =q=; note that quitting
+does not undo anything (if you selected an option and then quit, its
+effects were carried out and saved). You can see how many tokens still
+need to be annotated in the mode-line, next to the =sensetion=
+indicator.
 
 There is support for word collocations, such as phrasal verbs. The
 tokens part of a collocation are united by a key, which is shown in
@@ -40,9 +46,7 @@ tokens with the same sense together might be useful.
 
 ** Indexing
 If the index goes out of sync, you can force a new indexation with
-=M-x sensetion-make-index=. This will happen when you change a token's
-lemma, for example; the new lemma will be added to the index, but the
-old one will not be removed.
+=M-x sensetion-make-index=.
 
 
 ** Saving your work
@@ -51,6 +55,14 @@ old one will not be removed.
 - The updated index is saved by default to your home directory in
   =.sensetion-index= when you quit emacs gracefully (that's why it
   hangs a little). This path is customizable.
+
+
+** Seeing your work
+We recommend setting up a git repository for the annotation files (see
+any git tutorial if you are unfamiliar with it). Use
+: git diff --color-words=.
+(note the period =.=) to see the changes you made after the previous
+commit.
 
 
 * Report bugs
@@ -99,7 +111,11 @@ You may download the =wn= executable from your favorite package
 manager. Be aware that package managers usually offer WordNet 3.1, and
 not WordNet 3.0, which is the WordNet we use to annotate the WN gloss
 corpus. If that is the case, download [[http://wordnetcode.princeton.edu/3.0/WNdb-3.0.tar.gz][WordNet 3.0 database files]], and
-move them to the corresponding directory of package you installed.
+either:
+
+- move them to the corresponding directory of package you installed;
+- or set the =WNSEARCHDIR= variable to the directory of the WordNet
+  3.0 database files.
 
 
 * Annotation format
@@ -121,18 +137,12 @@ To re-run the conversion:
 - setup [[https://www.quicklisp.org/beta/][quicklisp]];
 - run:
   : ./convert.sh ~/WordNet-3.0/glosstag/merged/ ~/WordNet-3.0/dict/index.sense glosstag/
-  where the first parameter is a directory is from the gloss corpus archive, the
-  last parameter is the directory is where you want to put the files, and the
-  second parameter is the index.sense file from the WordNet database. (Use absolute paths
-  if you have problems with the command.)
+  where the first parameter is a directory is from the gloss corpus
+  archive, the last parameter is the directory is where you want to
+  put the files, and the second parameter is the index.sense file from
+  the WordNet database. (Use absolute paths if you have problems with
+  the command.)
 
-** identation 
-
-The elisp identation differ from CL identation of plists. If data is
-kept in a git repository, it can be useful to run the code below in
-the data directory before commit:
-
-: for f in `git ls-files -m`; do ~/sensetion.el/identation.sh $f $f.tmp; mv $f.tmp $f; done
 
 * Status
 

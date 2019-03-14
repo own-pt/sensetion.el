@@ -1,4 +1,4 @@
-;;; -*- lexical-binding: t; -*-
+;;; sensetion.el --- -*- lexical-binding: t; -*-
 (require 'seq)
 (require 'subr-x)
 (require 'ido)
@@ -9,6 +9,7 @@
 (require 'cl-lib)
 (require 'hydra)
 (require 'trie)
+(require 'sensetion-utils)
 (require 'sensetion-data)
 (require 'sensetion-edit)
 
@@ -83,6 +84,14 @@
 
   A trie mapping lemmas to sentence ids.")
 
+
+(defvar sensetion--sentid->line
+  nil
+  "Index.
+
+  A hash-table mapping sentence ids to integers.")
+
+
 (defvar sensetion--global-status
   nil
   "Global status.
@@ -107,7 +116,7 @@ A cons cell in the same format as `sensetion--global-status'.")
     (define-key map "l" #'sensetion-edit-lemma)
     (define-key map "m" #'sensetion-toggle-glob-mark)
     (define-key map "g" #'sensetion-glob)
-    (define-key map "." #'sensetion-go-to-source)
+    (define-key map "." #'sensetion-edit-sent)
     (define-key map [C-down] #'sensetion-move-line-down)
     (define-key map [C-up] #'sensetion-move-line-up)
     map)
@@ -148,24 +157,10 @@ annotated."
 
 
 (defvar-local sensetion--synset-cache
-  nil
-  "Should be an alist associating pos1 with the possible synsets
-  for a lemma")
+  nil)
 
 
 (defvar sensetion--index-lock nil "set to t when indexing process is working.")
-
-
-(defun sensetion--punctuation? (str)
-  (gethash
-   str
-   #s(hash-table size 45 test equal rehash-size 1.5 rehash-threshold 0.8125
-                 purecopy t data
-                 ("." t "," t ":" t "!" t "?" t "'" t "]" t ")" t "..." t "»" t))))
-
-
-(defun sensetion--beginning-of-buffer ()
-  (goto-char (point-min)))
 
 
 (defcustom sensetion-mode-line '(:eval (sensetion--mode-line-status-text))
@@ -184,7 +179,8 @@ annotated."
   (aset (or buffer-display-table
             (setq buffer-display-table (make-display-table)))
         ?\n [?\n?\n])
-  (setq-local mode-name '(:eval (sensetion--mode-line-status-text))))
+  (setq-local mode-name '(:eval (sensetion--mode-line-status-text)))
+  (setq-local write-contents-functions (list (lambda () t))))
 
 
 (defun sensetion--mode-line-status-text ()
@@ -214,17 +210,6 @@ annotated."
                             (sensetion--done-indexing-messager)))))
 
 
-;; (defun sensetion--setup-status-window ()
-;;   (setq fit-window-to-buffer-horizontally t)
-;;   (setq window-resize-pixelwise t)
-;;   (setq display-buffer-alist
-;;         (cons '("\\*sensetion-status\\*" display-buffer-in-side-window
-;;                 (side . top) (slot . 0) (window-height . fit-window-to-buffer)
-;;                 (preserve-size . (nil . t)) (no-other-window . t)
-;;                 (no-delete-other-windows . t))
-;;               display-buffer-alist)))
-
-
 (cl-defun sensetion--annotation-files (&optional (anno-dir sensetion-annotation-dir))
   (f-files anno-dir
            (lambda (f) (equal (f-ext f) sensetion-annotation-file-type))))
@@ -237,33 +222,35 @@ annotated."
   (unless lemma (user-error "Must provide lemma"))
   ;; using regexp just to get all pos combinations
   ;; TODO: add $ to regexp
-  (let* ((regexp (if (equal pos "any")
-                     (concat lemma "%?[1234]?")
-                   (concat lemma "%?" (sensetion--pos->synset-type pos) "?")))
-         (filter-fn (sensetion--regexp-search-filter-fn))
-         (matches (progn (trie-regexp-search sensetion--index regexp
-                                             nil nil nil filter-fn)
-                         (funcall filter-fn)))
-         (result-buffer (generate-new-buffer
-                         (sensetion--create-buffer-name lemma pos))))
-    (unless matches
-      (if pos
-          (user-error "No matches for lemma %s and PoS %s" lemma pos)
-        (user-error "No matches for lemma %s as any PoS." lemma)))
-    (with-current-buffer result-buffer
-      (sensetion-mode)
-      (with-inhibiting-read-only
-       (setq sensetion--lemma lemma)
-       (setq sensetion--synset-cache (sensetion--wordnet-lookup lemma))
-       (setq sensetion--local-status (sensetion--make-collocations matches)))
-      (sensetion--beginning-of-buffer))
-    (pop-to-buffer result-buffer)))
-
-
-(defun safe-cons (car cdr)
-  (if (listp cdr)
-      (cons car cdr)
-    (cons car (list cdr))))
+  (sensetion-is
+   (unless matches
+     (if pos
+         (user-error "No matches for lemma %s and PoS %s" lemma pos)
+       (user-error "No matches for lemma %s as any PoS." lemma)))
+   (with-current-buffer result-buffer
+     (sensetion-mode)
+     (with-inhibiting-read-only
+      (setq sensetion--lemma lemma)
+      (setq sensetion--synset-cache (sensetion--wordnet-lookup lemma))
+      (setq sensetion--local-status (sensetion--make-collocations matches)))
+     (sensetion--beginning-of-buffer))
+   (pop-to-buffer result-buffer)
+   where
+   ;; (sorted-matches (mapcan #'sort-gr
+   ;;                         (seq-group-by #'sensetion--sentid->ix matches)))
+   ;; (sort-gr (gr)
+   ;;          (sort gr (lambda (e1 e2)
+   ;;                     (< (sensetion--sent-line e1)
+   ;;                        (sensetion--sent-line e2)))))
+   (matches (progn (trie-regexp-search sensetion--index regexp
+                                       nil nil nil filter-fn)
+                   (funcall filter-fn)))
+   (filter-fn (sensetion--regexp-search-filter-fn))
+   (result-buffer (generate-new-buffer
+                   (sensetion--create-buffer-name lemma pos)))
+   (regexp (if (equal pos "any")
+               (concat lemma "%?[1234]?")
+             (concat lemma "%?" (sensetion--pos->synset-type pos) "?")))))
 
 
 (defun sensetion--regexp-search-filter-fn ()
@@ -292,10 +279,11 @@ other the unique values."
 
 
 (defun sensetion--get-sent (sent-id)
-  (let* ((fp (sensetion--sent-id->filename sent-id))
-         (text (f-read-text fp))
-         (plist (read text)))
-    (sensetion--plist->sent plist)))
+  (with-temp-buffer
+    (insert-file-contents (sensetion--sent-id->filename sent-id))
+    (sensetion--go-to-source sent-id)
+    (let ((plist (read (thing-at-point 'line t))))
+      (sensetion--plist->sent plist))))
 
 
 (defun sensetion--get-sent-at-point ()
@@ -647,7 +635,8 @@ synset and they have different pos1, return nil."
 
 
 (defun sensetion--sent-id->filename (sent-id)
-  (f-join sensetion-annotation-dir (concat sent-id "." sensetion-annotation-file-type)))
+  (f-join sensetion-annotation-dir
+          (concat (sensetion--sentid->ix sent-id) "." sensetion-annotation-file-type)))
 
 
 (defun sensetion--sent-id-prop-at-point ()
@@ -672,14 +661,16 @@ positions, plus global status."
          (sensetion--done-indexing-messager)))
   (if sensetion--index-lock
       (user-error "Indexing process already started; please wait while it finishes")
-    (message "Plese wait while we index files; a box will pop when finished.")
+    (message "Please wait while we index files; a box will pop when finished.")
     (setq sensetion--index-lock t)
     (async-start `(lambda ()
                     ,(async-inject-variables (regexp-opt '("load-path" "sensetion-index-file" "sensetion-status-file" "sensetion-annotation-file-type")))
                     (require 'sensetion)
-                    (seq-let (index status)
+                    (seq-let (index sentid->line status)
                         (sensetion--make-state (sensetion--annotation-files ,anno-dir))
-                      (sensetion--write-state :index index :status status)
+                      (sensetion--write-state :index index
+                                              :status status
+                                              :sentid->line sentid->line)
                       t))
                  (lambda (x)
                    (sensetion--read-state)
@@ -692,21 +683,38 @@ positions, plus global status."
     (message-box "Done indexing files. You may call `sensetion-annotate' now")))
 
 
+(defun sensetion--sentid->ix (id)
+  (format "%.0f"
+   (mod
+    (string-to-number
+     (substring
+      (secure-hash 'sha224 id)
+      50)
+     16)
+    1000)))
+
+
 (defun sensetion--make-state (files)
   "Read annotated files and build index associating lemmas* to
 where sentence-ids (and thus files) where they appear. Also
 builds the status (how many tokens have been annotated so far)."
   (let ((index (make-trie #'<))
+        (sentid->line (make-hash-table :size 200000 :test 'equal))
         (annotatable 0)
         (annotated 0))
     (cl-labels
-        ((run (id f)
-              (let ((sent (sensetion--plist->sent (read (f-read-text f)))))
-                (index-sent id sent)))
+        ((run (f)
+              (sensetion--map-lines f
+                                    (lambda (lno l)
+                                      (index-sent lno (sensetion--plist->sent (read l))))))
 
-         (index-sent (id sent)
-                     (mapc (apply-partially #'index-token id)
-                           (sensetion--sent-tokens sent)))
+         (index-sent (lno sent)
+                     (pcase sent
+                       ((cl-struct sensetion--sent id terms text tokens)
+                        (setf (gethash id sentid->line)
+                              lno)
+                        (mapc (apply-partially #'index-token id)
+                              tokens))))
 
          (index-token (sent-id tk)
                       (when (sensetion--tk-annotatable? tk)
@@ -720,8 +728,8 @@ builds the status (how many tokens have been annotated so far)."
                         (when (sensetion--tk-annotated? tk)
                           (cl-incf annotated)))))
       ;;
-      (mapc (lambda (f) (run (file-name-base f) f)) files)
-      (list index (cons annotated annotatable)))))
+      (mapc #'run files)
+      (list index sentid->line (cons annotated annotatable)))))
 
 
 (defun sensetion--index-lemmas (index lemmas-str sent-id)
@@ -761,10 +769,12 @@ present in SENT's tokens."
 
 
 (cl-defun sensetion--write-state (&key (index sensetion--index)
-                                       (status sensetion--global-status))
+                                       (status sensetion--global-status)
+                                       (sentid->line sensetion--sentid->line))
   (let ((print-circle t))
     (with-temp-file sensetion-index-file
-      (prin1 index (current-buffer))))
+      (prin1 index (current-buffer))
+      (prin1 sentid->line (current-buffer))))
   (f-write (with-output-to-string (prin1 status))
            'utf-8
            sensetion-status-file)
@@ -779,8 +789,8 @@ set `sensetion--global-status'. "
   (with-temp-message "Reading index"
     (with-temp-buffer
       (insert-file-contents sensetion-index-file)
-      (goto-char (point-min))           ;is this needed?
-      (setq sensetion--index (read (current-buffer))))
+      (setq sensetion--index (read (current-buffer)))
+      (setq sensetion--sentid->line (read (current-buffer))))
     (setq sensetion--global-status (read (f-read-text sensetion-status-file))))
   t)
 
@@ -882,9 +892,15 @@ edit hydra) and the second is the gloss string."
 
 
 (defun sensetion--save-sent (sent)
-  (f-write (pp-to-string (sensetion--sent->plist sent))
-           'utf-8
-           (sensetion--sent-id->filename (sensetion--sent-id sent))))
+  (sensetion-is
+   (with-temp-file fp
+     (insert-file-contents fp)
+     (sensetion--go-to-source id)
+     (delete-region (line-beginning-position) (line-end-position))
+     (prin1 (sensetion--sent->plist sent) (current-buffer)))
+   where
+   (fp (sensetion--sent-id->filename id))
+   (id (sensetion--sent-id sent))))
 
 
 ;; TODO: refactor prop names as variables
@@ -928,46 +944,24 @@ edit hydra) and the second is the gloss string."
    (transpose-lines 1)
    (forward-line -1)))
 
+
+(defun sensetion--sent-line (sent-id)
+  (gethash sent-id sensetion--sentid->line "shouldn't happen"))
+
+(defun sensetion--go-to-source (sent-id)
+  (sensetion--goto-line (sensetion--sent-line sent-id)))
+
+
 (defun sensetion-go-to-source (sent-id)
   (interactive (list (sensetion--sent-id-prop-at-point)))
   (sensetion-is
    (unless sent-buff
      (error "No sentence found; please report bug"))
    (pop-to-buffer sent-buff nil t)
+   (sensetion--go-to-source sent-id)
    where
    (sent-buff (find-file-noselect sent-fp))
    (sent-fp   (sensetion--sent-id->filename sent-id))))
-
-
-(defmacro with-inhibiting-read-only (&rest body)
-  `(let ((inhibit-read-only t))
-     ,@body))
-
-
-(defmacro sensetion-is (&rest body)
-  (seq-let (body wclauses)
-      (-split-when (lambda (c) (eq 'where c)) body)
-    (let ((body
-           (-reduce-from
-            (lambda (bd cl)
-              (pcase cl
-                (`(,var ,val)
-                 `((let ((,var ,val))
-                     ,@bd)))
-                (`(,name ,arglist . ,body)
-                 `((cl-labels ((,name ,arglist ,@body))
-                     ,@bd)))))
-            body
-            wclauses)))
-      (cl-first body))))
-
-;; (defmacro defun/where (name arglist &rest body)
-;;   "
-;; \(fn NAME ARGLIST &optional DOCSTRING DECL &rest BODY)"
-;;   (declare (doc-string 3) (indent 2) (debug defun))
-;;   `(defun ,name ,arglist
-;;      (sensetion-is
-;;       ,@body)))
 
 
 (provide 'sensetion)
