@@ -152,12 +152,12 @@
                  :pos (node-pos node)
                  :status (alexandria:if-let ((st (node-annotation-tag node)))
                            (or (serapeum:string-case st
-                                 ("man"
-                                  (unless senses
-                                    "nosense"))
-                                 ("auto"
-                                  (assert senses (senses)
-                                          "~S is tagged auto but has no sense" senses)))
+                                 (("auto" "man")
+                                  (assert senses)
+                                  (when (eq senses 'nosense)
+                                    (concatenate 'string st "-nosense")))
+                                 (("ignore" "un")
+                                  (assert (null senses))))
                                st))
                  :kind (let ((coll-keys (node-coll node)))
                          (case kind
@@ -175,22 +175,29 @@
                             (cons kind (first coll-keys)))
                            (otherwise kind)))
                  :anno senses
-                 :meta (list (list :id (node-get-id node))))))
+                 :meta (list (list :id (node-get-id node)))
+                 :conf (if (eq senses 'nosense) 0 1))))
 
        (node-get-senses (node)
-         (let ((ids (filter-child-elements
-                     node
-                     (lambda (n) (and
-                                  (equal (plump:tag-name n) "id")
-                                  ;; someone had the brilliant idea of
-                                  ;; including this false sense key
-                                  (not (equal
-                                        (plump:attribute n "sk")
-                                        "purposefully_ignored%0:00:00::")))))))
-           (mapcar (lambda (s)
-                     (let ((sk (plump:attribute s "sk")))
-                       (sense-key->synset-id sk)))
-                   ids)))
+         (let* ((ids (filter-child-elements
+                      node
+                      (lambda (n) (equal (plump:tag-name n) "id"))))
+                (ignored? (some (lambda (n) (equal
+                                             (plump:attribute n "sk")
+                                             "purposefully_ignored%0:00:00::"))
+                                ids)))
+           (if ignored?
+               (progn
+                 (assert (member (node-annotation-tag node) '("man" "auto")
+                                 :test #'equal)
+                         (node)
+                         "~S is purposefully ignored, so should have tag \"man\" or \"auto\".")
+                 (assert (null (cdr ids)) (ids) "~S must be a singleton if there's a purposefully ignored token." ids)
+                 'nosense)
+               (mapcar (lambda (s)
+                         (let ((sk (plump:attribute s "sk")))
+                           (sense-key->synset-id sk)))
+                       ids))))
 
        (cf-token (node)
          (let ((globs (filter-child-elements node
@@ -243,18 +250,21 @@
 
 
 (defun main (glosstag-fp out-fp sensemap-fp &key (*sense-map-ht* *sense-map-ht*))
-  (ensure-directories-exist out-fp)
-  (with-open-file (in-map sensemap-fp)
-    (let ((*sense-map-ht* (sense-map->ht in-map))
-	  (in-files (directory (make-pathname :defaults glosstag-fp :name :wild :type "xml"))))
-      (format t "Input Files: ~a~%Output Directory: ~a~%Sense Index: ~a~%" in-files out-fp sensemap-fp)
-      (loop for fp in in-files
-	    do (klacks:with-open-source (in (cxml:make-source fp))
-		 (let ((f (lambda (s-xml)
-                            (save-sent (gloss-sentence
-                                        (aref (plump:child-elements (plump:parse s-xml)) 0))
-                                       out-fp))))
-                   (loop while (klacks:find-element in "synset")
-                         do (funcall f (klacks:serialize-element in (cxml:make-string-sink))))))))))
+  (let ((out-fp (ensure-directories-exist out-fp)))
+    (with-open-file (in-map sensemap-fp)
+      (let ((*sense-map-ht* (sense-map->ht in-map))
+	    (in-files (directory (make-pathname :defaults glosstag-fp :name :wild :type "xml"))))
+        (format t "Input Files: ~a~%Output Directory: ~a~%Sense Index: ~a~%"
+                in-files
+                out-fp
+                sensemap-fp)
+        (loop for fp in in-files
+	      do (klacks:with-open-source (in (cxml:make-source fp))
+                   (labels ((f (s-xml)
+                              (save-sent (gloss-sentence
+                                          (aref (plump:child-elements (plump:parse s-xml)) 0))
+                                         out-fp)))
+                     (loop while (klacks:find-element in "synset")
+                           do (f (klacks:serialize-element in (cxml:make-string-sink)))))))))))
 
 

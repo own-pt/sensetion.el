@@ -460,7 +460,7 @@ with `sensetion-unmark-glob'."
               tk))
    (new-glob (sensetion--make-tk :form nil :lemma lemma :pos nil
                                  :status "un" :kind `(:glob . ,new-k)
-                                 :anno nil :meta nil))
+                                 :anno nil :meta nil :conf 1))
    (ixs   (reverse (get-text-property (line-end-position) 'sensetion--to-glob)))
    (new-k (char-to-string (1+ max-k)))
    (max-k (max-key sent))
@@ -508,11 +508,10 @@ number of selected tokens."
                                          ,(pcase (sensetion--tk-status tk)
                                             ((or "auto" "man")
                                              sensetion-previously-annotated-colour)
+                                            ;; TODO: add unsure color
                                             ("un"
                                              sensetion-unnanoted-colour)
-                                            ("unsure"
-                                             sensetion-unsure-colour)
-                                            ("now"
+                                            ("man-now"
                                              sensetion-currently-annotated-colour)
                                             (_ (error "%s" tk))))
                                  (when-let ((key (sensetion--tk-glob? tk)))
@@ -767,8 +766,9 @@ present in SENT's tokens."
   (pcase (sensetion--tk-kind tk)
     (`(:coll . ,_) nil)
     (_ (let ((status (sensetion--tk-status tk)))
-         (when (member status
-                       '("man" "un" "unsure" "auto" "now"))
+         (when (member
+                status
+                '("man" "man-nosense" "man-now" "un" "auto" "auto-nosense"))
            status)))))
 
 
@@ -892,7 +892,8 @@ edit hydra) and the second is the gloss string."
 
 
 (defun sensetion--tk-annotated? (tk)
-  (member (sensetion--tk-status tk) '("man" "auto" "unsure" "now")))
+  (member (sensetion--tk-status tk)
+          '("man" "auto" "man-nosense" "auto-nosense" "man-now")))
 
 
 (defun sensetion--save-sent (sent)

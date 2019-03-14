@@ -141,7 +141,8 @@ To re-run the conversion:
   archive, the last parameter is the directory is where you want to
   put the files, and the second parameter is the index.sense file from
   the WordNet database. (Use absolute paths if you have problems with
-  the command.)
+  the command.) Note that the trailing slash in =glosstag/= is
+  important.
 
 
 * Status
@@ -149,3 +150,15 @@ To re-run the conversion:
 Under heavy development -- user interface is unstable, and the code is
 still to be generalized so that it can be made useful for annotation
 of other corpora (maybe even of other stuff).
+
+# - use nonsense
+# - prevent user from assigning man without senses
+# - index everyone?
+# - index parts of collocations
+# - add ignore command
+# - add unsure command
+# - add unsure as a field
+# - add confidence to plist
+# - transform purposefully_ignored to man/auto with low confidence
+# - confidence may be colored
+# - purposefully ignored -> tag-nosense

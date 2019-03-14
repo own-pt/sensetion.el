@@ -74,7 +74,7 @@
       (setf (sensetion--tk-anno (elt (sensetion--sent-tokens sent) tk-ix))
             nil)
       (setf (sensetion--tk-status (elt (sensetion--sent-tokens sent) tk-ix))
-            "now")
+            "man-now")
       (sensetion--edit-reinsert-state-call tk-ix sent)))
    (pres-senses (sensetion--tk-anno tk))
    (tk (elt (sensetion--sent-tokens sent) tk-ix))))
@@ -88,7 +88,7 @@
    (setf (sensetion--tk-anno (elt (sensetion--sent-tokens sent) ix))
          senses)
    (setf (sensetion--tk-status (elt (sensetion--sent-tokens sent) ix))
-         "now")
+         "man-now")
    where
    (lemma-str (s-join "|" lemmas))
    (lemmas (seq-uniq (cons (sensetion--make-lemma* lemma st) old-lemmas)))
