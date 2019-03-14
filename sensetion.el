@@ -385,7 +385,7 @@ collocation."
   "Marks token to be globbed with the `sensetion-glob' command."
   (with-inhibiting-read-only
    (put-text-property beg end
-                      'face '(:foreground "yellow"))
+                      'face '(:foreground "brown"))
    (put-text-property (line-end-position) (1+ (line-end-position))
                       'sensetion--to-glob (cons ix marked))))
 
@@ -456,6 +456,7 @@ with `sensetion-unmark-glob'."
             (let ((cks (sensetion--tk-coll-keys tk)))
               (setf (sensetion--tk-kind tk)
                     (cl-list* :coll key cks))
+              ;; TODO: delete senses and make status "un"
               tk))
    (new-glob (sensetion--make-tk :form nil :lemma lemma :pos nil
                                  :status "un" :kind `(:glob . ,new-k)
