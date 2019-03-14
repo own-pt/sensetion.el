@@ -88,7 +88,9 @@
 
 
 (defun sense-key->synset-id (sk)
-  (gethash sk *sense-map-ht* "|#|"))
+  (or
+   (gethash sk *sense-map-ht*)
+   (error "sense key ~S does not exist" sk)))
 
 
 (defun filter-child-elements (node p)
@@ -149,14 +151,27 @@
                  :lemma (node-lemma node)
                  :pos (node-pos node)
                  :status (alexandria:if-let ((st (node-annotation-tag node)))
-                           (if (and (equal st "man") (null senses))
-                               "skip"
-                               st)
-                           st)
+                           (or (serapeum:string-case st
+                                 ("man"
+                                  (unless senses
+                                    "nosense"))
+                                 ("auto"
+                                  (assert senses (senses)
+                                          "~S is tagged auto but has no sense" senses)))
+                               st))
                  :kind (let ((coll-keys (node-coll node)))
                          (case kind
-                           (:coll (cons kind coll-keys))
-                           (:glob (assert (null (cdr coll-keys)))
+                           (:coll
+                            (assert (null senses)
+                                    (senses)
+                                    "when token ~S is part of a collocation, it must have no annotation (only its glob may be annotated"
+                                    node)
+                            (cons kind coll-keys))
+                           (:glob
+                            (assert (null (cdr coll-keys))
+                                    (coll-keys)
+                                    "when token ~S is a glob it must have be part of only one colloc"
+                                    node)
                             (cons kind (first coll-keys)))
                            (otherwise kind)))
                  :anno senses
