@@ -1,4 +1,4 @@
-;;; -*- lexical-binding: t; -*-
+;;; sensetion.el --- -*- lexical-binding: t; -*-
 
 (defun sensetion--punctuation? (str)
   (gethash

@@ -1,5 +1,6 @@
-;;; -*- lexical-binding: t; -*-
+;;; sensetion.el --- -*- lexical-binding: t; -*-
 (require 'sensetion-data)
+
 
 (defun sensetion-edit (lemma ix pos sent)
   (interactive (list (buffer-local-value 'sensetion--lemma (current-buffer))
@@ -103,5 +104,44 @@
     (cl-incf (car sensetion--local-status) 1))
   (when (and lemma st options)
     (sensetion--call-hydra lemma st tk-ix sent options)))
+
+;; ;; ;; ;; edit source sent
+(defun sensetion-edit-sent (sent)
+  (interactive (list (sensetion--get-sent-at-point)))
+  (sensetion--edit-sent
+   sent
+   (get-buffer (sensetion--make-edit-buffer-name sent))))
+
+
+(defun sensetion--edit-sent (sent mbuffer)
+  (let ((buffer (or mbuffer (generate-new-buffer (sensetion--make-edit-buffer-name sent)))))
+    (unless mbuffer
+      (with-current-buffer buffer
+        (prin1 (sensetion--sent->plist sent) (current-buffer))
+        (sensetion--beginning-of-buffer)
+        (indent-pp-sexp 1)
+        (sensetion--edit-mode)
+        (set-buffer-modified-p nil)))
+    (pop-to-buffer buffer nil t)))
+
+
+(defun sensetion--make-edit-buffer-name (sent)
+  (format "*%s-sensetion-edit*" (sensetion--sent-id sent)))
+
+
+(defun sensetion--save-edit (&optional force)
+  (when (buffer-modified-p (current-buffer))
+    (when (or force (y-or-n-p "Save sentence? "))
+      (save-excursion
+        (goto-char (point-min))
+        (sensetion--save-sent (sensetion--plist->sent (read (thing-at-point 'sexp t)))))
+      (set-buffer-modified-p nil)))
+  t)
+
+
+(define-derived-mode sensetion--edit-mode prog-mode "sensetion-edit"
+  "sensetion-edit-mode is a major mode for editing sensetion database files."
+  (add-hook 'kill-buffer-hook 'sensetion--save-edit nil t)
+  (setq-local write-contents-functions (list (lambda () (sensetion--save-edit t)))))
 
 (provide 'sensetion-edit)

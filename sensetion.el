@@ -1,4 +1,4 @@
-;;; -*- lexical-binding: t; -*-
+;;; sensetion.el --- -*- lexical-binding: t; -*-
 (require 'seq)
 (require 'subr-x)
 (require 'ido)
@@ -116,7 +116,7 @@ A cons cell in the same format as `sensetion--global-status'.")
     (define-key map "l" #'sensetion-edit-lemma)
     (define-key map "m" #'sensetion-toggle-glob-mark)
     (define-key map "g" #'sensetion-glob)
-    (define-key map "." #'sensetion-go-to-source)
+    (define-key map "." #'sensetion-edit-sent)
     (define-key map [C-down] #'sensetion-move-line-down)
     (define-key map [C-up] #'sensetion-move-line-up)
     map)
