@@ -181,6 +181,9 @@ arguments."
 (defalias 'sensetion-edit-unsure
   (sensetion--edit-function
    (lambda (tk sent)
+     (let ((st (sensetion--tk-status tk)))
+       (when (member st  '("un"))
+         (user-error "Can't be unsure about unnanotated token")))
      (setf (sensetion--tk-conf tk) 0)))
   "Annotate that confidence in the annotation is low.")
 
