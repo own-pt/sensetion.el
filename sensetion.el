@@ -64,7 +64,7 @@
 
 (defcustom sensetion-number-completions
   15
-  "Number of completions to show."
+  "Number of lemma completions to show in `sensetion-annotate'."
   :group 'sensetion
   :type  'integer)
 
@@ -117,36 +117,48 @@ A cons cell in the same format as `sensetion--global-status'.")
     (define-key map "m" #'sensetion-toggle-glob-mark)
     (define-key map "g" #'sensetion-glob)
     (define-key map "." #'sensetion-edit-sent)
+    (define-key map "?" #'sensetion-edit-unsure)
+    (define-key map "i" #'sensetion-edit-ignore)
     (define-key map [C-down] #'sensetion-move-line-down)
     (define-key map [C-up] #'sensetion-move-line-up)
     map)
   "Keymap for `sensetion-mode'.")
 
 
-(defcustom sensetion-unnanoted-colour
+(defcustom sensetion-unnanotated-colour
   "salmon"
-  "Color to display the selected tokens in."
+  "Colour to display the selected tokens in."
   :group 'sensetion
   :type 'color)
 
 
 (defcustom sensetion-previously-annotated-colour
-  "green"
-  "Color to display the tokens who have been previously
+  "dark green"
+  "Colour to display the tokens which have been previously
 annotated."
   :group 'sensetion
   :type 'color)
 
 
-(defcustom sensetion-currently-annotated-colour
-  "dodger blue"
-  "Color to display the selected tokens in."
+(defcustom sensetion-previously-annotated-unsure-colour
+  "light green"
+  "Colour to display the tokens which have been previously
+annotated with low confidence."
   :group 'sensetion
   :type 'color)
 
-(defcustom sensetion-unsure-colour
-  "yellow"
-  "Color to display the tokens whose annotation is unsure."
+
+(defcustom sensetion-currently-annotated-colour
+  "dark blue"
+  "Colour to use in displaying tokens annotated in this batch."
+  :group 'sensetion
+  :type 'color)
+
+
+(defcustom sensetion-currently-annotated-unsure-colour
+  "light blue"
+  "Colour to use in displaying tokens annotated in this batch,
+with low confidence."
   :group 'sensetion
   :type 'color)
 
@@ -506,13 +518,16 @@ number of selected tokens."
                        (cl-list* 'sensetion--selected t
                                  'face `(:foreground
                                          ,(pcase (sensetion--tk-status tk)
-                                            ((or "auto" "man")
-                                             sensetion-previously-annotated-colour)
-                                            ;; TODO: add unsure color
-                                            ("un"
-                                             sensetion-unnanoted-colour)
                                             ("man-now"
-                                             sensetion-currently-annotated-colour)
+                                             (if (sensetion--tk-confident-in-anno? tk)
+                                                 sensetion-currently-annotated-colour
+                                               sensetion-currently-annotated-unsure-colour))
+                                            ("un"
+                                             sensetion-unnanotated-colour)
+                                            ((or "auto" "man" "man-nosense" "auto-nosense")
+                                             (if (sensetion--tk-confident-in-anno? tk)
+                                                 sensetion-previously-annotated-colour
+                                               sensetion-previously-annotated-unsure-colour))
                                             (_ (error "%s" tk))))
                                  (when-let ((key (sensetion--tk-glob? tk)))
                                    (list 'sensetion--glob-ix
@@ -867,28 +882,6 @@ edit hydra) and the second is the gloss string."
                                             (cl-second pair))))
                     chunk-by-pos)))
           senses)))))
-
-
-
-
-
-(defun sensetion-edit-lemma (tk-ix sent)
-  ;; TODO: if lemma changes, synset chosen doesn't make any sense
-  ;; anymore; how much sense does it make to not postag at the same
-  ;; time?
-  (interactive (list (sensetion--tk-ix-prop-at-point)
-                     (sensetion--get-sent-at-point)))
-  (let* ((old   (sensetion--tk-lemma (elt (sensetion--sent-tokens sent) tk-ix)))
-         (lemma (read-string "Assign lemma to token: " (cons old (1+ (length old))))))
-    (sensetion--edit-lemma old lemma tk-ix sent)))
-
-
-(defun sensetion--edit-lemma (old-lemma lemma tk-ix sent)
-  (setf (sensetion--tk-lemma (elt (sensetion--sent-tokens sent) tk-ix))
-        lemma)
-  (sensetion--remove-lemmas sensetion--index old-lemma sent)
-  (sensetion--reinsert-sent-at-point sent)
-  (sensetion--index-lemmas sensetion--index lemma (sensetion--sent-id sent)))
 
 
 (defun sensetion--tk-annotated? (tk)

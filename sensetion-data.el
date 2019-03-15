@@ -51,5 +51,9 @@
                       meta
                       conf)))))
 
+(defun sensetion--tk-confident-in-anno? (tk)
+  (unless (zerop (sensetion--tk-conf tk))
+    t))
+
 
 (provide 'sensetion-data)

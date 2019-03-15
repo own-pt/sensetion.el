@@ -23,14 +23,22 @@ with instances of this lemma+pos that have not been annotated
 yet. Unannotated words will show as red/pink, while
 previously-annotated tokens will show as green, and newly-annotated
 tokens will show as blue (all these colors can be customized by the
-user). You can navigate through taggable tokens with =<= and =>=. If
-you wish to annotate a token, press =/= on it. Select one of the
-options with the appropriate keyboard key; when satisfied, press
-enter/return. If you'd like to quit, press =q=; note that quitting
-does not undo anything (if you selected an option and then quit, its
-effects were carried out and saved). You can see how many tokens still
-need to be annotated in the mode-line, next to the =sensetion=
-indicator.
+user). For annotated tokens, dark colours indicate confidence in the
+annotation. You can navigate through annotatable tokens with =<= and
+=>=.
+
+If you wish to sense-tag a token, press =/= on it. You may select one
+or many senses -- or no sense at all -- by pressing the appropriate
+keyboard key. Senses which are already selected are prefixed by a plus
+sign (=+=); when satisfied, press enter/return. If you'd like to quit,
+press =q=; note that quitting does not undo anything (if you selected
+an option and then quit, its effects were already carried out and
+saved). You can see how many tokens still need to be annotated in the
+mode-line, next to the =sensetion= indicator.
+
+If you wish to change a token's lemma use =l=. If you wish to say a
+token is not annotatable (i.e., ignore it), use =i=. If you wish to
+say you are unsure about an annotation, use =?=.
 
 There is support for word collocations, such as phrasal verbs. The
 tokens part of a collocation are united by a key, which is shown in
@@ -99,6 +107,10 @@ You need both elisp libraries and the =wn= executable.
                   ;; don't like to use '/' to invoke sensetion-edit, so we
                   ;; bind it to 'e'
                   ("e" . sensetion-edit))
+      :hook (sensetion-edit-mode
+             ;;  here we can specify modes to be turned on for the raw
+             ;;  sentence editing
+             . lispy-mode)
       :custom (sensetion-annotation-dir "~/path/to/annotation/files"))
   #+END_SRC
   this will ensure the dependencies are installed and that the
@@ -151,14 +163,18 @@ Under heavy development -- user interface is unstable, and the code is
 still to be generalized so that it can be made useful for annotation
 of other corpora (maybe even of other stuff).
 
-# - use nonsense
-# - prevent user from assigning man without senses
-# - index everyone?
-# - index parts of collocations
-# - add ignore command
-# - add unsure command
-# - add unsure as a field
-# - add confidence to plist
-# - transform purposefully_ignored to man/auto with low confidence
-# - confidence may be colored
-# - purposefully ignored -> tag-nosense
+#+BEGIN_COMMENT
+- [] use nosense
+- [] prevent user from assigning man without senses
+- index everyone?
+  - [ ] no, only index parts of collocations
+- [x] add ignore command
+- [x] add unsure command
+- [x] add unsure as a field
+- [x] add confidence to plist
+- [x] transform purposefully_ignored to man/auto with low confidence
+- [x] confidence may be colored
+- [x] purposefully ignored -> tag-nosense
+#+END_COMMENT
+
+
