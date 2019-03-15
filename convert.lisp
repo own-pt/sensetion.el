@@ -131,6 +131,11 @@
            (serapeum:string-case tag
              (("cf" "wf")
               (list node))
+             ("qf"
+              (mapcat #'expand-tokens
+                      (concatenate 'vector
+                                   ;; (list ) stopped here
+                                   (plump:child-elements node))))
              (("qf" "mwf" "aux" "classif" "def" "ex")
               (mapcat #'expand-tokens
                       (plump:child-elements node))))))
