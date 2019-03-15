@@ -55,8 +55,7 @@
                        ,tk-ix ,sent ,lemma ,st ',options))
                    (sense-help-text sid sense-text)
                    :column "Pick sense:")))
-         options)
-      ("?" ,not-sure-function "Not sure" :column "Pick sense:"))
+         options))
    where
    (sense-help-text (sid sense-text)
                     (concat (sense-chosen-ind sid)

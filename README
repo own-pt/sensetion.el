@@ -167,7 +167,7 @@ of other corpora (maybe even of other stuff).
 - [] use nosense
 - [] prevent user from assigning man without senses
 - index everyone?
-  - [ ] no, only index parts of collocations
+  - [x] no, only index parts of collocations
 - [x] add ignore command
 - [x] add unsure command
 - [x] add unsure as a field

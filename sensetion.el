@@ -426,12 +426,13 @@ command."
         (sensetion--unmark-glob beg end ix marked)
       (sensetion--mark-glob beg end ix marked))))
 
+
 (defun sensetion-glob (lemma)
   "Glob all tokens marked to be globbed, assigning it lemma
 LEMMA.
 
-You can mark tokens with `sensetion-toggle-glob-mark', or unmark them
-with `sensetion-unmark-glob'."
+You can mark tokens with `sensetion-toggle-glob-mark', or unmark
+them with `sensetion-unmark-glob'."
   (interactive (list
                 (s-join "_"
                         (s-split " "
@@ -471,8 +472,8 @@ with `sensetion-unmark-glob'."
               ;; TODO: delete senses and make status "un"
               tk))
    (new-glob (sensetion--make-tk :form nil :lemma lemma :pos nil
-                                 :status "un" :kind `(:glob . ,new-k)
-                                 :anno nil :meta nil :conf 1))
+                        :status "un" :kind `(:glob . ,new-k)
+                        :anno nil :meta nil :conf 1))
    (ixs   (reverse (get-text-property (line-end-position) 'sensetion--to-glob)))
    (new-k (char-to-string (1+ max-k)))
    (max-k (max-key sent))
@@ -620,7 +621,8 @@ number of selected tokens."
 
 (cl-defun sensetion--to-annotate? (tk &optional (lemma sensetion--lemma))
   (and (sensetion--tk-annotatable? tk)
-       (sensetion--tk-has-lemma? tk lemma)))
+       (sensetion--tk-has-lemma? tk lemma)
+       (null (sensetion--tk-coll-keys tk))))
 
 
 (defun sensetion--tk-synset-pos (tk)
@@ -723,8 +725,8 @@ builds the status (how many tokens have been annotated so far)."
     (cl-labels
         ((run (f)
               (sensetion--map-lines f
-                                    (lambda (lno l)
-                                      (index-sent lno (sensetion--plist->sent (read l))))))
+                           (lambda (lno l)
+                             (index-sent lno (sensetion--plist->sent (read l))))))
 
          (index-sent (lno sent)
                      (pcase sent
@@ -778,13 +780,11 @@ present in SENT's tokens."
 
 (defun sensetion--tk-annotatable? (tk)
   ;; TODO: make status keywords
-  (pcase (sensetion--tk-kind tk)
-    (`(:coll . ,_) nil)
-    (_ (let ((status (sensetion--tk-status tk)))
-         (when (member
-                status
-                '("man" "man-nosense" "man-now" "un" "auto" "auto-nosense"))
-           status)))))
+  (let ((status (sensetion--tk-status tk)))
+    (when (member
+           status
+           '("man" "man-nosense" "man-now" "un" "auto" "auto-nosense"))
+      status)))
 
 
 (cl-defun sensetion--write-state (&key (index sensetion--index)
