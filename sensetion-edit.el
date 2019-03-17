@@ -84,16 +84,11 @@
   (sensetion-is
    (if (and present? (null (cdr orig)))
        (message "Can't remove last sense")
-     (setf (sensetion--tk-lemma (elt (sensetion--sent-tokens sent) ix))
-           lemma-str)
      (setf (sensetion--tk-anno (elt (sensetion--sent-tokens sent) ix))
            senses)
      (setf (sensetion--tk-status (elt (sensetion--sent-tokens sent) ix))
            "man-now"))
    where
-   (lemma-str (s-join "|" lemmas))
-   (lemmas (seq-uniq (cons (sensetion--make-lemma* lemma st) old-lemmas)))
-   (old-lemmas (sensetion--tk-lemmas tk))
    (senses (if present? (remove sense orig) (cons sense orig)))
    (present? (member sense orig))
    (orig (sensetion--tk-anno tk))))
