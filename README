@@ -164,8 +164,8 @@ still to be generalized so that it can be made useful for annotation
 of other corpora (maybe even of other stuff).
 
 #+BEGIN_COMMENT
-- [] use nosense
-- [] prevent user from assigning man without senses
+- [x] use nosense
+- [x] prevent user from assigning man without senses
 - index everyone?
   - [x] no, only index parts of collocations
 - [x] add ignore command

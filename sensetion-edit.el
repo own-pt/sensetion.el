@@ -45,7 +45,7 @@
            (cl-destructuring-bind (sid key sense-text) s
              (list key
                    `(lambda () (interactive)
-                      (sensetion--add-sense ,lemma
+                      (sensetion--toggle-sense ,lemma
                                    ,st
                                    ,tk
                                    ,sid
@@ -79,20 +79,24 @@
    (tk (elt (sensetion--sent-tokens sent) tk-ix))))
 
 
-(defun sensetion--add-sense (lemma st tk sense ix sent)
+(defun sensetion--toggle-sense (lemma st tk sense ix sent)
   "Called by `sensetion--edit-hydra-maker'. Only used for side-effects."
   (sensetion-is
-   (setf (sensetion--tk-lemma (elt (sensetion--sent-tokens sent) ix))
-         lemma-str)
-   (setf (sensetion--tk-anno (elt (sensetion--sent-tokens sent) ix))
-         senses)
-   (setf (sensetion--tk-status (elt (sensetion--sent-tokens sent) ix))
-         "man-now")
+   (if (and present? (null (cdr orig)))
+       (message "Can't remove last sense")
+     (setf (sensetion--tk-lemma (elt (sensetion--sent-tokens sent) ix))
+           lemma-str)
+     (setf (sensetion--tk-anno (elt (sensetion--sent-tokens sent) ix))
+           senses)
+     (setf (sensetion--tk-status (elt (sensetion--sent-tokens sent) ix))
+           "man-now"))
    where
    (lemma-str (s-join "|" lemmas))
    (lemmas (seq-uniq (cons (sensetion--make-lemma* lemma st) old-lemmas)))
    (old-lemmas (sensetion--tk-lemmas tk))
-   (senses (seq-uniq (cons sense (sensetion--tk-anno tk))))))
+   (senses (if present? (remove sense orig) (cons sense orig)))
+   (present? (member sense orig))
+   (orig (sensetion--tk-anno tk))))
 
 
 (defun sensetion--edit-reinsert-state-call (tk-ix sent &optional lemma st options)
@@ -160,8 +164,8 @@ arguments."
            (sensetion--get-sent-at-point)))
     (let ((tk (elt (sensetion--sent-tokens sent) tk-ix)))
       (save-excursion
-        (funcall before-save-fn tk sent))
-      (sensetion--reinsert-sent-at-point sent)
+        (funcall before-save-fn tk sent)
+        (sensetion--reinsert-sent-at-point sent))
       (when after-save-fn
         (funcall after-save-fn tk sent)))))
 
