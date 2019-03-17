@@ -2,7 +2,9 @@
 (require 'sensetion-data)
 
 
-(defun sensetion-edit (lemma ix pos sent)
+(defalias 'sensetion-edit #'sensetion-annotate)
+
+(defun sensetion-edit-sense (lemma ix pos sent)
   (interactive (list (buffer-local-value 'sensetion--lemma (current-buffer))
                      (or (get-char-property (point) 'sensetion--glob-ix)
                          (sensetion--tk-ix-prop-at-point))
@@ -13,10 +15,10 @@
     (user-error "Token at point not selected for annotation"))
   (unless lemma
     (error "No local sensetion--lemma; please report bug"))
-  (sensetion--edit lemma pos ix sent))
+  (sensetion--edit-sense lemma pos ix sent))
 
 
-(defun sensetion--edit (lemma pos1 ix sent)
+(defun sensetion--edit-sense (lemma pos1 ix sent)
   (let ((senses (cl-loop for k being the hash-keys of sensetion--synset-cache
                          using (hash-values v)
                          when (equal (substring k 0 1) pos1)
@@ -83,7 +85,7 @@
   "Called by `sensetion--edit-hydra-maker'. Only used for side-effects."
   (sensetion-is
    (if (and present? (null (cdr orig)))
-       (message "Can't remove last sense")
+       (warn "Can't remove last sense")
      (setf (sensetion--tk-anno (elt (sensetion--sent-tokens sent) ix))
            senses)
      (setf (sensetion--tk-status (elt (sensetion--sent-tokens sent) ix))

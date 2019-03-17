@@ -6,6 +6,10 @@ This project intends to finish the word-sense annotations of the
 S-expression-based format we have defined.
 
 
+* Installation
+See the =INSTALL= file.
+
+
 * Usage
 You should set the directory where the files to be annotated are with
 =M-x customize-variable RET sensetion-annotation-dir=. (You can
@@ -51,6 +55,26 @@ again.
 You can move sentences up or down with =C-↑= and =C-↓=. Clustering
 tokens with the same sense together might be useful.
 
+** Command summary
+You can call a command using =M-x <command-name>= or by pressing its
+keybinding.
+| command name                | key binding | description                                                       |
+|-----------------------------+-------------+-------------------------------------------------------------------|
+| sensetion                   | -           | Start sensetion annotation process.                               |
+| sensetion-annotate          | -           | Start annotating a new lemma/PoS tag.                             |
+| sensetion-edit-sent         | =.=         | Edit sentence source data (be careful!)                           |
+| sensetion-edit-sense        | =/=         | Annotate sense of selected token at point                         |
+| sensetion-edit-lemma        | =l=         | Annotate lemma of token at point                                  |
+| sensetion-edit-ignore       | =i=         | Marks file as to be ignored in the annotation process             |
+| sensetion-edit-unsure       | =?=         | Marks annotation as done with little confidence                   |
+| sensetion-toggle-glob-mark  | =m=         | Mark/Unmark token for globbing                                    |
+| sensetion-glob              | =g=         | Glob the marked tokens as a new collocation and ask for its lemma |
+| sensetion-unglob            | =u=         | Unglob collocation of token at point (removes collocation)        |
+| sensetion-next-selected     | =>=         | Move point to next selected token                                 |
+| sensetion-previous-selected | =<=         | Move point to previous selected token                             |
+| sensetion-move-line-up      | =C-↑=       | Move sentence up                                                  |
+| sensetion-move-line-down    | =C-↓=       | Move sentence down                                                |
+
 
 ** Indexing
 If the index goes out of sync, you can force a new indexation with
@@ -66,76 +90,26 @@ If the index goes out of sync, you can force a new indexation with
 
 
 ** Seeing your work
-We recommend setting up a git repository for the annotation files (see
-any git tutorial if you are unfamiliar with it). Use
+We recommend (although it is not strictly necessary) setting up a git
+repository for the annotation files (see any git tutorial if you are
+unfamiliar with it). Use
 : git diff --color-words=.
 (note the period =.=) to see the changes you made after the previous
 commit.
+
+In any case, please back up your work!
 
 
 * Report bugs
 - Give clear instructions to reproduce the bug;
 - Call =M-x toggle-debug-on-error=, reproduce the bug, and send the
-  backtrace with your report.
-
-
-* Installation
-You need both elisp libraries and the =wn= executable.
-
-** elisp
-- make sure you have ELPA and [[https://melpa.org/#/getting-started][MELPA]] set up, so that you can download
-  dependencies easily.
-- to make things easier, install =use-package= with =M-x
-  install-package RET use-package=.
-- clone this repository.
-- add the following snippet to your user configuration file (usually
-  at =~/emacs.d/init.el=), substituting the paths to the appropriate
-  ones:
-  #+BEGIN_SRC elisp
-    (use-package hydra :defer t :ensure t)
-    (use-package flycheck :defer t :ensure t)
-    (use-package s :defer t :ensure t)
-    (use-package f :defer t :ensure t)
-    (use-package trie :defer t :ensure t)
-    (use-package async :defer t :ensure t)
-
-    (use-package sensetion
-      :commands sensetion
-      :load-path "~/sensetion.el/"
-      :bind (:map sensetion-mode-map
-                  ;; here you can customize the standard command names; we
-                  ;; don't like to use '/' to invoke sensetion-edit, so we
-                  ;; bind it to 'e'
-                  ("e" . sensetion-edit))
-      :hook (sensetion-edit-mode
-             ;;  here we can specify modes to be turned on for the raw
-             ;;  sentence editing
-             . lispy-mode)
-      :custom (sensetion-annotation-dir "~/path/to/annotation/files"))
-  #+END_SRC
-  this will ensure the dependencies are installed and that the
-  packages are properly loaded at the right time.
-- restart emacs (or reload or your init file).
-
-
-** wn
-You may download the =wn= executable from your favorite package
-manager. Be aware that package managers usually offer WordNet 3.1, and
-not WordNet 3.0, which is the WordNet we use to annotate the WN gloss
-corpus. If that is the case, download [[http://wordnetcode.princeton.edu/3.0/WNdb-3.0.tar.gz][WordNet 3.0 database files]], and
-either:
-
-- move them to the corresponding directory of package you installed;
-- or set the =WNSEARCHDIR= variable to the directory of the WordNet
-  3.0 database files.
+  backtrace with your report (you may open an [[https://github.com/own-pt/sensetion.el/issues][issue]]).
 
 
 * Annotation format
-
 We convert the original XML files to property lists.
 
 ** conversion from original XML
-
 The script that converts the original XML WN gloss corpus is at
 =convert.lisp=. The MISC field of the annotation files saves lots of
 information from the XML to preserve a mapping between them.
@@ -158,23 +132,7 @@ To re-run the conversion:
 
 
 * Status
-
 Under heavy development -- user interface is unstable, and the code is
 still to be generalized so that it can be made useful for annotation
 of other corpora (maybe even of other stuff).
-
-#+BEGIN_COMMENT
-- [x] use nosense
-- [x] prevent user from assigning man without senses
-- index everyone?
-  - [x] no, only index parts of collocations
-- [x] add ignore command
-- [x] add unsure command
-- [x] add unsure as a field
-- [x] add confidence to plist
-- [x] transform purposefully_ignored to man/auto with low confidence
-- [x] confidence may be colored
-- [x] purposefully ignored -> tag-nosense
-#+END_COMMENT
-
 
