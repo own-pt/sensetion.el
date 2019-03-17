@@ -543,54 +543,58 @@ number of selected tokens."
                                                 ;; token part of more
                                                 ;; than one colloc
                                                 (gethash (cl-first ckeys) sel-keys)))
-                              (punct? (sensetion--punctuation? form-str)))
+                              (punct-before? (and form-str
+                                                  (sensetion--punctuation-no-space-before? form-str))))
                          (when selected?
                            (cl-incf total)
                            (when (sensetion--tk-annotated? tk)
                              (cl-incf done)))
-                         (if-let ((glob-key (sensetion--tk-glob? tk)))
-                             (prog1 ""
-                               (when selected?
-                                 (setf (gethash glob-key sel-keys) (cons ix tk))))
-                           (concat
-                            ;; spacing
-                            (if punct? "" " ")
-                            ;; collocation index
-                            (if ckeys
-                                (propertize (s-join "," ckeys)
-                                            'display '(raise -0.3)
-                                            'face '(:height 0.6))
-                              "")
-                            ;; form string
-                            (apply #'propertize
-                                   form-str
-                                   'sensetion--tk-ix ix
-                                   (cond
-                                    (glob-selected?
-                                     (sel-tk-props (cdr glob-selected?)
-                                                   (car glob-selected?)))
-                                    (selected?
-                                     (sel-tk-props tk))))
-                            (if-let ((_ selected?)
-                                     (pos (or (sensetion--tk-synset-pos tk)
-                                              (sensetion--tk-pos tk))))
-                                (propertize pos
-                                            'display '(raise 0.4)
-                                            'face '(:height 0.6))
-                              "")
-                            (if-let ((_ (or selected?
-                                            glob-selected?))
-                                     (sids (if selected?
-                                               (sensetion--tk-anno tk)
-                                             (sensetion--tk-anno (cdr glob-selected?)))))
-                                (propertize (s-join ","
-                                                    (mapcar (lambda (s)
-                                                              (cl-first
-                                                               (gethash s sensetion--synset-cache)))
-                                                            sids))
-                                            'display '(raise 0.4)
-                                            'face '(:height 0.6))
-                              ""))))))
+                         (pcase (sensetion--tk-kind tk)
+                           (`(:glob . ,glob-key)
+                            (prog1 ""
+                              (when selected?
+                                (setf (gethash glob-key sel-keys) (cons ix tk)))))
+                           (:meta "")
+                           (_
+                            (concat
+                             ;; spacing
+                             (if punct-before? "" " ")
+                             ;; collocation index
+                             (if ckeys
+                                 (propertize (s-join "," ckeys)
+                                             'display '(raise -0.3)
+                                             'face '(:height 0.6))
+                               "")
+                             ;; form string
+                             (apply #'propertize
+                                    form-str
+                                    'sensetion--tk-ix ix
+                                    (cond
+                                     (glob-selected?
+                                      (sel-tk-props (cdr glob-selected?)
+                                                    (car glob-selected?)))
+                                     (selected?
+                                      (sel-tk-props tk))))
+                             (if-let ((_ selected?)
+                                      (pos (or (sensetion--tk-synset-pos tk)
+                                               (sensetion--tk-pos tk))))
+                                 (propertize pos
+                                             'display '(raise 0.4)
+                                             'face '(:height 0.6))
+                               "")
+                             (if-let ((_ (or selected?
+                                             glob-selected?))
+                                      (sids (if selected?
+                                                (sensetion--tk-anno tk)
+                                              (sensetion--tk-anno (cdr glob-selected?)))))
+                                 (propertize (s-join ","
+                                                     (mapcar (lambda (s)
+                                                               (cl-first
+                                                                (gethash s sensetion--synset-cache)))
+                                                             sids))
+                                             'display '(raise 0.4)
+                                             'face '(:height 0.6))
+                               "")))))))
       ;;
       (let* ((tks (sensetion--sent-tokens sent))
              (tks-colloc (seq-map-indexed #'token-colloc tks))

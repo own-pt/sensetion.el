@@ -1,4 +1,5 @@
 (ql:quickload :plump)
+(ql:quickload :plump-sexp)
 (ql:quickload :serapeum)
 (ql:quickload :alexandria)
 (ql:quickload :ironclad)
@@ -40,6 +41,23 @@
     (if (equal form "")
         nil
         form)))
+
+
+(defun meta->tk (node)
+  (plump:children
+   (plump-sexp:parse
+    `((meta :tag "ignore" :id ,(concatenate 'string "id_" (plump:tag-name node))) ""))))
+
+
+(defun qf->wf (node)
+  (plump:children
+   (plump-sexp:parse
+    `((meta :tag "ignore")
+      ,(serapeum:string-case (plump:attribute node "rend")
+         ("dq" "\"")
+         ("sq" "'")
+         (t (error "attribute rend of ~S must be \"dq\" or \"sq\"" node)))))))
+
 
 (defun node-lemma (node)
   (plump:attribute node "lemma"))
@@ -129,24 +147,32 @@
        (expand-tokens (node)
          (let ((tag (plump:tag-name node)))
            (serapeum:string-case tag
-             (("cf" "wf")
+             (("cf" "wf" "meta")
               (list node))
              ("qf"
-              (mapcat #'expand-tokens
-                      (concatenate 'vector
-                                   ;; (list ) stopped here
-                                   (plump:child-elements node))))
-             (("qf" "mwf" "aux" "classif" "def" "ex")
-              (mapcat #'expand-tokens
-                      (plump:child-elements node))))))
+              (let ((qf (qf->wf node)))
+                (mapcat #'expand-tokens
+                        (concatenate 'vector
+                                     qf
+                                     (plump:child-elements node)
+                                     qf))))
+             (("mwf" "aux" "classif" "def" "ex")
+              (let ((meta-tk (meta->tk node)))
+                (mapcat #'expand-tokens
+                        (concatenate 'vector
+                                     meta-tk
+                                     (plump:child-elements node)
+                                     meta-tk)))))))
 
        (make-token (node)
          (serapeum:string-case
-             (plump:tag-name node)
-           ("wf"
-            (list (make-token-plist node :wf)))
-           ("cf"
-            (cf-token node))))
+          (plump:tag-name node)
+          ("wf"
+           (list (make-token-plist node :wf)))
+          ("cf"
+           (cf-token node))
+          ("meta"
+           (list (make-token-plist node :meta)))))
 
        (make-token-plist (node kind)
          ;; senses are always direct children of either wf or glob,
@@ -180,7 +206,7 @@
                             (cons kind (first coll-keys)))
                            (otherwise kind)))
                  :anno senses
-                 :meta (list (list :id (node-get-id node)))
+                 :meta (let ((id (node-get-id node))) (and id (list (list :id id))))
                  :conf (if (eq senses 'nosense) 0 1))))
 
        (node-get-senses (node)
