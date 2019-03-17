@@ -1,0 +1,38 @@
+# -*- mode:org -*-
+#+TITLE: Install sensetion.el
+
+* dependencies
+
+** emacs
+Download and install emacs -- instructions [[https://www.gnu.org/software/emacs/][here]].
+
+** wn
+You may download the =wn= executable from your favorite package
+manager (for Mac users that's brew: install from [[brew.sh][here]] and run =brew
+install wordnet=). Be aware that package managers usually offer
+WordNet 3.1, and not WordNet 3.0, which is the WordNet we use to
+annotate the WN gloss corpus. If that is the case, download [[http://wordnetcode.princeton.edu/3.0/WNdb-3.0.tar.gz][WordNet
+3.0 database files]], and either:
+
+- set the =WNSEARCHDIR= variable to the directory of the WordNet 3.0
+  database files. Add the following line to =.profile= in your home
+  directory:
+  : export WNSEARCHDIR="$HOME/builds/WordNet-3.0/dict"
+  substituting the path for the corresponding directory where you
+  downloaded it.
+
+** elisp
+- Clone this repository ([[https://help.github.com/en/articles/cloning-a-repository][how-to]]);
+- If you are new to emacs, you can simply copy the =init.el= file in
+  this repository to a directory named =.emacs= in your home directory
+  and things will be taken care of for you. If you do know emacs, take
+  a look at =init.el= and see how it is done;
+- By default the =init.el= file assumes you clone this repository to
+  your home directory; If you cloned it to
+  ="~/projects/sensetion.el/"= you must search =init.el= for
+  =~/sensetion.el= and replace it.
+- Download the annotation files (if you haven't got them already) and
+  edit =init.el= to have the path to their directory. The default
+  directory for the annotation files is ="~/sensetion-data/"=;
+- Restart emacs (or reload or your init file).
+
