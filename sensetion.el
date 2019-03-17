@@ -64,7 +64,7 @@
 
 (defcustom sensetion-number-completions
   15
-  "Number of completions to show."
+  "Number of lemma completions to show in `sensetion-annotate'."
   :group 'sensetion
   :type  'integer)
 
@@ -117,36 +117,48 @@ A cons cell in the same format as `sensetion--global-status'.")
     (define-key map "m" #'sensetion-toggle-glob-mark)
     (define-key map "g" #'sensetion-glob)
     (define-key map "." #'sensetion-edit-sent)
+    (define-key map "?" #'sensetion-edit-unsure)
+    (define-key map "i" #'sensetion-edit-ignore)
     (define-key map [C-down] #'sensetion-move-line-down)
     (define-key map [C-up] #'sensetion-move-line-up)
     map)
   "Keymap for `sensetion-mode'.")
 
 
-(defcustom sensetion-unnanoted-colour
+(defcustom sensetion-unnanotated-colour
   "salmon"
-  "Color to display the selected tokens in."
+  "Colour to display the selected tokens in."
   :group 'sensetion
   :type 'color)
 
 
 (defcustom sensetion-previously-annotated-colour
-  "green"
-  "Color to display the tokens who have been previously
+  "dark green"
+  "Colour to display the tokens which have been previously
 annotated."
   :group 'sensetion
   :type 'color)
 
 
-(defcustom sensetion-currently-annotated-colour
-  "dodger blue"
-  "Color to display the selected tokens in."
+(defcustom sensetion-previously-annotated-unsure-colour
+  "light green"
+  "Colour to display the tokens which have been previously
+annotated with low confidence."
   :group 'sensetion
   :type 'color)
 
-(defcustom sensetion-unsure-colour
-  "yellow"
-  "Color to display the tokens whose annotation is unsure."
+
+(defcustom sensetion-currently-annotated-colour
+  "dark blue"
+  "Colour to use in displaying tokens annotated in this batch."
+  :group 'sensetion
+  :type 'color)
+
+
+(defcustom sensetion-currently-annotated-unsure-colour
+  "light blue"
+  "Colour to use in displaying tokens annotated in this batch,
+with low confidence."
   :group 'sensetion
   :type 'color)
 
@@ -385,7 +397,7 @@ collocation."
   "Marks token to be globbed with the `sensetion-glob' command."
   (with-inhibiting-read-only
    (put-text-property beg end
-                      'face '(:foreground "yellow"))
+                      'face '(:foreground "brown"))
    (put-text-property (line-end-position) (1+ (line-end-position))
                       'sensetion--to-glob (cons ix marked))))
 
@@ -414,12 +426,13 @@ command."
         (sensetion--unmark-glob beg end ix marked)
       (sensetion--mark-glob beg end ix marked))))
 
+
 (defun sensetion-glob (lemma)
   "Glob all tokens marked to be globbed, assigning it lemma
 LEMMA.
 
-You can mark tokens with `sensetion-toggle-glob-mark', or unmark them
-with `sensetion-unmark-glob'."
+You can mark tokens with `sensetion-toggle-glob-mark', or unmark
+them with `sensetion-unmark-glob'."
   (interactive (list
                 (s-join "_"
                         (s-split " "
@@ -456,10 +469,11 @@ with `sensetion-unmark-glob'."
             (let ((cks (sensetion--tk-coll-keys tk)))
               (setf (sensetion--tk-kind tk)
                     (cl-list* :coll key cks))
+              ;; TODO: delete senses and make status "un"
               tk))
    (new-glob (sensetion--make-tk :form nil :lemma lemma :pos nil
-                                 :status "un" :kind `(:glob . ,new-k)
-                                 :anno nil :meta nil))
+                        :status "un" :kind `(:glob . ,new-k)
+                        :anno nil :meta nil :conf 1))
    (ixs   (reverse (get-text-property (line-end-position) 'sensetion--to-glob)))
    (new-k (char-to-string (1+ max-k)))
    (max-k (max-key sent))
@@ -505,14 +519,16 @@ number of selected tokens."
                        (cl-list* 'sensetion--selected t
                                  'face `(:foreground
                                          ,(pcase (sensetion--tk-status tk)
-                                            ((or "auto" "man")
-                                             sensetion-previously-annotated-colour)
+                                            ("man-now"
+                                             (if (sensetion--tk-confident-in-anno? tk)
+                                                 sensetion-currently-annotated-colour
+                                               sensetion-currently-annotated-unsure-colour))
                                             ("un"
-                                             sensetion-unnanoted-colour)
-                                            ("unsure"
-                                             sensetion-unsure-colour)
-                                            ("now"
-                                             sensetion-currently-annotated-colour)
+                                             sensetion-unnanotated-colour)
+                                            ((or "auto" "man" "man-nosense" "auto-nosense")
+                                             (if (sensetion--tk-confident-in-anno? tk)
+                                                 sensetion-previously-annotated-colour
+                                               sensetion-previously-annotated-unsure-colour))
                                             (_ (error "%s" tk))))
                                  (when-let ((key (sensetion--tk-glob? tk)))
                                    (list 'sensetion--glob-ix
@@ -527,54 +543,58 @@ number of selected tokens."
                                                 ;; token part of more
                                                 ;; than one colloc
                                                 (gethash (cl-first ckeys) sel-keys)))
-                              (punct? (sensetion--punctuation? form-str)))
+                              (punct-before? (and form-str
+                                                  (sensetion--punctuation-no-space-before? form-str))))
                          (when selected?
                            (cl-incf total)
                            (when (sensetion--tk-annotated? tk)
                              (cl-incf done)))
-                         (if-let ((glob-key (sensetion--tk-glob? tk)))
-                             (prog1 ""
-                               (when selected?
-                                 (setf (gethash glob-key sel-keys) (cons ix tk))))
-                           (concat
-                            ;; spacing
-                            (if punct? "" " ")
-                            ;; collocation index
-                            (if ckeys
-                                (propertize (s-join "," ckeys)
-                                            'display '(raise -0.3)
-                                            'face '(:height 0.6))
-                              "")
-                            ;; form string
-                            (apply #'propertize
-                                   form-str
-                                   'sensetion--tk-ix ix
-                                   (cond
-                                    (glob-selected?
-                                     (sel-tk-props (cdr glob-selected?)
-                                                   (car glob-selected?)))
-                                    (selected?
-                                     (sel-tk-props tk))))
-                            (if-let ((_ selected?)
-                                     (pos (or (sensetion--tk-synset-pos tk)
-                                              (sensetion--tk-pos tk))))
-                                (propertize pos
-                                            'display '(raise 0.4)
-                                            'face '(:height 0.6))
-                              "")
-                            (if-let ((_ (or selected?
-                                            glob-selected?))
-                                     (sids (if selected?
-                                               (sensetion--tk-anno tk)
-                                             (sensetion--tk-anno (cdr glob-selected?)))))
-                                (propertize (s-join ","
-                                                    (mapcar (lambda (s)
-                                                              (cl-first
-                                                               (gethash s sensetion--synset-cache)))
-                                                            sids))
-                                            'display '(raise 0.4)
-                                            'face '(:height 0.6))
-                              ""))))))
+                         (pcase (sensetion--tk-kind tk)
+                           (`(:glob . ,glob-key)
+                            (prog1 ""
+                              (when selected?
+                                (setf (gethash glob-key sel-keys) (cons ix tk)))))
+                           (:meta "")
+                           (_
+                            (concat
+                             ;; spacing
+                             (if punct-before? "" " ")
+                             ;; collocation index
+                             (if ckeys
+                                 (propertize (s-join "," ckeys)
+                                             'display '(raise -0.3)
+                                             'face '(:height 0.6))
+                               "")
+                             ;; form string
+                             (apply #'propertize
+                                    form-str
+                                    'sensetion--tk-ix ix
+                                    (cond
+                                     (glob-selected?
+                                      (sel-tk-props (cdr glob-selected?)
+                                                    (car glob-selected?)))
+                                     (selected?
+                                      (sel-tk-props tk))))
+                             (if-let ((_ selected?)
+                                      (pos (or (sensetion--tk-synset-pos tk)
+                                               (sensetion--tk-pos tk))))
+                                 (propertize pos
+                                             'display '(raise 0.4)
+                                             'face '(:height 0.6))
+                               "")
+                             (if-let ((_ (or selected?
+                                             glob-selected?))
+                                      (sids (if selected?
+                                                (sensetion--tk-anno tk)
+                                              (sensetion--tk-anno (cdr glob-selected?)))))
+                                 (propertize (s-join ","
+                                                     (mapcar (lambda (s)
+                                                               (cl-first
+                                                                (gethash s sensetion--synset-cache)))
+                                                             sids))
+                                             'display '(raise 0.4)
+                                             'face '(:height 0.6))
+                               "")))))))
       ;;
       (let* ((tks (sensetion--sent-tokens sent))
              (tks-colloc (seq-map-indexed #'token-colloc tks))
@@ -605,7 +625,8 @@ number of selected tokens."
 
 (cl-defun sensetion--to-annotate? (tk &optional (lemma sensetion--lemma))
   (and (sensetion--tk-annotatable? tk)
-       (sensetion--tk-has-lemma? tk lemma)))
+       (sensetion--tk-has-lemma? tk lemma)
+       (null (sensetion--tk-coll-keys tk))))
 
 
 (defun sensetion--tk-synset-pos (tk)
@@ -708,8 +729,8 @@ builds the status (how many tokens have been annotated so far)."
     (cl-labels
         ((run (f)
               (sensetion--map-lines f
-                                    (lambda (lno l)
-                                      (index-sent lno (sensetion--plist->sent (read l))))))
+                           (lambda (lno l)
+                             (index-sent lno (sensetion--plist->sent (read l))))))
 
          (index-sent (lno sent)
                      (pcase sent
@@ -763,12 +784,11 @@ present in SENT's tokens."
 
 (defun sensetion--tk-annotatable? (tk)
   ;; TODO: make status keywords
-  (pcase (sensetion--tk-kind tk)
-    (`(:coll . ,_) nil)
-    (_ (let ((status (sensetion--tk-status tk)))
-         (when (member status
-                       '("man" "un" "unsure" "auto" "now"))
-           status)))))
+  (let ((status (sensetion--tk-status tk)))
+    (when (member
+           status
+           '("man" "man-nosense" "man-now" "un" "auto" "auto-nosense"))
+      status)))
 
 
 (cl-defun sensetion--write-state (&key (index sensetion--index)
@@ -868,30 +888,9 @@ edit hydra) and the second is the gloss string."
           senses)))))
 
 
-
-
-
-(defun sensetion-edit-lemma (tk-ix sent)
-  ;; TODO: if lemma changes, synset chosen doesn't make any sense
-  ;; anymore; how much sense does it make to not postag at the same
-  ;; time?
-  (interactive (list (sensetion--tk-ix-prop-at-point)
-                     (sensetion--get-sent-at-point)))
-  (let* ((old   (sensetion--tk-lemma (elt (sensetion--sent-tokens sent) tk-ix)))
-         (lemma (read-string "Assign lemma to token: " (cons old (1+ (length old))))))
-    (sensetion--edit-lemma old lemma tk-ix sent)))
-
-
-(defun sensetion--edit-lemma (old-lemma lemma tk-ix sent)
-  (setf (sensetion--tk-lemma (elt (sensetion--sent-tokens sent) tk-ix))
-        lemma)
-  (sensetion--remove-lemmas sensetion--index old-lemma sent)
-  (sensetion--reinsert-sent-at-point sent)
-  (sensetion--index-lemmas sensetion--index lemma (sensetion--sent-id sent)))
-
-
 (defun sensetion--tk-annotated? (tk)
-  (member (sensetion--tk-status tk) '("man" "auto" "unsure" "now")))
+  (member (sensetion--tk-status tk)
+          '("man" "auto" "man-nosense" "auto-nosense" "man-now")))
 
 
 (defun sensetion--save-sent (sent)

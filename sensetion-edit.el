@@ -45,7 +45,7 @@
            (cl-destructuring-bind (sid key sense-text) s
              (list key
                    `(lambda () (interactive)
-                      (sensetion--add-sense ,lemma
+                      (sensetion--toggle-sense ,lemma
                                    ,st
                                    ,tk
                                    ,sid
@@ -55,8 +55,7 @@
                        ,tk-ix ,sent ,lemma ,st ',options))
                    (sense-help-text sid sense-text)
                    :column "Pick sense:")))
-         options)
-      ("?" ,not-sure-function "Not sure" :column "Pick sense:"))
+         options))
    where
    (sense-help-text (sid sense-text)
                     (concat (sense-chosen-ind sid)
@@ -74,26 +73,25 @@
       (setf (sensetion--tk-anno (elt (sensetion--sent-tokens sent) tk-ix))
             nil)
       (setf (sensetion--tk-status (elt (sensetion--sent-tokens sent) tk-ix))
-            "now")
+            "man-now")
       (sensetion--edit-reinsert-state-call tk-ix sent)))
    (pres-senses (sensetion--tk-anno tk))
    (tk (elt (sensetion--sent-tokens sent) tk-ix))))
 
 
-(defun sensetion--add-sense (lemma st tk sense ix sent)
+(defun sensetion--toggle-sense (lemma st tk sense ix sent)
   "Called by `sensetion--edit-hydra-maker'. Only used for side-effects."
   (sensetion-is
-   (setf (sensetion--tk-lemma (elt (sensetion--sent-tokens sent) ix))
-         lemma-str)
-   (setf (sensetion--tk-anno (elt (sensetion--sent-tokens sent) ix))
-         senses)
-   (setf (sensetion--tk-status (elt (sensetion--sent-tokens sent) ix))
-         "now")
+   (if (and present? (null (cdr orig)))
+       (message "Can't remove last sense")
+     (setf (sensetion--tk-anno (elt (sensetion--sent-tokens sent) ix))
+           senses)
+     (setf (sensetion--tk-status (elt (sensetion--sent-tokens sent) ix))
+           "man-now"))
    where
-   (lemma-str (s-join "|" lemmas))
-   (lemmas (seq-uniq (cons (sensetion--make-lemma* lemma st) old-lemmas)))
-   (old-lemmas (sensetion--tk-lemmas tk))
-   (senses (seq-uniq (cons sense (sensetion--tk-anno tk))))))
+   (senses (if present? (remove sense orig) (cons sense orig)))
+   (present? (member sense orig))
+   (orig (sensetion--tk-anno tk))))
 
 
 (defun sensetion--edit-reinsert-state-call (tk-ix sent &optional lemma st options)
@@ -120,7 +118,7 @@
         (prin1 (sensetion--sent->plist sent) (current-buffer))
         (sensetion--beginning-of-buffer)
         (indent-pp-sexp 1)
-        (sensetion--edit-mode)
+        (sensetion-edit-mode)
         (set-buffer-modified-p nil)))
     (pop-to-buffer buffer nil t)))
 
@@ -139,10 +137,61 @@
   t)
 
 
-(define-derived-mode sensetion--edit-mode prog-mode "sensetion-edit"
+(define-derived-mode sensetion-edit-mode prog-mode "sensetion-edit"
   "sensetion-edit-mode is a major mode for editing sensetion database files."
   (add-hook 'kill-buffer-hook 'sensetion--save-edit nil t)
   (setq-local write-contents-functions (list (lambda () (sensetion--save-edit t)))))
+
+
+(defun sensetion--edit-function (before-save-fn &optional after-save-fn)
+  "Creates function to edit token at point.
+
+Get token and sentence at point, call BEFORE-SAVE-FN with them as
+arguments, save sentence, call AFTER-SAVE-FN with them as
+arguments. None of the arguments may move point. Also use
+`message' to issue MESSAGE-STR to the minibuffer, with ARGS as
+arguments."
+  (lambda (tk-ix sent)
+    (interactive
+     ;; TODO: ask about which token to annotate?
+     (list (or (get-char-property (point) 'sensetion--glob-ix)
+               (sensetion--tk-ix-prop-at-point))
+           (sensetion--get-sent-at-point)))
+    (let ((tk (elt (sensetion--sent-tokens sent) tk-ix)))
+      (save-excursion
+        (funcall before-save-fn tk sent)
+        (sensetion--reinsert-sent-at-point sent))
+      (when after-save-fn
+        (funcall after-save-fn tk sent)))))
+
+
+(defalias 'sensetion-edit-lemma
+  (sensetion--edit-function
+   (lambda (tk sent)
+     (let* ((old-lemma (sensetion--tk-lemma tk))
+            (lemma     (read-string "Assign lemma to token: "
+                                    (cons old-lemma (1+ (length old-lemma))))))
+       (setf (sensetion--tk-lemma tk) lemma)
+       (sensetion--remove-lemmas sensetion--index old-lemma sent)
+       (sensetion--index-lemmas sensetion--index lemma (sensetion--sent-id sent)))))
+  "Edit lemma of token of index TK-IX at point and save modified SENT.")
+
+
+(defalias 'sensetion-edit-unsure
+  (sensetion--edit-function
+   (lambda (tk sent)
+     (let ((st (sensetion--tk-status tk)))
+       (when (member st  '("un"))
+         (user-error "Can't be unsure about unnanotated token")))
+     (setf (sensetion--tk-conf tk) 0)))
+  "Annotate that confidence in the annotation is low.")
+
+
+(defalias 'sensetion-edit-ignore
+  (sensetion--edit-function
+   (lambda (tk sent)
+     (setf (sensetion--tk-status tk) "ignore")))
+  "Annotate that token is to be ignored in annotation.")
 
 
 (provide 'sensetion-edit)

@@ -5,7 +5,7 @@
 
 (cl-defstruct (sensetion--tk (:constructor nil)
                              (:constructor sensetion--make-tk))
-  form lemma pos status kind anno meta)
+  form lemma pos status kind anno meta conf)
 
 
 (cl-defstruct (sensetion--sent (:constructor nil)
@@ -35,19 +35,25 @@
 
 
 (defun sensetion--tk->plist (tk)
-  (cl-mapcan #'list '(:form :lemma :pos :status :kind :anno :meta)
-             (list (sensetion--tk-form tk)
-                   (sensetion--tk-lemma tk)
-                   (sensetion--tk-pos tk)
-                   (let ((st (sensetion--tk-status tk)))
-                     ;; "now" is a virtual token status, shouldn't be
-                     ;; written to file
-                     (if (equal st "now")
-                         "man"
-                       st))
-                   (sensetion--tk-kind tk)
-                   (sensetion--tk-anno tk)
-                   (sensetion--tk-meta tk))))
+  (pcase tk
+    ((cl-struct sensetion--tk form lemma pos status kind anno meta conf)
+     (cl-mapcan #'list '(:form :lemma :pos :status :kind :anno :meta :conf)
+                (list form
+                      lemma
+                      pos
+                      ;; "man-now" is a virtual token status,
+                      ;; shouldn't be written to file
+                      (if (equal status "man-now")
+                          "man"
+                        status)
+                      kind
+                      anno
+                      meta
+                      conf)))))
+
+(defun sensetion--tk-confident-in-anno? (tk)
+  (unless (zerop (sensetion--tk-conf tk))
+    t))
 
 
 (provide 'sensetion-data)
