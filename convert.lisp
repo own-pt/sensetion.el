@@ -144,10 +144,19 @@
                          ;; wf, qf, mwf..
                          nodes)))
 
+       (tag-boundary (nodes bound)
+         (let* ((first (first nodes))
+                (last (first (last nodes)))
+                (firstb (plump:attribute first "bound"))
+                (lastb (plump:attribute last "bound")))
+           (plump:set-attribute first "bound" (if firstb (concatenate 'string firstb "|" bound) bound))
+           (plump:set-attribute last "bound" (if lastb (concatenate 'string lastb "|" bound) bound))
+           nodes))
+
        (expand-tokens (node)
          (let ((tag (plump:tag-name node)))
            (serapeum:string-case tag
-             (("cf" "wf" "meta")
+             (("cf" "wf")
               (list node))
              ("qf"
               (let ((qf (qf->wf node)))
@@ -157,22 +166,17 @@
                                      (plump:child-elements node)
                                      qf))))
              (("mwf" "aux" "classif" "def" "ex")
-              (let ((meta-tk (meta->tk node)))
-                (mapcat #'expand-tokens
-                        (concatenate 'vector
-                                     meta-tk
-                                     (plump:child-elements node)
-                                     meta-tk)))))))
+              (let ((children (mapcat #'expand-tokens
+                                      (plump:child-elements node))))
+                (when children (tag-boundary children tag)))))))
 
        (make-token (node)
          (serapeum:string-case
-          (plump:tag-name node)
-          ("wf"
-           (list (make-token-plist node :wf)))
-          ("cf"
-           (cf-token node))
-          ("meta"
-           (list (make-token-plist node :meta)))))
+             (plump:tag-name node)
+           ("wf"
+            (list (make-token-plist node :wf)))
+           ("cf"
+            (cf-token node))))
 
        (make-token-plist (node kind)
          ;; senses are always direct children of either wf or glob,
@@ -207,7 +211,11 @@
                             (cons kind (first coll-keys)))
                            (otherwise kind)))
                  :anno senses
-                 :meta (let ((id (node-get-id node))) (and id (list (list :id id))))
+                 :meta (let ((id (node-get-id node))
+                             (bound (plump:attribute node "bound")))
+                         (append
+                          (and id (list (list :id id)))
+                          (and bound (mapcar (lambda (x) (list :bound x)) (serapeum:split-sequence #\| bound)))))
                  :conf (if (eq senses 'nosense) 0 1))))
 
        (node-get-senses (node)
@@ -220,8 +228,7 @@
                                 ids)))
            (if ignored?
                (progn
-                 (assert (member (node-annotation-tag node) '("man" "auto")
-                                 :test #'equal)
+                 (assert (equal (node-annotation-tag node) "man")
                          (node)
                          "~S is purposefully ignored, so should have tag \"man\" or \"auto\".")
                  (if (null (cdr ids))
@@ -294,12 +301,12 @@
                 out-fp
                 sensemap-fp)
         (loop for fp in in-files
-	      do (klacks:with-open-source (in (cxml:make-source fp :validate nil))
+	      do (klacks:with-open-source (in (cxml:make-source fp))
                    (labels ((f (s-xml)
                               (save-sent (gloss-sentence
                                           (aref (plump:child-elements (plump:parse s-xml)) 0))
                                          out-fp)))
                      (loop while (klacks:find-element in "synset")
-                           do (f (klacks:serialize-element in (cxml:make-string-sink)))))))))))
+                           do (f (klacks:serialize-element in (cxml:make-string-sink :omit-xml-declaration-p t)))))))))))
 
 
