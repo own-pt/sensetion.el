@@ -685,7 +685,7 @@ positions, plus global status."
          (sensetion--done-indexing-messager)))
   (if sensetion--index-lock
       (user-error "Indexing process already started; please wait while it finishes")
-    (message "Please wait while we index files; a box will pop when finished.")
+    (message "Please wait while we index files; a box will pop up when finished.")
     (setq sensetion--index-lock t)
     (async-start `(lambda ()
                     ,(async-inject-variables (regexp-opt '("load-path" "sensetion-index-file" "sensetion-status-file" "sensetion-annotation-file-type")))

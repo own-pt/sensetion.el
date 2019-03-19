@@ -185,8 +185,9 @@
                            (or (serapeum:string-case st
                                  (("auto" "man")
                                   (assert senses)
-                                  (when (eq senses 'nosense)
-                                    (concatenate 'string st "-nosense")))
+                                  (case senses
+                                    (nosense (concatenate 'string st "-nosense"))
+                                    (reset "un")))
                                  (("ignore" "un")
                                   (assert (null senses))))
                                st))
@@ -223,8 +224,11 @@
                                  :test #'equal)
                          (node)
                          "~S is purposefully ignored, so should have tag \"man\" or \"auto\".")
-                 (assert (null (cdr ids)) (ids) "~S must be a singleton if there's a purposefully ignored token." ids)
-                 'nosense)
+                 (if (null (cdr ids))
+                     'nosense
+                     (or (warn "node with id ~S must be a singleton if there's a purposefully ignored token."
+                               (plump:attribute node "id"))
+                         'reset)))
                (mapcar (lambda (s)
                          (let ((sk (plump:attribute s "sk")))
                            (sense-key->synset-id sk)))
@@ -290,7 +294,7 @@
                 out-fp
                 sensemap-fp)
         (loop for fp in in-files
-	      do (klacks:with-open-source (in (cxml:make-source fp))
+	      do (klacks:with-open-source (in (cxml:make-source fp :validate nil))
                    (labels ((f (s-xml)
                               (save-sent (gloss-sentence
                                           (aref (plump:child-elements (plump:parse s-xml)) 0))
