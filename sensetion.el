@@ -116,6 +116,7 @@ A cons cell in the same format as `sensetion--global-status'.")
     (define-key map "l" #'sensetion-edit-lemma)
     (define-key map "m" #'sensetion-toggle-glob-mark)
     (define-key map "g" #'sensetion-glob)
+    (define-key map "v" #'sensetion-toggle-scripts)
     (define-key map "." #'sensetion-edit-sent)
     (define-key map "?" #'sensetion-edit-unsure)
     (define-key map "i" #'sensetion-edit-ignore)
@@ -187,6 +188,7 @@ with low confidence."
   (setq-local sentence-end ".$$") ;; to be able to use M-a and M-e to jump
   (setq-local buffer-read-only t)
   (visual-line-mode 1)
+  (setq-local buffer-invisibility-spec nil)
   (setq-local minor-mode-alist nil)
   (aset (or buffer-display-table
             (setq buffer-display-table (make-display-table)))
@@ -434,9 +436,10 @@ LEMMA.
 You can mark tokens with `sensetion-toggle-glob-mark', or unmark
 them with `sensetion-unmark-glob'."
   (interactive (list
-                (s-join "_"
-                        (s-split " "
-                                 (read-string "Lemma of glob: " nil nil "") t))))
+                (s-trim
+                 (cl-substitute (string-to-char "_") (string-to-char " ")
+                                (read-string "Lemma of glob: " nil nil "")
+                                :test #'eq))))
   (sensetion--index-lemmas sensetion--index lemma (sensetion--sent-id-prop-at-point))
   (sensetion-is
    (sensetion--reinsert-sent-at-point globbed-sent)
@@ -563,6 +566,7 @@ number of selected tokens."
                              (if ckeys
                                  (propertize (s-join "," ckeys)
                                              'display '(raise -0.3)
+                                             'invisible 'sensetion--scripts
                                              'face '(:height 0.6))
                                "")
                              ;; form string
@@ -580,6 +584,7 @@ number of selected tokens."
                                                (sensetion--tk-pos tk))))
                                  (propertize pos
                                              'display '(raise 0.4)
+                                             'invisible 'sensetion--scripts
                                              'face '(:height 0.6))
                                "")
                              (if-let ((_ (or selected?
@@ -593,6 +598,7 @@ number of selected tokens."
                                                                 (gethash s sensetion--synset-cache)))
                                                              sids))
                                              'display '(raise 0.4)
+                                             'invisible 'sensetion--scripts
                                              'face '(:height 0.6))
                                "")))))))
       ;;
@@ -964,6 +970,12 @@ edit hydra) and the second is the gloss string."
    where
    (sent-buff (find-file-noselect sent-fp))
    (sent-fp   (sensetion--sent-id->filename sent-id))))
+
+(defun sensetion-toggle-scripts ()
+  (interactive)
+  (if (memq 'sensetion--scripts buffer-invisibility-spec)
+      (remove-from-invisibility-spec 'sensetion--scripts)
+      (add-to-invisibility-spec 'sensetion--scripts)))
 
 
 (provide 'sensetion)
