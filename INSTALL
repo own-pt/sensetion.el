@@ -1,6 +1,8 @@
 # -*- mode:org -*-
 #+TITLE: Install sensetion.el
 
+You can install it yourself, or use the docker image.
+
 * dependencies
 
 ** emacs
@@ -36,3 +38,14 @@ annotate the WN gloss corpus. If that is the case, download [[http://wordnetcode
   directory for the annotation files is ="~/sensetion-data/"=;
 - Restart emacs (or reload or your init file).
 
+
+* docker
+- install docker for your platform ;
+- clone this repository ;
+- run
+  : docker build -t sensetion .
+  in the root directory of the repository;
+- run
+  : docker run -it -v /path/to/annotation/files:/home/sensetioner/sensetion-data sensetion emacs
+  to start annotating. Remember to change the path to the annotation
+  files to the appropriate directory.
