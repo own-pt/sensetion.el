@@ -19,6 +19,40 @@
 	      ,(rest args) ,@body)))))
 
 
+(defun filter-child-elements (node p)
+  (loop for c across (plump:child-elements node)
+        when (funcall p c)
+        collect c))
+
+
+(defun lemma*->st (lemma*)
+  (let ((len (length lemma*)))
+    (when (and (> len 1) (eql (elt lemma* (- len 2)) #\%))
+      (subseq lemma* (1- len)))))
+
+
+(defun lemma*->lemma (lemma*)
+  (let ((st (lemma*->st lemma*)))
+    (if st
+        (subseq lemma* 0 (- (length lemma*) 2))
+        lemma*)))
+
+
+(defun validate-sense-lemma (node)
+  (let ((ids (filter-child-elements
+              node
+              (lambda (n) (and (equal (plump:tag-name n) "id")
+                               (not (equal
+                                     (plump:attribute n "sk")
+                                     "purposefully_ignored%0:00:00::"))))))
+        (lemmas (mapcar #'lemma*->lemma (serapeum:split-sequence #\| (plump:attribute node "lemma") :remove-empty-subseqs t))))
+    (every (lambda (id)
+             (let* ((lemma (plump:attribute id "lemma"))
+                    (lemma (substitute #\_ #\space lemma)))
+               (unless (member lemma lemmas :test #'equal)
+                 (warn "~S not one of ~S in ~S" lemma lemmas (plump:attribute node "id")))))
+           ids)))
+
 
 (defun mapcat (f vec)
   (loop for x across vec
@@ -111,12 +145,6 @@
    (error "sense key ~S does not exist" sk)))
 
 
-(defun filter-child-elements (node p)
-  (loop for c across (plump:child-elements node)
-        when (funcall p c)
-        collect c))
-
-
 (defun gloss-text (node)
   (let* ((text-node (first
                      (filter-child-elements node
@@ -166,9 +194,13 @@
                                      (plump:child-elements node)
                                      qf))))
              (("mwf" "aux" "classif" "def" "ex")
-              (let ((children (mapcat #'expand-tokens
-                                      (plump:child-elements node))))
-                (when children (tag-boundary children tag)))))))
+              (let* ((children (mapcat #'expand-tokens
+                                       (plump:child-elements node)))
+                     (type (plump:attribute node "type"))
+                     (bound (if type
+                                (concatenate 'string tag "-" type)
+                                tag)))
+                (when children (tag-boundary children bound)))))))
 
        (make-token (node)
          (serapeum:string-case
@@ -212,10 +244,21 @@
                            (otherwise kind)))
                  :anno senses
                  :meta (let ((id (node-get-id node))
-                             (bound (plump:attribute node "bound")))
+                             (bound (plump:attribute node "bound"))
+                             (glob (plump:attribute node "glob"))
+                             (sep (plump:attribute node "sep"))
+                             (type (plump:attribute node "type"))
+                             (rdf (plump:attribute node "rdf")))
                          (append
-                          (and id (list (list :id id)))
-                          (and bound (mapcar (lambda (x) (list :bound x)) (serapeum:split-sequence #\| bound)))))
+                          (and sep `((:sep ,sep)))
+                          (and type `((:type ,type)))
+                          (and id `((:id ,id)))
+                          (and rdf `((:rdf ,rdf)))
+                          (and bound
+                               (mapcar (lambda (x)
+                                         (list :bound x))
+                                       (serapeum:split-sequence #\| bound)))
+                          (and glob `((:glob ,glob)))))
                  :conf (if (eq senses 'nosense) 0 1))))
 
        (node-get-senses (node)
@@ -226,6 +269,7 @@
                                              (plump:attribute n "sk")
                                              "purposefully_ignored%0:00:00::"))
                                 ids)))
+           (validate-sense-lemma node)
            (if ignored?
                (progn
                  (assert (equal (node-annotation-tag node) "man")
