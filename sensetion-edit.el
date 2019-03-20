@@ -47,14 +47,15 @@
            (cl-destructuring-bind (sid key sense-text) s
              (list key
                    `(lambda () (interactive)
-                      (sensetion--toggle-sense ,lemma
-                                   ,st
-                                   ,tk
-                                   ,sid
-                                   ,tk-ix
-                                   ,sent)
-                      (sensetion--edit-reinsert-state-call
-                       ,tk-ix ,sent ,lemma ,st ',options))
+                      (atomic-change-group
+                        (sensetion--toggle-sense ,lemma
+                                        ,st
+                                        ,tk
+                                        ,sid
+                                        ,tk-ix
+                                        ,sent)
+                        (sensetion--edit-reinsert-state-call
+                         ,tk-ix ,sent ,lemma ,st ',options)))
                    (sense-help-text sid sense-text)
                    :column "Pick sense:")))
          options))
@@ -160,11 +161,12 @@ arguments."
                (sensetion--tk-ix-prop-at-point))
            (sensetion--get-sent-at-point)))
     (let ((tk (elt (sensetion--sent-tokens sent) tk-ix)))
-      (save-excursion
-        (funcall before-save-fn tk sent)
-        (sensetion--reinsert-sent-at-point sent))
-      (when after-save-fn
-        (funcall after-save-fn tk sent)))))
+      (atomic-change-group
+        (save-excursion
+          (funcall before-save-fn tk sent)
+          (sensetion--reinsert-sent-at-point sent))
+        (when after-save-fn
+          (funcall after-save-fn tk sent))))))
 
 
 (defalias 'sensetion-edit-lemma

@@ -70,6 +70,7 @@ keybinding.
 | sensetion-toggle-glob-mark  | =m=         | Mark/Unmark token for globbing                                    |
 | sensetion-glob              | =g=         | Glob the marked tokens as a new collocation and ask for its lemma |
 | sensetion-unglob            | =u=         | Unglob collocation of token at point (removes collocation)        |
+| sensetion-toggle-scripts    | =v=         | Show/hide super/subscripts                                        |
 | sensetion-next-selected     | =>=         | Move point to next selected token                                 |
 | sensetion-previous-selected | =<=         | Move point to previous selected token                             |
 | sensetion-move-line-up      | =C-↑=       | Move sentence up                                                  |
