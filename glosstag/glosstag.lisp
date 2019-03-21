@@ -47,6 +47,11 @@
 	:gloss (ss-gloss-orig ss)
 	:tokens (mapcar #'token->plist (ss-tokens ss))))
 
+(defun filter-attrs (type attrs)
+  (remove-if (lambda (a) 
+	       (member (car a) (list "id:id" "wf:id" "cf:id" "id") :test #'equal))
+	     attrs))
+
 (defun token->plist (tk)
   (assert (or (null (tk-sform tk)) (= 1 (length (tk-sform tk)))))
   (let ((out (list 'tk :kind (intern (string-upcase (tk-kind tk)) "KEYWORD"))))
@@ -54,8 +59,8 @@
 	(setf out (append out (list :sform (car (tk-sform tk))))))
     (if (tk-action tk)
 	(setf out (append out (list :action (intern (string-upcase (tk-action tk)) "KEYWORD")))))
-    (if (tk-attrs tk)
-	(setf out (append out (list :attrs (tk-attrs tk)))))
+    (let ((attrs (filter-attrs (tk-kind tk) (tk-attrs tk))))
+      (if attrs (setf out (append out (list :attrs attrs)))))
     out))
 
 
