@@ -168,3 +168,44 @@
     (format out "~{~s~%~}" (mapcar #'synset->plist (load-xml (make-pathname :defaults filein))))))
 
 
+
+;; saving
+
+(defun save-plists (plists dir basename)
+  (format t "Saving ~a ~a~%" dir basename)
+  (with-open-file (out (make-pathname :name basename :type "plist" :defaults dir)
+		       :direction :output :if-exists :supersede)
+    (mapcar (lambda (pl)
+	      (write pl :pretty nil :case :downcase :stream out)
+	      (terpri out))
+	    plists)))
+
+
+(defun split-and-save (source current-group current-size group &key output-dir size files)
+  (cond
+    ((null source)
+     (if files
+	 (split-and-save (mapcar #'synset->plist (load-xml (make-pathname :defaults (car files))))
+			 current-group current-size group
+			 :output-dir output-dir :size size :files (cdr files))
+	 (if current-group
+	     (save-plists current-group output-dir (format nil "~a" group)))))
+
+    ((and source (< current-size size))
+     (split-and-save (cdr source)
+		     (cons (car source) current-group) (1+ current-size) group
+		     :output-dir output-dir :size size :files files))
+
+    ((and current-group (>= current-size size))
+     (save-plists current-group output-dir (format nil "~a" group))
+     (split-and-save source nil 0 (1+ group)
+		     :output-dir output-dir :size size :files files))
+
+    (t (error "problem!"))))
+
+
+(defun main (glosstag-dir out-dir &key (size 100))
+  (let ((out-path (ensure-directories-exist out-dir))
+	(in-files (directory (make-pathname :defaults glosstag-dir :name :wild :type "xml"))))
+    (format t "Input Files: ~a~%Output Directory: ~a~%" in-files out-path)
+    (split-and-save nil nil 0 0 :output-dir out-path :size size :files in-files)))
