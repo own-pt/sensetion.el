@@ -28,9 +28,10 @@
 
 
 (defclass token ()
-  ((id         :initform nil :initarg :id    :accessor tk-id)
-   (attrs      :initform nil :initarg :ofs   :accessor tk-attrs)
-   (sform      :initform nil :initarg :sform :accessor tk-sform)))
+  ((kind    :initform nil :initarg :kind   :accessor tk-kind)
+   (action  :initform nil :initarg :action :accessor tk-action)
+   (attrs   :initform nil :initarg :attrs  :accessor tk-attrs)
+   (sform   :initform nil :initarg :sform  :accessor tk-sform)))
 
 (defclass wordnet-handler (sax:default-handler)
   ((synsets :initform nil :accessor wh-synsets) 
@@ -44,32 +45,18 @@
 	:id (ss-id ss) :ofs (ss-ofs ss) :pos (ss-pos ss)
 	:keys (mapcar (lambda (a b) (cons a b))  (ss-keys ss) (ss-terms ss))
 	:gloss (ss-gloss-orig ss)
-	:tokens (remove-if (lambda (tk) (member :remove tk))
-			   (mapcar #'token->plist (ss-tokens ss)))))
+	:tokens (mapcar #'token->plist (ss-tokens ss))))
 
 (defun token->plist (tk)
   (assert (or (null (tk-sform tk)) (= 1 (length (tk-sform tk)))))
-  (cond
-    ((member (car (car (tk-attrs tk))) (list "def" "ex") :test #'equal)
-     (assert (equal 1 (length (tk-attrs tk))))
-     (let ((att (car (tk-attrs tk))))
-       (list 'tk :kind (car att) :action (cadr att))))
-
-    ((equal "qf" (car (car (tk-attrs tk))))
-     (assert (equal 1 (length (tk-attrs tk))))
-     (let ((att (car (tk-attrs tk))))
-       (if (equal "open" (cadr (car (tk-attrs tk))))
-	   (list 'tk :kind (car att) :action (cadr att) :rend (nth 3 att))
-	   (list 'tk :kind (car att) :action (cadr att)))))
-
-    ((member '("wf" "type" "punc") (tk-attrs tk) :test #'equal)
-     (if (member '("wf" "pos" ":") (tk-attrs tk) :test #'equal)
-	 ;; all cases where punc and @pos are the fake `;`, marking to remove
-	 (list 'tk :kind "wf" :pos "punc" :sform (car (tk-sform tk)) :remove t) 
-	 (list 'tk :kind "wf" :pos "punc" :sform (car (tk-sform tk)))))
-    (t (if (tk-sform tk)
-	   (list 'tk :attrs (tk-attrs tk) :sform (car (tk-sform tk)))
-	   (list 'tk :attrs (tk-attrs tk))))))
+  (let ((out (list 'tk :kind (intern (string-upcase (tk-kind tk)) "KEYWORD"))))
+    (if (tk-sform tk)
+	(setf out (append out (list :sform (car (tk-sform tk))))))
+    (if (tk-action tk)
+	(setf out (append out (list :action (intern (string-upcase (tk-action tk)) "KEYWORD")))))
+    (if (tk-attrs tk)
+	(setf out (append out (list :attrs (tk-attrs tk)))))
+    out))
 
 
 (defmethod sax:start-element ((wh wordnet-handler) (namespace t) (local-name t) (qname t) 
@@ -94,24 +81,26 @@
      
      ((member local-name '("cf" "wf") :test #'equal)
       (state-on :reading-token)
-      (let ((tk (make-instance 'token)))
+      (let ((tk (make-instance 'token :kind local-name)))
 	(mapcar (lambda (at)
-		  (push (list local-name (sax:attribute-local-name at) (sax:attribute-value at))
+		  (push (list (format nil "~a:~a" local-name (sax:attribute-local-name at))
+			      (sax:attribute-value at))
 			(slot-value tk 'attrs)))
 		attributes)
 	(setf ctk tk)))
 
      ((member local-name '("mwf" "qf" "aux" "classif" "ex" "def") :test #'equal)
-      (let ((tk (make-instance 'token)))
+      (let ((tk (make-instance 'token :kind local-name :action "open")))
 	(mapcar (lambda (at)
-		  (push (list local-name "open" (sax:attribute-local-name at) (sax:attribute-value at))
+		  (push (list (sax:attribute-local-name at) (sax:attribute-value at))
 			(slot-value tk 'attrs)))
 		attributes)
 	(push tk (ss-tokens css))))
 
      ((member local-name (list "id" "glob") :test #'equal)
       (mapcar (lambda (at)
-		(push (list local-name (sax:attribute-local-name at) (sax:attribute-value at))
+		(push (list (format nil "~a:~a" local-name (sax:attribute-local-name at))
+			    (sax:attribute-value at))
 		      (slot-value ctk 'attrs)))
 	      attributes)))))
 
@@ -136,10 +125,7 @@
        (state-off :reading-gloss-orig))
 
       ((member local-name '("mwf" "qf" "aux" "classif" "def" "ex") :test #'equal)
-       (let ((tk (make-instance 'token)))
-	 (push (list local-name "close")
-	       (slot-value tk 'attrs))
-	 (push tk (ss-tokens css))))
+       (push (make-instance 'token :kind local-name :action "close") (ss-tokens css)))
 
       ((member local-name '("cf" "wf") :test #'equal)
        (state-off :reading-token)
