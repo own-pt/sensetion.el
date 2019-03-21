@@ -118,11 +118,11 @@ The script that converts the original XML WN gloss corpus is at
   - you can validate it with the =xmllint= utility from the =libxml=
     package:
     : xmllint --dtdvalid dtd/glosstag.dtd merged/*.xml
-- download the [[http://wordnetcode.princeton.edu/3.0/WNdb-3.0.tar.gz][WordNet 3.0 database files]] (edited version is available);
 - download and setup [[http://www.sbcl.org/][sbcl]] (although any common lisp implementation
   should work);
 - setup [[https://www.quicklisp.org/beta/][quicklisp]];
-- create a symbolic link from the =glosstag= directory inside the =quicklisp/local-projects/=
+- create a symbolic link from the =glosstag= directory inside the
+  =quicklisp/local-projects/=.
 - run:
   : ./convert.sh ~/WordNet-3.0/glosstag/merged/ DESTINATION-PATH/
   where the first parameter is a directory is from the gloss corpus
@@ -131,6 +131,7 @@ The script that converts the original XML WN gloss corpus is at
   command.) Note that the trailing slash in =glosstag/= is
   important. You must have the glosstag DTD in the same directory as
   the annotation files.
+
 
 * Status
 
