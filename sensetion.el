@@ -34,25 +34,25 @@
   :type 'string)
 
 
+(defcustom sensetion-annotation-dir
+  (expand-file-name "~/sensetion-data/")
+  "Path to annotation directory"
+  :group 'sensetion
+  :type 'directory)
+
+
 (defcustom sensetion-index-file
-  (expand-file-name "~/.sensetion-index")
+  (f-join sensetion-annotation-dir ".sensetion-index")
   "Path to index file."
   :group 'sensetion
   :type 'file)
 
 
 (defcustom sensetion-status-file
-  (expand-file-name "~/.sensetion-status")
+  (f-join sensetion-annotation-dir ".sensetion-status")
   "Path to status file."
   :group 'sensetion
   :type 'file)
-
-
-(defcustom sensetion-annotation-dir
-  nil
-  "Path to annotation directory"
-  :group 'sensetion
-  :type 'directory)
 
 
 (defcustom sensetion-annotation-file-type

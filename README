@@ -85,9 +85,9 @@ If the index goes out of sync, you can force a new indexation with
 ** Saving your work
 - Any annotations are saved to their files at the moment they are
   done.
-- The updated index is saved by default to your home directory in
-  =.sensetion-index= when you quit emacs gracefully (that's why it
-  hangs a little). This path is customizable.
+- The updated index is saved by default to your annotation directory
+  in the file =.sensetion-index= when you quit emacs gracefully
+  (that's why it hangs a little). This path is customizable.
 
 
 ** Seeing your work
