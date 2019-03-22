@@ -7,5 +7,6 @@
                       ;; #:cl-fad :fare-csv
                :alexandria :serapeum)
   :components ((:file "package")
-	       (:file "glosstag" :depends-on ("package"))))
+	       (:file "glosstag" :depends-on ("package"))
+	       (:file "utils"    :depends-on ("package"))))
 
