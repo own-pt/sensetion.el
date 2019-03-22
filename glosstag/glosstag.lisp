@@ -39,9 +39,23 @@
    (ctk     :initform nil :accessor wh-ctk)))
 
 
+(defun fix-sense-key (str)
+  (let ((lemma+lex_sense (serapeum:split-sequence-if
+			  #'(lambda (char)
+			      (or (char-equal #\: char)
+				  (char-equal #\% char)))
+			  str)))
+    (if (and
+	 (string-equal (nth 1 lemma+lex_sense) "3")
+	 (not (string-equal (nth 4 lemma+lex_sense) "")))
+	(progn
+	  (setf (nth 1 lemma+lex_sense) "5")
+	  (format nil "~{~a~^:~}" lemma+lex_sense))
+	str)))
+
 (defun synset->plist (ss)
   (list :ofs (ss-ofs ss) :pos (ss-pos ss)
-	:keys (mapcar #'cons (ss-keys ss) (ss-terms ss))
+	:keys (mapcar #'cons (mapcar #'fix-sense-key (ss-keys ss)) (ss-terms ss))
 	:gloss (ss-gloss-orig ss)
 	:tokens (mapcan #'token->plist (ss-tokens ss))))
 
@@ -61,7 +75,7 @@
 		       (let* ((id-attr (cadr id))
 			      (sk (assocadr "sk" id-attr))
 			      (lemma (assocadr "lemma" id-attr)))
-			 (cons sk lemma)))
+			 (cons (fix-sense-key sk) lemma)))
 		   ids)))
        
        (str->kw (str)
