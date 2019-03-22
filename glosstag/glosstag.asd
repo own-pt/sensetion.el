@@ -3,8 +3,8 @@
 
 (asdf:defsystem #:glosstag
   :serial t
-  :depends-on (#:cxml ;; #:cl-ppcre #:flexi-streams
-                      ;; #:cl-fad :fare-csv
+  :depends-on (#:cxml #:cl-ppcre
+		      ;; #:flexi-streams #:cl-fad :fare-csv
                :alexandria :serapeum)
   :components ((:file "package")
 	       (:file "glosstag" :depends-on ("package"))
