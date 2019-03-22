@@ -39,64 +39,126 @@
    (ctk     :initform nil :accessor wh-ctk)))
 
 
-
 (defun synset->plist (ss)
-  (list :id (ss-id ss) :ofs (ss-ofs ss) :pos (ss-pos ss)
+  (list :ofs (ss-ofs ss) :pos (ss-pos ss)
 	:keys (mapcar #'cons (ss-keys ss) (ss-terms ss))
 	:gloss (ss-gloss-orig ss)
 	:tokens (mapcan #'token->plist (ss-tokens ss))))
 
 (defun filter-attrs (attrs)
-  (remove-if (lambda (a) 
-	       (member (car a) (list "id:id" "wf:id" "cf:id" "id") :test #'equal))
+  (remove-if (lambda (a)
+	       (member (car a) (list "id:id" "wf:id" "cf:id") :test #'equal))
 	     attrs))
 
 (defun token->plist (tk)
   (assert (or (null (tk-sform tk)) (= 1 (length (tk-sform tk)))))
   (labels
-      ((make-senses (senses)
-         nil)
+      ((make-senses (attrs)
+	 (let ((ids (remove-if-not #'(lambda (atrr)
+				       (equal (car atrr) "id"))
+				   attrs)))
+	   (mapcar #'(lambda (id)
+		       (let* ((id-attr (cadr id))
+			      (sk (assocadr "sk" id-attr))
+			      (lemma (assocadr "lemma" id-attr)))
+			 (cons sk lemma)))
+		   ids)))
+       
        (str->kw (str)
-         (intern (string-upcase str) "KEYWORD"))
+	 (when str
+           (intern (string-upcase str) "KEYWORD")))
+       
        (opt (key val)
          (and val (list key val)))
+       
        (action-kw (tk)
          (str->kw (tk-action tk)))
-       (assocdr (item alist)
+       
+       (assocadr (item alist)
          (second (assoc item alist :test #'equal)))
+       
        (ex (tk)
          (list :kind :ex :action (action-kw tk)))
+       
        (aux (tk attrs)
-         (let ((tag (assocdr "aux:tag" attrs))
-               (type (assocdr "aux:type" attrs)))
+         (let ((tag (assocadr "aux:tag" attrs))
+               (type (assocadr "aux:type" attrs)))
            (append (list :kind :aux :action (action-kw tk))
                    (opt :tag  (str->kw tag))
                    (opt :type (str->kw type)))))
+       
        (def (tk)
          (list :kind :def :action (action-kw tk)))
+       
        (classif (tk attrs)
-         (let ((type (assocdr "classif:type" attrs)))
+         (let ((type (assocadr "classif:type" attrs)))
            (append (list :kind :classif :action (action-kw tk))
                    (opt :type (str->kw type)))))
+       
        (mwf (tk attrs)
-         (let ((type (assocdr "type" attrs)))
+         (let ((type (assocadr "type" attrs)))
            (append (list :kind :mwf :action (action-kw tk))
                    (opt :type (str->kw type)))))
+       
        (qf (tk attrs)
-         (let ((rend (assocdr "qf:rend" attrs)))
-           (list :kind :qf :action (action-kw tk) :rend (str->kw rend))))
+         (let ((rend (assocadr "qf:rend" attrs)))
+           (append (list :kind :qf :action (action-kw tk))
+		   (opt :rend (str->kw rend)))))
+       
        (wf (tk attrs)
-         (let ((lemma (assocdr "wf:lemma" attrs))
-               (pos (assocdr "wf:pos" attrs))
-               (type (assocdr "wf:type" attrs))
-               (rdf (assocdr "wf:rdf" attrs))
-               (sep (assocdr "wf:sep" attrs))
+         (let ((tag   (assocadr "wf:tag" attrs))
+	       (lemma (assocadr "wf:lemma" attrs))
+               (pos (assocadr "wf:pos" attrs))
+               (type (assocadr "wf:type" attrs))
+               (rdf (assocadr "wf:rdf" attrs))
+               (sep (assocadr "wf:sep" attrs))
                (senses (make-senses attrs)))
            (append
             (list :kind :wf :form (car (tk-sform tk)))
-            (opt :lemma lemma) (opt :pos pos) (opt :senses senses)
-            (opt :type type) (opt :rdf rdf) (opt :sep sep)))))
-    (let ((kind (str->kw (tk-kind tk)))
+            (opt :lemma lemma) (opt :pos pos)
+	    (list :tag tag) (opt :senses senses)
+            (opt :sep sep) (opt :type type) (opt :rdf rdf))))
+
+       (globs (tk attrs)
+	 (let ((globs (remove-if-not #'(lambda (atrr)
+					 (equal (car atrr) "glob"))
+				     attrs)))
+	   (when globs
+	    (mapcar
+	     #'(lambda (glob)
+		 (let* ((glob-attr (cadr glob))
+			(lemma  (assocadr "lemma" glob-attr))
+			(tag    (assocadr "tag" glob-attr))
+			(glob   (assocadr "glob" glob-attr))
+			(coll   (assocadr "coll" glob-attr))
+			(glob-ids (remove-if-not #'(lambda (attr)
+						     (and (equal (car attr) "id")
+							  (equal (assocadr "coll" (cadr attr)) coll)))
+						 attrs))
+			(senses (make-senses glob-ids)))
+		   (append
+		    (list :kind `(:glob . ,coll) :lemma lemma :glob glob)
+		    (opt :tag tag) (opt :senses senses) (list :glob glob))))
+	     globs))))
+       
+       (cf (tk attrs)
+	 (let ((colls  (serapeum:split-sequence
+			#\, (assocadr "cf:coll" attrs)))	       
+	       (lemma  (assocadr "cf:lemma" attrs))
+	       (pos    (assocadr "cf:pos" attrs))
+	       (tag    (assocadr "cf:tag" attrs))
+	       (type   (assocadr "cf:type" attrs))
+               (rdf    (assocadr "cf:rdf" attrs))
+               (sep    (assocadr "cf:sep" attrs)))
+	   (append
+	    (globs tk attrs)
+	    (list
+	     (append
+	      (list :kind `(:cf . ,colls) :form (car (tk-sform tk)))
+	      (opt :lemma lemma) (opt :pos pos) (list :tag tag)
+	      (opt :sep sep) (opt :type type) (opt :rdf rdf)))))))
+
+    (let ((kind  (str->kw (tk-kind tk)))
           (attrs (filter-attrs (tk-attrs tk))))
       (case kind
         (:EX (list (ex tk)))
@@ -106,54 +168,54 @@
         (:MWF (list (mwf tk attrs)))
         (:QF (list (qf tk attrs)))
         (:WF (list (wf tk attrs)))
-        ;; (:CF (cf tk attrs))
-        ))))
+	(:CF (cf tk attrs))))))
 
 
 (defmethod sax:start-element ((wh wordnet-handler) (namespace t) (local-name t) (qname t) 
 			      (attributes t))
   (with-slots (css ctk) wh
     (cond 
-     ((equal local-name "synset")
-      (setf css (make-instance 'synset
-			       :id  (sax:attribute-value (sax:find-attribute "id"  attributes))
-			       :pos (sax:attribute-value (sax:find-attribute "pos" attributes))
-			       :ofs (sax:attribute-value (sax:find-attribute "ofs" attributes)))))
-     ((equal local-name "term")
-      (state-on :reading-term))
-     ((equal local-name "sk")
-      (state-on :reading-key))
-     
-     ((equal local-name "gloss")
-      (let* ((av (sax:attribute-value (sax:find-attribute "desc" attributes))))
-	(switch (av :test #'equal)
-		("orig"  (state-on :reading-gloss-orig))
-		("text"  (state-on :reading-gloss-tok)))))
-     
-     ((member local-name '("cf" "wf") :test #'equal)
-      (state-on :reading-token)
-      (let ((tk (make-instance 'token :kind local-name)))
-	(mapcar (lambda (at)
-		  (push (list (format nil "~a:~a" local-name (sax:attribute-local-name at))
-			      (sax:attribute-value at))
-			(slot-value tk 'attrs)))
-		attributes)
-	(setf ctk tk)))
+      ((equal local-name "synset")
+       (setf css (make-instance 'synset
+				:id  (sax:attribute-value (sax:find-attribute "id"  attributes))
+				:pos (sax:attribute-value (sax:find-attribute "pos" attributes))
+				:ofs (sax:attribute-value (sax:find-attribute "ofs" attributes)))))
+      ((equal local-name "term")
+       (state-on :reading-term))
+      ((equal local-name "sk")
+       (state-on :reading-key))
 
-     ((member local-name '("mwf" "qf" "aux" "classif" "ex" "def") :test #'equal)
-      (let ((tk (make-instance 'token :kind local-name :action "open")))
-	(mapcar (lambda (at)
-		  (push (list (sax:attribute-local-name at) (sax:attribute-value at))
-			(slot-value tk 'attrs)))
-		attributes)
-	(push tk (ss-tokens css))))
+      ((equal local-name "gloss")
+       (let* ((av (sax:attribute-value (sax:find-attribute "desc" attributes))))
+	 (switch (av :test #'equal)
+	   ("orig"  (state-on :reading-gloss-orig))
+	   ("text"  (state-on :reading-gloss-tok)))))
 
-     ((member local-name (list "id" "glob") :test #'equal)
-      (mapcar (lambda (at)
-		(push (list (format nil "~a:~a" local-name (sax:attribute-local-name at))
-			    (sax:attribute-value at))
-		      (slot-value ctk 'attrs)))
-	      attributes)))))
+      ((member local-name '("cf" "wf") :test #'equal)
+       (state-on :reading-token)
+       (let ((tk (make-instance 'token :kind local-name)))
+	 (mapcar (lambda (at)
+		   (push (list (format nil "~a:~a" local-name (sax:attribute-local-name at))
+			       (sax:attribute-value at))
+			 (slot-value tk 'attrs)))
+		 attributes)
+	 (setf ctk tk)))
+
+      ((member local-name '("mwf" "qf" "aux" "classif" "ex" "def") :test #'equal)
+       (let ((tk (make-instance 'token :kind local-name :action "open")))
+	 (mapcar (lambda (at)
+		   (push (list (sax:attribute-local-name at) (sax:attribute-value at))
+			 (slot-value tk 'attrs)))
+		 attributes)
+	 (push tk (ss-tokens css))))
+
+      ((member local-name (list "id" "glob") :test #'equal)
+       (push
+	(list local-name
+	      (mapcar (lambda (at)
+			(list (sax:attribute-local-name at) (sax:attribute-value at)))
+		      attributes))
+	(slot-value ctk 'attrs))))))
 
 
 (defmethod sax:end-element ((wh wordnet-handler) (namespace t) (local-name t) (qname t))
