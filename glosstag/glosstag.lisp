@@ -50,7 +50,9 @@
 	 (not (string-equal (nth 4 lemma+lex_sense) "")))
 	(progn
 	  (setf (nth 1 lemma+lex_sense) "5")
-	  (format nil "~{~a~^:~}" lemma+lex_sense))
+	  (format nil "~a%~a:~{~a~^:~}" (first lemma+lex_sense)
+                  (second lemma+lex_sense)
+                  (cddr lemma+lex_sense)))
 	str)))
 
 (defun synset->plist (ss)
@@ -151,7 +153,7 @@
 						 attrs))
 			(senses (make-senses glob-ids)))
 		   (append
-		    (list :kind `(:glob . ,coll) :lemma lemma :glob glob)
+		    (list :kind `(:glob . ,coll) :lemma lemma)
 		    (opt :tag tag) (opt :senses senses) (list :glob glob))))
 	     globs))))
        
