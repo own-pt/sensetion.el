@@ -2,8 +2,9 @@
 #+TITLE: Word-sense annotation in Emacs
 
 This project intends to finish the word-sense annotations of the
-[[http://wordnetcode.princeton.edu/glosstag.shtml][WordNet gloss corpus]], but can be used to sense-tag any corpus in the
-S-expression-based format we have defined.
+[[http://wordnetcode.princeton.edu/glosstag.shtml][WordNet gloss corpus]].
+# , but can be used to sense-tag any corpus in the S-expression-based
+# format we have defined.
 
 
 * Installation
@@ -11,14 +12,9 @@ See the =INSTALL= file.
 
 
 * Usage
-You should set the directory where the files to be annotated are with
-=M-x customize-variable RET sensetion-annotation-dir=. (You can
-customize other stuff with =M-x customize-group RET sensetion=.)
-
 Use =M-x sensetion= to start annotating. If this is the first time you
 call it, it might take some time to index the files (you can do other
-stuff on Emacs while it works); else it'll read the index files (which
-lie by default in your home directory, prefixed by =.sensetion-=), and
+stuff on Emacs while it works); else it'll read the index files, and
 start the annotation process.
 
 =M-x sensetion-annotate= will ask you for a lemma and a PoS tag. You
@@ -54,6 +50,9 @@ again.
 
 You can move sentences up or down with =C-↑= and =C-↓=. Clustering
 tokens with the same sense together might be useful.
+
+Note that you can customize most things (like annotation colors) with
+=M-x customize-group RET sensetion=.
 
 ** Command summary
 You can call a command using =M-x <command-name>= or by pressing its
@@ -108,35 +107,33 @@ In any case, please back up your work!
 
 
 * Annotation format
+
 We convert the original XML files to property lists.
 
-** conversion from original XML
 The script that converts the original XML WN gloss corpus is at
-=convert.lisp=. The MISC field of the annotation files saves lots of
-information from the XML to preserve a mapping between them.
-
-To re-run the conversion:
+=convert.sh=. To re-run the conversion:
 
 - download the [[http://wordnetcode.princeton.edu/glosstag.shtml][WordNet gloss corpus]];
   - you can validate it with the =xmllint= utility from the =libxml=
     package:
     : xmllint --dtdvalid dtd/glosstag.dtd merged/*.xml
-- download the [[http://wordnetcode.princeton.edu/3.0/WNdb-3.0.tar.gz][WordNet 3.0 database files]];
 - download and setup [[http://www.sbcl.org/][sbcl]] (although any common lisp implementation
   should work);
 - setup [[https://www.quicklisp.org/beta/][quicklisp]];
+- create a symbolic link from the =glosstag= directory inside the
+  =quicklisp/local-projects/=.
 - run:
-  : ./convert.sh ~/WordNet-3.0/glosstag/merged/ ~/WordNet-3.0/dict/index.sense glosstag/
+  : ./convert.sh ~/WordNet-3.0/glosstag/merged/ DESTINATION-PATH/
   where the first parameter is a directory is from the gloss corpus
   archive, the last parameter is the directory is where you want to
-  put the files, and the second parameter is the index.sense file from
-  the WordNet database. (Use absolute paths if you have problems with
-  the command.) Note that the trailing slash in =glosstag/= is
+  put the files. (Use absolute paths if you have problems with the
+  command.) Note that the trailing slash in =glosstag/= is
   important. You must have the glosstag DTD in the same directory as
   the annotation files.
 
 
 * Status
+
 Under heavy development -- user interface is unstable, and the code is
 still to be generalized so that it can be made useful for annotation
 of other corpora (maybe even of other stuff).

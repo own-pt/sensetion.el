@@ -38,7 +38,7 @@ itself."
 
 (defmacro sensetion-is (&rest body)
   (seq-let (body wclauses)
-      (-split-when (lambda (c) (eq 'where c)) body)
+      (-split-when (lambda (c) (eq :where c)) body)
     (let ((body
            (-reduce-from
             (lambda (bd cl)
