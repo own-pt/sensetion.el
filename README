@@ -2,8 +2,9 @@
 #+TITLE: Word-sense annotation in Emacs
 
 This project intends to finish the word-sense annotations of the
-[[http://wordnetcode.princeton.edu/glosstag.shtml][WordNet gloss corpus]], but can be used to sense-tag any corpus in the
-S-expression-based format we have defined.
+[[http://wordnetcode.princeton.edu/glosstag.shtml][WordNet gloss corpus]].
+# , but can be used to sense-tag any corpus in the S-expression-based
+# format we have defined.
 
 
 * Installation
@@ -11,14 +12,9 @@ See the =INSTALL= file.
 
 
 * Usage
-You should set the directory where the files to be annotated are with
-=M-x customize-variable RET sensetion-annotation-dir=. (You can
-customize other stuff with =M-x customize-group RET sensetion=.)
-
 Use =M-x sensetion= to start annotating. If this is the first time you
 call it, it might take some time to index the files (you can do other
-stuff on Emacs while it works); else it'll read the index files (which
-lie by default in your home directory, prefixed by =.sensetion-=), and
+stuff on Emacs while it works); else it'll read the index files, and
 start the annotation process.
 
 =M-x sensetion-annotate= will ask you for a lemma and a PoS tag. You
@@ -54,6 +50,9 @@ again.
 
 You can move sentences up or down with =C-↑= and =C-↓=. Clustering
 tokens with the same sense together might be useful.
+
+Note that you can customize most things (like annotation colors) with
+=M-x customize-group RET sensetion=.
 
 ** Command summary
 You can call a command using =M-x <command-name>= or by pressing its
