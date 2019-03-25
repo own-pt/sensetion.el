@@ -97,8 +97,8 @@
          (list :kind :ex :action (action-kw tk)))
        
        (aux (tk attrs)
-         (let ((tag (assocadr "aux:tag" attrs))
-               (type (assocadr "aux:type" attrs)))
+         (let ((tag (assocadr "tag" attrs))
+               (type (assocadr "type" attrs)))
            (append (list :kind :aux :action (action-kw tk))
                    (opt :tag  (str->kw tag))
                    (opt :type (str->kw type)))))
@@ -107,7 +107,7 @@
          (list :kind :def :action (action-kw tk)))
        
        (classif (tk attrs)
-         (let ((type (assocadr "classif:type" attrs)))
+         (let ((type (assocadr "type" attrs)))
            (append (list :kind :classif :action (action-kw tk))
                    (opt :type (str->kw type)))))
        
@@ -117,7 +117,7 @@
                    (opt :type (str->kw type)))))
        
        (qf (tk attrs)
-         (let ((rend (assocadr "qf:rend" attrs)))
+         (let ((rend (assocadr "rend" attrs)))
            (append (list :kind :qf :action (action-kw tk))
 		   (opt :rend (str->kw rend)))))
        
