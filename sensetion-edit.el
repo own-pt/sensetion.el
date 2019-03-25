@@ -83,6 +83,9 @@
          (senses (if present?
                      (cl-remove sk orig :key #'car :test #'equal)
                    (cons (cons sk lemma) orig))))
+    (unless (sensetion--tk-annotated? tk)
+      (cl-incf (car sensetion--global-status) 1)
+      (cl-incf (car sensetion--local-status) 1))
     (if (and present? (null (cdr orig)))
         (warn "Can't remove last sense")
       (setf (sensetion--tk-senses tk)
@@ -95,9 +98,6 @@
   (let ((point (point)))
     (sensetion--reinsert-synset-at-point synset)
     (goto-char point))
-  (unless (sensetion--tk-annotated? (elt (sensetion--synset-tokens synset) tk-ix))
-    (cl-incf (car sensetion--global-status) 1)
-    (cl-incf (car sensetion--local-status) 1))
   (when (and lemma st options)
     (sensetion--call-hydra lemma st tk-ix synset options)))
 
@@ -137,7 +137,7 @@
 
 
 (define-derived-mode sensetion-edit-mode prog-mode "sensetion-edit"
-  "sensetion-edit-mode is a major mode for editing sensetion database files."
+  "sensetion-edit-mode is a major mode for editing sensetion data files."
   (add-hook 'kill-buffer-hook 'sensetion--save-edit nil t)
   (setq-local write-contents-functions (list (lambda () (sensetion--save-edit t)))))
 
@@ -174,10 +174,11 @@ arguments. None of the arguments may move point."
    (lambda (tk synset)
      (let* ((old-lemma (sensetion--tk-lemma tk))
             (lemma     (read-string "Assign lemma to token: "
-                                    (cons old-lemma (1+ (length old-lemma))))))
+                                    (cons old-lemma (1+ (length old-lemma)))))
+            (coord (sensetion--synset-coord-prop-at-point)))
        (setf (sensetion--tk-lemma tk) lemma)
-       (sensetion--remove-lemmas sensetion--index old-lemma synset)
-       (sensetion--index-lemmas sensetion--index lemma (sensetion--synset-id synset)))))
+       (sensetion--remove-lemmas sensetion--index old-lemma synset coord)
+       (sensetion--index-lemmas sensetion--index lemma coord))))
   "Edit lemma of token of index TK-IX at point and save modified SYNSET.")
 
 
