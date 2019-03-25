@@ -103,14 +103,19 @@
 
 
 ;; ;; ;; ;; edit source synset
-(defun sensetion-edit-synset (synset)
-  (interactive (list (sensetion--get-synset-at-point)))
-  (sensetion--edit-synset
-   synset
-   (get-buffer (sensetion--make-edit-buffer-name synset))))
+(defvar-local sensetion--edit-file-coord nil "Coordinates for the synset being edited in this buffer")
 
 
-(defun sensetion--edit-synset (synset mbuffer)
+(defun sensetion-edit-synset (coord)
+  (interactive (list (sensetion--synset-coord-prop-at-point)))
+  (let ((synset (sensetion--get-synset coord)))
+    (sensetion--edit-synset
+     synset
+     coord
+     (get-buffer (sensetion--make-edit-buffer-name synset)))))
+
+
+(defun sensetion--edit-synset (synset coord mbuffer)
   (let ((buffer (or mbuffer (generate-new-buffer (sensetion--make-edit-buffer-name synset)))))
     (unless mbuffer
       (with-current-buffer buffer
@@ -118,6 +123,7 @@
         (sensetion--beginning-of-buffer)
         (indent-pp-sexp 1)
         (sensetion-edit-mode)
+        (setq-local sensetion--edit-file-coord coord)
         (set-buffer-modified-p nil)))
     (pop-to-buffer buffer nil t)))
 
@@ -131,7 +137,7 @@
     (when (or force (y-or-n-p "Save synset? "))
       (save-excursion
         (goto-char (point-min))
-        (sensetion--save-synset (sensetion--plist->synset (read (thing-at-point 'sexp t)))))
+        (sensetion--save-synset (sensetion--plist->synset (read (thing-at-point 'sexp t))) sensetion--edit-file-coord))
       (set-buffer-modified-p nil)))
   t)
 
@@ -195,7 +201,14 @@ arguments. None of the arguments may move point."
 (defalias 'sensetion-edit-ignore
   (sensetion--edit-function
    (lambda (tk _)
-     (setf (sensetion--tk-tag tk) "ignore")))
+     (when (sensetion--tk-annotatable? tk)
+       (cl-incf (cdr sensetion--global-status) -1)
+       (cl-incf (cdr sensetion--local-status) -1)
+       (when (sensetion--tk-annotated? tk)
+         (cl-incf (car sensetion--global-status) -1)
+         (cl-incf (car sensetion--local-status) -1))
+       (setf (sensetion--tk-tag tk) "ignore")
+       (setf (sensetion--tk-senses tk) nil))))
   "Annotate that token is to be ignored in annotation.")
 
 
