@@ -463,8 +463,7 @@ LEMMA.
 You can mark/unmark tokens with `sensetion-toggle-glob-mark'."
   (interactive (list
                 (s-trim
-                 (cl-substitute (string-to-char "_") (string-to-char " ")
-                                (read-string "Lemma of glob: " nil nil "")))))
+                 (sensetion--spaces->underlines (read-string "Lemma of glob: " nil nil "")))))
   (sensetion--index-lemmas sensetion--index lemma (sensetion--synset-coord-prop-at-point))
   (sensetion-is
    (sensetion--reinsert-synset-at-point globbed-synset)
@@ -903,7 +902,10 @@ and the third is the gloss."
                      lemma (sensetion--synset-ofs synset) (sensetion--synset-pos synset))))
    (synsets  (sensetion--get-synsets coords))
    (coords   (trie-lookup sensetion--lemma->synsets lemma))
-   (options  (make-hash-table :test 'equal :size 30))))
+   (options  (make-hash-table :test 'equal :size 30))
+   (lemma (cl-substitute (string-to-char " ")
+                         (string-to-char "_")
+                         lemma))))
 
 
 (defun sensetion--tk-annotated? (tk)

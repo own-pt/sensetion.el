@@ -68,4 +68,10 @@ itself."
   (let ((sl (or start-line 0)))
     (forward-line (- line sl))))
 
+
+(defun sensetion--spaces->underlines (str)
+  (cl-substitute (string-to-char "_")
+                 (string-to-char " ")
+                 str))
+
 (provide 'sensetion-utils)
