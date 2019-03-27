@@ -38,7 +38,7 @@
 
 (defun sensetion--tk->plist (tk)
   (pcase tk
-    ((cl-struct sensetion--tk kind form lemma pos tag senses glob sep type rdf unsure action)
+    ((cl-struct sensetion--tk kind form lemma pos tag senses glob sep type rdf unsure action rend)
      (cl-mapcan
       (lambda (k v) (when v (list k v)))
       '(:kind :form :lemma :pos :tag :senses :glob :sep :type :rdf :action :unsure :rend)
