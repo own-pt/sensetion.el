@@ -5,7 +5,7 @@
 
 (cl-defstruct (sensetion--tk (:constructor nil)
                     (:constructor sensetion--make-tk))
-  kind form lemma pos tag senses glob unsure sep type rdf action)
+  kind form lemma pos tag senses glob unsure sep type rdf action rend)
 
 
 (cl-defstruct (sensetion--synset (:constructor nil)
@@ -41,7 +41,7 @@
     ((cl-struct sensetion--tk kind form lemma pos tag senses glob sep type rdf unsure action)
      (cl-mapcan
       (lambda (k v) (when v (list k v)))
-      '(:kind :form :lemma :pos :tag :senses :glob :sep :type :rdf :action :unsure)
+      '(:kind :form :lemma :pos :tag :senses :glob :sep :type :rdf :action :unsure :rend)
       (list kind
             form
             lemma
@@ -57,7 +57,8 @@
             type
             rdf
             action
-            unsure)))))
+            unsure
+            rend)))))
 
 
 (defun sensetion--tk-confident-in-anno? (tk)
