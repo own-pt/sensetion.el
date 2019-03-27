@@ -112,6 +112,7 @@ A cons cell in the same format as `sensetion--global-status'.")
 
 (defvar sensetion-mode-map
   (let ((map (make-sparse-keymap)))
+    (define-key map "s" #'sensetion-hydra/body)
     (define-key map "<" #'sensetion-previous-selected)
     (define-key map ">" #'sensetion-next-selected)
     (define-key map "/" #'sensetion-edit-sense)
@@ -974,6 +975,24 @@ and the third is the gloss."
   (if (memq 'sensetion--scripts buffer-invisibility-spec)
       (remove-from-invisibility-spec 'sensetion--scripts)
     (add-to-invisibility-spec 'sensetion--scripts)))
+
+
+(defhydra sensetion-hydra (:color blue)
+  ("q" nil nil)
+  ("s" nil nil)
+  ("RET" nil nil)
+  ("l" sensetion-edit-lemma "Edit token lemma" :column "Edit")
+  ("/" sensetion-edit-sense "Edit token senses" :column "Edit")
+  ("i" sensetion-edit-ignore "Ignore token" :column "Edit")
+  ("?" sensetion-edit-unsure "Mark annotation as unsure" :column "Edit")
+  ("." sensetion-edit-sent "Edit data file" :column "Edit")
+  ("m" sensetion-toggle-glob-mark "(Un)Mark token for globbing" :column "Globbing")
+  ("g" sensetion-glob "Glob marked tokens" :column "Globbing")
+  ("u" sensetion-unglob "Unglob token's collocation" :column "Globbing")
+  ("<left>" sensetion-previous-selected "Go to previous selected token" :column "Navigation" :color pink)
+  ("<right>" sensetion-next-selected "Go to next selected token" :column "Navigation" :color pink)
+  ("<up>" sensetion-move-line-up "Move sentence up" :column "Navigation" :color pink)
+  ("<down>" sensetion-move-line-down "Move sentence down" :column "Navigation" :color pink))
 
 
 (provide 'sensetion)

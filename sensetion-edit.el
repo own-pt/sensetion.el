@@ -47,13 +47,14 @@
          (lambda (s)
            (cl-destructuring-bind (sk hkey terms gloss) s
              (list hkey
-                   `(lambda () (interactive)
-                      (atomic-change-group
-                        (sensetion--toggle-sense ,lemma
-                                        ,tk
-                                        ,sk)
-                        (sensetion--edit-reinsert-state-call
-                         ,tk-ix ,synset ,lemma ,st ',options)))
+                   ;; gets wrapped in (lambda () (interactive)
+                   ;; automatically by hydra
+                   `(atomic-change-group
+                      (sensetion--toggle-sense ,lemma
+                                      ,tk
+                                      ,sk)
+                      (sensetion--edit-reinsert-state-call
+                       ,tk-ix ,synset ,lemma ,st ',options))
                    (sense-help-text sk terms gloss)
                    :column "Pick sense:")))
          options))
@@ -65,13 +66,13 @@
    (sense-chosen-ind (sk)
                      (if (member sk pres-skeys) "+ " ""))
    (no-sense-function
-    (lambda () (interactive)
-      (funcall
-       (sensetion--edit-function
+    `(funcall
+      ,(sensetion--edit-function
         (lambda (tk _)
           (setf (sensetion--tk-senses tk) nil)
-          (setf (sensetion--tk-tag tk) "man-now")))
-       tk-ix synset)))
+          (setf (sensetion--tk-tag tk) "man-now")
+          t))
+      tk-ix synset))
    (pres-skeys (sensetion--tk-skeys tk))
    (tk (elt (sensetion--synset-tokens synset) tk-ix))))
 
@@ -152,8 +153,8 @@
   "Creates function to edit token at point.
 
 Get token and synset at point, call BEFORE-SAVE-FN with them as
-arguments, save synset, call AFTER-SAVE-FN with them as
-arguments. None of the arguments may move point."
+arguments, save synset and call AFTER-SAVE-FN if BEFORE-SAVE-FN
+returns non-nil. None of the arguments may move point."
   (lambda (tk-ix synset)
     (interactive
      ;; TODO: ask about which token to annotate?
@@ -164,15 +165,16 @@ arguments. None of the arguments may move point."
            (tk         (elt (sensetion--synset-tokens synset) tk-ix))
            (prev-anno? (sensetion--tk-annotated? tk)))
       (atomic-change-group
-        (funcall before-save-fn tk synset)
-        (let ((curr-anno? (sensetion--tk-annotated? tk)))
+        (let* ((to-save? (funcall before-save-fn tk synset))
+               (curr-anno? (sensetion--tk-annotated? tk)))
           (when (and (not prev-anno?) curr-anno?)
             (cl-incf (car sensetion--global-status) 1)
-            (cl-incf (car sensetion--local-status) 1)))
-        (sensetion--reinsert-synset-at-point synset)
-        (when after-save-fn
-          (funcall after-save-fn tk synset))
-        (goto-char point)))))
+            (cl-incf (car sensetion--local-status) 1))
+          (when to-save?
+            (sensetion--reinsert-synset-at-point synset)
+            (when after-save-fn
+              (funcall after-save-fn tk synset))))
+          (goto-char point)))))
 
 
 (defalias 'sensetion-edit-lemma
@@ -184,31 +186,37 @@ arguments. None of the arguments may move point."
             (coord (sensetion--synset-coord-prop-at-point)))
        (setf (sensetion--tk-lemma tk) lemma)
        (sensetion--remove-lemmas sensetion--index old-lemma synset coord)
-       (sensetion--index-lemmas sensetion--index lemma coord))))
+       (sensetion--index-lemmas sensetion--index lemma coord))
+     t))
   "Edit lemma of token of index TK-IX at point and save modified SYNSET.")
 
 
 (defalias 'sensetion-edit-unsure
+  ;; TODO: allow this anywhere?
   (sensetion--edit-function
    (lambda (tk _)
      (let ((st (sensetion--tk-tag tk)))
-       (when (member st  '("un"))
+       (when (member st '("un"))
          (user-error "Can't be unsure about unnanotated token")))
-     (setf (sensetion--tk-unsure tk) 0)))
+     (setf (sensetion--tk-unsure tk) 0)
+     t))
   "Annotate that confidence in the annotation is low.")
 
 
 (defalias 'sensetion-edit-ignore
+  ;; TODO: allow this anywhere?
   (sensetion--edit-function
    (lambda (tk _)
-     (when (sensetion--tk-annotatable? tk)
-       (cl-incf (cdr sensetion--global-status) -1)
-       (cl-incf (cdr sensetion--local-status) -1)
-       (when (sensetion--tk-annotated? tk)
-         (cl-incf (car sensetion--global-status) -1)
-         (cl-incf (car sensetion--local-status) -1))
-       (setf (sensetion--tk-tag tk) "ignore")
-       (setf (sensetion--tk-senses tk) nil))))
+     (unless (sensetion--tk-annotatable? tk)
+       (user-error "Token already ignored"))
+     (cl-incf (cdr sensetion--global-status) -1)
+     (cl-incf (cdr sensetion--local-status) -1)
+     (when (sensetion--tk-annotated? tk)
+       (cl-incf (car sensetion--global-status) -1)
+       (cl-incf (car sensetion--local-status) -1))
+     (setf (sensetion--tk-tag tk) "ignore")
+     (setf (sensetion--tk-senses tk) nil)
+     t))
   "Annotate that token is to be ignored in annotation.")
 
 
