@@ -26,11 +26,15 @@ There are two things you can do about this warning:
   (package-refresh-contents)
   (package-install 'use-package))
 
+;; --- If on Mac this might be necessary
 (use-package exec-path-from-shell :ensure t)
-
-;; If on Mac this might be necessary
 (when (memq window-system '(mac ns x))
   (exec-path-from-shell-initialize))
+;; ---
+
+
+;; ---------------------------------------------------------------
+;; copy below this part if you already have use-package configured
 
 (use-package hydra     :defer t :ensure t)
 (use-package flycheck  :defer t :ensure t)
@@ -47,10 +51,12 @@ There are two things you can do about this warning:
               ;; here you can customize the standard command names; we
               ;; don't like to use '/' to invoke sensetion-edit, so we
               ;; bind it to 'e'
-              ("e" . sensetion-edit-sense))
-  :hook (sensetion-edit-mode
-         ;;  here we can specify modes to be turned on for the raw
-         ;;  sentence editing
-         . lispy-mode)
+              ("e" . sensetion-edit))
+  ;; you can specify modes to be turned on for the raw sentence
+  ;; editing like this (where lispy-mode is activated when
+  ;; `sensetion-edit-mode' is on):
+  ; :hook (sensetion-edit-mode . lispy-mode)
+
   ;; change path to annotation files directory here
   :custom (sensetion-annotation-dir "~/sensetion-data/"))
+
