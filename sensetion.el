@@ -236,8 +236,9 @@ with low confidence."
    (list (completing-read "Lemma to annotate: " sensetion--completion-function)
          (ido-completing-read "PoS tag? " '("a" "r" "v" "n" "any") nil t nil nil "any")))
   (unless lemma (user-error "Must provide lemma"))
+  (unless sensetion--index (user-error "Index is missing. Please check your annotation files and call M-x `sensetion-make-index'."))
   ;; using regexp just to get all pos combinations
-  ;; TODO: add $ to regexp
+  ;; TODO: add $ to regexp (there's no need, I think)
   (sensetion-is
    (unless matches
      (if pos

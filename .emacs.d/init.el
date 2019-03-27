@@ -40,7 +40,7 @@ There are two things you can do about this warning:
 (use-package async     :defer t :ensure t)
 
 (use-package sensetion
-  :commands sensetion
+  :commands (sensetion sensetion-annotate sensetion-make-index)
   ;; change path to repository here
   :load-path "~/sensetion.el/"
   :bind (:map sensetion-mode-map
