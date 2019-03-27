@@ -67,6 +67,7 @@
 (defvar sensetion--completion-function
   (completion-table-dynamic
    (lambda (prefix)
+     (sensetion--check-index-nonnil)
      ;; TODO: randomize completion so that stuff like completing a to
      ;; a_ doesn't happen (as often)
      (trie-complete sensetion--index prefix nil sensetion-number-completions nil nil
@@ -231,12 +232,17 @@ with low confidence."
            (lambda (f) (equal (f-ext f) sensetion-annotation-file-type))))
 
 
+(defun sensetion--check-index-nonnil ()
+  (unless sensetion--index
+    (user-error "Index is missing. Have you run `M-x sensetion`? If yes, please check your annotation files and call `M-x sensetion-make-index`. If none of that works, report the bug")))
+
+
 (defun sensetion-annotate (lemma &optional pos)
   (interactive
    (list (completing-read "Lemma to annotate: " sensetion--completion-function)
          (ido-completing-read "PoS tag? " '("a" "r" "v" "n" "any") nil t nil nil "any")))
   (unless lemma (user-error "Must provide lemma"))
-  (unless sensetion--index (user-error "Index is missing. Please check your annotation files and call M-x `sensetion-make-index'."))
+  (sensetion--check-index-nonnil)
   ;; using regexp just to get all pos combinations
   ;; TODO: add $ to regexp (there's no need, I think)
   (sensetion-is
