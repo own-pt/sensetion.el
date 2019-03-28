@@ -41,8 +41,9 @@
     ((cl-struct sensetion--tk kind form lemma pos tag senses glob sep type rdf unsure action rend)
      (cl-mapcan
       (lambda (k v) (when v (list k v)))
-      '(:kind :form :lemma :pos :tag :senses :glob :sep :type :rdf :action :unsure :rend)
+      '(:kind :action :form :lemma :pos :tag :senses :glob :sep :type :rdf :unsure :rend)
       (list kind
+            action
             form
             lemma
             pos
@@ -56,7 +57,6 @@
             sep
             type
             rdf
-            action
             unsure
             rend)))))
 
