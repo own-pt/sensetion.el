@@ -66,13 +66,12 @@
    (sense-chosen-ind (sk)
                      (if (member sk pres-skeys) "+ " ""))
    (no-sense-function
-    `(funcall
-      ,(sensetion--edit-function
+    `(,(sensetion--edit-function
         (lambda (tk _)
           (setf (sensetion--tk-senses tk) nil)
           (setf (sensetion--tk-tag tk) "man-now")
           t))
-      tk-ix synset))
+      ,tk-ix ,synset))
    (pres-skeys (sensetion--tk-skeys tk))
    (tk (elt (sensetion--synset-tokens synset) tk-ix))))
 
