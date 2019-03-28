@@ -108,7 +108,8 @@ In any case, please back up your work!
 
 * Annotation format
 
-We convert the original XML files to property lists.
+We convert the original XML files to property lists, whose grammar can
+be found in =glosstag/grammar.txt=..
 
 The script that converts the original XML WN gloss corpus is at
 =convert.sh=. To re-run the conversion:
