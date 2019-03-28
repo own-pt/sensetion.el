@@ -154,13 +154,18 @@
 Get token and synset at point, call BEFORE-SAVE-FN with them as
 arguments, save synset and call AFTER-SAVE-FN if BEFORE-SAVE-FN
 returns non-nil. None of the arguments may move point."
-  (lambda (tk-ix synset)
+  (lambda (tk-ix synset &optional glob-ix)
     (interactive
-     ;; TODO: ask about which token to annotate?
-     (list (or (get-char-property (point) 'sensetion--glob-ix)
-               (sensetion--tk-ix-prop-at-point))
-           (sensetion--get-synset-at-point)))
+     (list (sensetion--tk-ix-prop-at-point)
+           (sensetion--get-synset-at-point)
+           (get-char-property (point) 'sensetion--glob-ix)))
     (let* ((point      (point))
+           (use-glob? (when glob-ix (ido-completing-read "Edit glob or token? "
+                                                         '("glob" "token")
+                                                         nil t nil nil t)))
+           (tk-ix (if (equal use-glob? "token")
+                      glob-ix
+                    tk-ix))
            (tk         (elt (sensetion--synset-tokens synset) tk-ix))
            (prev-anno? (sensetion--tk-annotated? tk)))
       (atomic-change-group
@@ -173,7 +178,7 @@ returns non-nil. None of the arguments may move point."
             (sensetion--reinsert-synset-at-point synset)
             (when after-save-fn
               (funcall after-save-fn tk synset))))
-          (goto-char point)))))
+        (goto-char point)))))
 
 
 (defalias 'sensetion-edit-lemma
