@@ -501,7 +501,7 @@ You can mark/unmark tokens with `sensetion-toggle-glob-mark'."
               ;; TODO: delete senses and make status "un"
               tk))
    (new-glob (sensetion--make-tk :lemma lemma :tag "un"
-                        :kind `(:glob . ,new-k)))
+                        :kind `(:glob . ,new-k) :glob "man"))
    (ixs   (reverse (get-text-property (line-end-position) 'sensetion--to-glob)))
    (new-k (char-to-string (1+ max-k)))
    (max-k (max-key synset))
@@ -985,7 +985,7 @@ and the third is the gloss."
   ("/" sensetion-edit-sense "Edit token senses" :column "Edit")
   ("i" sensetion-edit-ignore "Ignore token" :column "Edit")
   ("?" sensetion-edit-unsure "Mark annotation as unsure" :column "Edit")
-  ("." sensetion-edit-sent "Edit data file" :column "Edit")
+  ("." sensetion-edit-synset "Edit data file" :column "Edit")
   ("m" sensetion-toggle-glob-mark "(Un)Mark token for globbing" :column "Globbing")
   ("g" sensetion-glob "Glob marked tokens" :column "Globbing")
   ("u" sensetion-unglob "Unglob token's collocation" :column "Globbing")
