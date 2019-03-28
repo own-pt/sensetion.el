@@ -26,10 +26,10 @@ Download and install emacs -- instructions [[https://www.gnu.org/software/emacs/
 ** elisp
 - Clone this repository ([[https://help.github.com/en/articles/cloning-a-repository][how-to]]) -- preferentially to your home
   directory ;
-- If you are new to emacs, you can simply copy the =init.el= file in
-  this repository to a directory named =.emacs= in your home directory
-  and things will be taken care of for you. If you do know emacs, take
-  a look at =init.el= and see how it is done;
+- If you are new to emacs, you can simply copy the =.emacs.d/init.el=
+  file in the root of this repository to a directory named =.emacs.d=
+  in your home directory and things will be taken care of for you. If
+  you do know emacs, take a look at the file and see how it is done;
 - By default the =init.el= file assumes you clone this repository to
   your home directory; If you cloned it to
   ="~/projects/sensetion.el/"= you must search =init.el= for
