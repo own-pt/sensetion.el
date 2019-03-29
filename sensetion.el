@@ -463,8 +463,7 @@ LEMMA.
 
 You can mark/unmark tokens with `sensetion-toggle-glob-mark'."
   (interactive (list
-                (s-trim
-                 (sensetion--spaces->underlines (read-string "Lemma of glob: " nil nil "")))))
+                (completing-read "Lemma to annotate: " sensetion--completion-function)))
   (sensetion--index-lemmas sensetion--index lemma (sensetion--synset-coord-prop-at-point))
   (sensetion-is
    (sensetion--reinsert-synset-at-point globbed-synset)
