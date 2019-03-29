@@ -23,6 +23,7 @@ Download and install emacs -- instructions [[https://www.gnu.org/software/emacs/
 #   substituting the path for the corresponding directory where you
 #   downloaded it.
 
+
 ** elisp
 - Clone this repository ([[https://help.github.com/en/articles/cloning-a-repository][how-to]]) -- preferentially to your home
   directory ;
@@ -32,13 +33,23 @@ Download and install emacs -- instructions [[https://www.gnu.org/software/emacs/
   you do know emacs, take a look at the file and see how it is done;
 - By default the =init.el= file assumes you clone this repository to
   your home directory; If you cloned it to
-  ="~/projects/sensetion.el/"= you must search =init.el= for
+  ~"~/projects/sensetion.el/"~ you must search =init.el= for
   =~/sensetion.el= and replace it.
 - Download the annotation files (if you haven't got them already) and
   edit =init.el= to have the path to their directory. The default
-  directory for the annotation files is ="~/sensetion-data/"=;
+  directory for the annotation files is ~"~/sensetion-data/"~;
 - Restart emacs (or reload or your init file).
-
+- If you are Windows you might need help determining where your HOME
+  (the tilde =~= part in the paths above) is. Adapting the [[https://www.gnu.org/software/emacs/manual/html_mono/efaq-w32.html#Location-of-init-file][Emacs
+  Windows FAQ]]:
+  #+BEGIN_QUOTE
+  Within Emacs, =~= at the beginning of a file name is expanded to
+  your HOME directory, so you can always find (or create) your
+  =init.el= directory by typing the command =C-x C-f
+  ~/.emacs.d/init.el=.
+  #+END_QUOTE
+  You should then copy the contents of the file at =.emacs.d/init.el=
+  in the root of this repository to this file you just opened.
 
 * docker
 - install docker for your platform ;
