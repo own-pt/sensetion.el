@@ -203,9 +203,9 @@ returns non-nil. None of the arguments may move point."
      (let ((st (sensetion--tk-tag tk)))
        (when (member st '("un"))
          (user-error "Can't be unsure about unnanotated token")))
-     (setf (sensetion--tk-unsure tk) 0)
+     (cl-callf not (sensetion--tk-unsure tk))
      t))
-  "Annotate that confidence in the annotation is low.")
+  "Toggle the confidence in the annotation (t indicates that confidence is low).")
 
 
 (defalias 'sensetion-edit-ignore
