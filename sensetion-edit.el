@@ -61,8 +61,9 @@
    :where
    (sense-help-text (sk terms gloss)
                     (concat (sense-chosen-ind sk)
-                            (s-word-wrap (- (frame-width) 5)
-                                         (concat (s-join "," terms) " | " gloss))))
+                            (s-replace "\n" "\n  "
+                                       (s-word-wrap (- (frame-width) 5)
+                                                    (concat (s-join "," terms) " | " gloss)))))
    (sense-chosen-ind (sk)
                      (if (member sk pres-skeys) "+ " ""))
    (no-sense-function
