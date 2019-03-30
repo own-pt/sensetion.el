@@ -225,13 +225,14 @@ with low confidence."
   (add-hook 'kill-emacs-hook
             (lambda ()
               (sensetion--write-state)))
-  (unless sensetion--index
-    (if (and (f-exists? sensetion-index-file) (f-exists? sensetion-status-file))
-        (progn
-          (sensetion--read-state)
-          (call-interactively #'sensetion-annotate))
-      (sensetion-make-state sensetion-annotation-dir
-                            (sensetion--done-indexing-messager)))))
+  (if sensetion--index
+      (call-interactively #'sensetion-annotate)
+      (if (and (f-exists? sensetion-index-file) (f-exists? sensetion-status-file))
+          (progn
+            (sensetion--read-state)
+            (call-interactively #'sensetion-annotate))
+        (sensetion-make-state sensetion-annotation-dir
+                     (sensetion--done-indexing-messager)))))
 
 
 (cl-defun sensetion--annotation-files (&optional (anno-dir sensetion-annotation-dir))
