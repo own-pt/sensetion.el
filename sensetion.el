@@ -63,6 +63,12 @@
   :group 'sensetion
   :type  'integer)
 
+(defcustom sensetion-sense-menu-show-synset-id
+  nil
+  "Show synset id in sense menu during annotation."
+  :group 'sensetion
+  :type  'boolean)
+
 
 (defvar sensetion--completion-function
   (completion-table-dynamic
@@ -632,7 +638,7 @@ number of selected tokens."
       (let* ((tks        (sensetion--synset-tokens synset))
              (tks-colloc (seq-map-indexed #'token-colloc tks))
              (terms      (sensetion--synset-terms synset))
-             (pos        (substring (sensetion--synset-id synset) 0 1)))
+             (pos        (sensetion--synset-pos synset)))
         (list
          (apply #'concat "(" pos ") " (s-join "," terms) " |" tks-colloc)
          (cons done total))))))
@@ -872,8 +878,8 @@ set `sensetion--global-status'. "
 (defun sensetion--wordnet-lookup (lemma)
   "Return hash-table where the keys are synset keys and the
 values are a list where the first element is sense key shown by
-the edit hydra, the second are the terms defined by that synset,
-and the third is the gloss."
+the edit hydra, the second is the synset id, the third are the
+terms defined by that synset, and the fourth is the gloss."
   (sensetion-is
    (seq-mapn #'index synsets)
    options
@@ -882,6 +888,7 @@ and the third is the gloss."
           (let ((pos (sensetion--synset-pos synset)))
             (setf (gethash (lemma-sk lemma synset) options)
                   (list (ix->hydra-key (gethash pos counter 0))
+                        (sensetion--synset-id synset)
                         (sensetion--synset-terms synset)
                         (sensetion--synset-gloss synset)))
             (cl-incf (gethash pos counter 0))))

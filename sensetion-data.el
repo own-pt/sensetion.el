@@ -85,8 +85,9 @@
 
 
 (defun sensetion--synset-id (synset)
-  (concat (sensetion--synset-pos synset)
-          (sensetion--synset-ofs synset)))
+  (concat (sensetion--synset-ofs synset)
+          "-"
+          (sensetion--synset-pos synset)))
 
 
 (provide 'sensetion-data)

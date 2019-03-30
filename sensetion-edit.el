@@ -45,7 +45,7 @@
       ("0" ,no-sense-function "No sense in Wordnet" :column "Pick sense:")
       ,@(mapcar
          (lambda (s)
-           (cl-destructuring-bind (sk hkey terms gloss) s
+           (cl-destructuring-bind (sk hkey sid terms gloss) s
              (list hkey
                    ;; gets wrapped in (lambda () (interactive)
                    ;; automatically by hydra
@@ -55,13 +55,14 @@
                                       ,sk)
                       (sensetion--edit-reinsert-state-call
                        ,tk-ix ,synset ,lemma ,st ',options))
-                   (sense-help-text sk terms gloss)
+                   (sense-help-text sk sid terms gloss)
                    :column "Pick sense:")))
          options))
    :where
-   (sense-help-text (sk terms gloss)
+   (sense-help-text (sk sid terms gloss)
                     (concat (sense-chosen-ind sk)
-                            (s-replace "\n" "\n  "
+                            (if sensetion-sense-menu-show-synset-id (concat "(" sid ") ") "")
+                            (s-replace "\n" "\n   "
                                        (s-word-wrap (- (frame-width) 5)
                                                     (concat (s-join "," terms) " | " gloss)))))
    (sense-chosen-ind (sk)
@@ -130,7 +131,7 @@
 
 
 (defun sensetion--make-edit-buffer-name (synset)
-  (format "*%s-sensetion-edit*" (sensetion--synset-id synset)))
+  (format "*%s:sensetion-edit*" (sensetion--synset-id synset)))
 
 
 (defun sensetion--save-edit (&optional force)
