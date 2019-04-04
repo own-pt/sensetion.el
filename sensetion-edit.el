@@ -105,19 +105,25 @@
 
 
 ;; ;; ;; ;; edit source synset
+(defvar-local sensetion--edit-file-annotation-buffer nil "Buffer where file is displayed for annotation")
 (defvar-local sensetion--edit-file-coord nil "Coordinates for the synset being edited in this buffer")
 
 
-(defun sensetion-edit-synset (coord)
-  (interactive (list (sensetion--synset-coord-prop-at-point)))
+(defun sensetion-edit-synset (coord obuffer)
+  "Edit data file corresponding to synset at point in the current OBUFFER.
+
+The data file corresponds to COORD coordinates."
+  (interactive (list (sensetion--synset-coord-prop-at-point)
+                     (buffer-name)))
   (let ((synset (sensetion--get-synset coord)))
     (sensetion--edit-synset
      synset
      coord
-     (get-buffer (sensetion--make-edit-buffer-name synset)))))
+     (get-buffer (sensetion--make-edit-buffer-name synset))
+     obuffer)))
 
 
-(defun sensetion--edit-synset (synset coord mbuffer)
+(defun sensetion--edit-synset (synset coord mbuffer obuffer)
   (let ((buffer (or mbuffer (generate-new-buffer (sensetion--make-edit-buffer-name synset)))))
     (unless mbuffer
       (with-current-buffer buffer
@@ -125,6 +131,7 @@
         (sensetion--beginning-of-buffer)
         (indent-pp-sexp 1)
         (sensetion-edit-mode)
+        (setq-local sensetion--edit-file-annotation-buffer obuffer)
         (setq-local sensetion--edit-file-coord coord)
         (set-buffer-modified-p nil)))
     (pop-to-buffer buffer nil t)))
@@ -134,13 +141,29 @@
   (format "*%s:sensetion-edit*" (sensetion--synset-id synset)))
 
 
+(defun sensetion--refresh-synset (synset coord &optional buffer)
+  (catch 'sensetion--exit
+    (sensetion--map-buffer-lines
+     (lambda (lno line)
+       (when-let* ((last-pos (1- (length line)))
+                   (line-coord (get-char-property last-pos 'sensetion--synset-coord line))
+                   (_ (equal coord line-coord)))
+         (sensetion--reinsert-synset-at-point synset)
+         (throw 'sensetion--exit t)))
+     buffer)))
+
+
 (defun sensetion--save-edit (&optional force)
   (when (buffer-modified-p (current-buffer))
     (when (or force (y-or-n-p "Save synset? "))
       (save-excursion
-        (goto-char (point-min))
-        (sensetion--save-synset (sensetion--plist->synset (read (thing-at-point 'sexp t))) sensetion--edit-file-coord))
-      (set-buffer-modified-p nil)))
+        (sensetion--beginning-of-buffer)
+        (let ((file-coord sensetion--edit-file-coord)
+              (anno-buffer sensetion--edit-file-annotation-buffer)
+              (synset (sensetion--plist->synset (read (thing-at-point 'sexp t)))))
+          (sensetion--save-synset synset file-coord)
+          (set-buffer-modified-p nil)
+          (sensetion--refresh-synset synset file-coord anno-buffer)))))
   t)
 
 

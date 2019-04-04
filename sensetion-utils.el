@@ -12,23 +12,32 @@
   (goto-char (point-min)))
 
 
-(defun sensetion--map-lines (file f)
+(defun sensetion--map-buffer-lines (f &optional buffer)
+  "Apply F to each line of BUFFER.
+
+BUFFER defaults to current buffer if not provided. F must take as
+argument the line number and the line string itself."
+  (with-current-buffer (or buffer (current-buffer))
+    (save-excursion
+      (sensetion--beginning-of-buffer)
+      (let (res
+            (counter 0))
+        (while (not (eobp))
+          (when-let ((line-res (funcall f counter (thing-at-point 'line))))
+            (setf res (cons line-res res)))
+          (cl-incf counter)
+          (forward-line 1))
+        res))))
+
+
+(defun sensetion--map-file-lines (file f)
   "Apply F to each line of FILE.
 
 F must take as argument the line number and the line string
 itself."
   (with-temp-buffer
     (insert-file-contents file)
-    (let (res
-          (counter 0))
-      (while (not (eobp))
-        (setf res
-              (cons 
-               (funcall f counter (thing-at-point 'line t))
-               res))
-        (cl-incf counter)
-        (forward-line 1))
-      res)))
+    (sensetion--map-buffer-lines f)))
 
 
 (defmacro with-inhibiting-read-only (&rest body)
@@ -64,7 +73,7 @@ itself."
 
 (defun sensetion--goto-line (line &optional start-line)
   (unless start-line
-    (goto-char (point-min)))
+    (sensetion--beginning-of-buffer))
   (let ((sl (or start-line 0)))
     (forward-line (- line sl))))
 

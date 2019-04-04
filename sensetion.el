@@ -561,7 +561,7 @@ number of selected tokens."
                                                sensetion-currently-annotated-unsure-colour))
                                             ("un"
                                              sensetion-unnanotated-colour)
-                                            ((or "auto" "man" "man-nosense" "auto-nosense")
+                                            ((or "auto" "man")
                                              (if (sensetion--tk-confident-in-anno? tk)
                                                  sensetion-previously-annotated-colour
                                                sensetion-previously-annotated-unsure-colour))
@@ -764,7 +764,7 @@ builds the status (how many tokens have been annotated so far)."
         (annotated         0))
     (cl-labels
         ((run (f)
-              (sensetion--map-lines f
+              (sensetion--map-file-lines f
                            (lambda (lno l)
                              (index-synset (sensetion--filename->ix f)
                                            lno
@@ -830,7 +830,7 @@ present in SYNSET's tokens."
   (let ((status (sensetion--tk-tag tk)))
     (when (member
            status
-           '("man" "man-nosense" "man-now" "un" "auto" "auto-nosense"))
+           '("man" "man-now" "un" "auto"))
       status)))
 
 
@@ -918,7 +918,7 @@ terms defined by that synset, and the fourth is the gloss."
 
 (defun sensetion--tk-annotated? (tk)
   (member (sensetion--tk-tag tk)
-          '("man" "auto" "man-nosense" "auto-nosense" "man-now")))
+          '("man" "auto" "man-now")))
 
 
 (defun sensetion--save-synset (synset coord)
