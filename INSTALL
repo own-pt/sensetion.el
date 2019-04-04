@@ -12,29 +12,31 @@ You can install it yourself, or use the docker image.
 - Place the annotation data in a directory called =sensetion-data= in
   your home directory.
 - Copy the file =.emacs.d/init.el= in this repository to an =.emacs.d=
-  directory in your home directory (if it doesn't exist it, create
+  directory in your home directory (if it doesn't exist yet, create
   it).
 - Open emacs and call =M-x sensetion=.
 
 * Manual installation
-- Clone this repository -- preferentially to your home directory ;
+- Clone this repository -- preferentially to your home directory.
+- Download the annotation files -- preferentially to a
+  =sensetion-data= directory in your home directory.
 - The file at =.emacs.d/init.el= in this repository has comments
   specifying code you should include in your init file to have
   sensetion.el running smoothly. In summary you must install
   dependencies from [[http://melpa.org/][MELPA]] and [[http://elpa.gnu.org/][ELPA]], and tell emacs where this library
   and the annotation files are in your file system (unless you placed
   them in the default locations in your home directory). If you are
-  using a Mac, you might also need the package =exec-path-from=shell=,
+  using a Mac, you might also need the package =exec-path-from-shell=,
   available from MELPA.
 - Restart emacs (or reload or your init file).
 
 
 * Docker installation
-- install docker for your platform ;
-- clone this repository ;
+- install docker for your platform.
+- clone this repository.
 - run
   : docker build -t sensetion .
-  in the root directory of the repository;
+  in the root directory of the repository.
 - run
   : docker run -it -v /path/to/annotation/files:/home/sensetioner/sensetion-data sensetion emacs
   to start annotating. Remember to change the path to the annotation

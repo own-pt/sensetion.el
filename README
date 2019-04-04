@@ -114,7 +114,7 @@ In any case, please back up your work!
 
 
 * FAQ -- Frequently Asked Questions
-** how can I copy and paste annotation text without super/subscripts?
+** How can I copy and paste annotation text without super/subscripts?
 You can assign the function =org-copy-visible= to your copying command
 key in the annotation buffers by adding these two lines to your
 sensetion =use-package= declaration:
