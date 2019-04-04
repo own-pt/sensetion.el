@@ -113,6 +113,19 @@ In any case, please back up your work!
   backtrace with your report (you may open an [[https://github.com/own-pt/sensetion.el/issues][issue]]).
 
 
+* FAQ -- Frequently Asked Questions
+** how can I copy and paste annotation text without super/subscripts?
+You can assign the function =org-copy-visible= to your copying command
+key in the annotation buffers by adding these two lines to your
+sensetion =use-package= declaration:
+#+BEGIN_SRC elisp
+(use-package sensetion
+   :commands sensetion
++  :bind (:map sensetion-mode-map
++              ("M-w" . org-copy-visible))
+#+END_SRC
+
+
 * Annotation format
 
 We convert the original XML files to property lists, whose grammar can
