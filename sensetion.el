@@ -549,7 +549,8 @@ number of selected tokens."
         ;; stores selected glob tokens and their indices by their key;
         ;; this is used to highlight their constituent tokens and edit
         ;; them properly
-        (sel-keys (make-hash-table :test 'equal)))
+        (sel-keys (make-hash-table :test 'equal))
+        (ignoring?   nil))
     (cl-labels
         ((sel-tk-props (tk &optional ix)
                        (cl-list* 'sensetion--selected t
@@ -602,6 +603,7 @@ number of selected tokens."
                                     form-str
                                     'sensetion--tk-ix ix
                                     (cond
+                                     (ignoring? nil)
                                      (glob-selected?
                                       (sel-tk-props (cdr glob-selected?)
                                                     (car glob-selected?)))
@@ -618,8 +620,8 @@ number of selected tokens."
                              (if-let ((_ (or selected?
                                              glob-selected?))
                                       (sks (if selected?
-                                                (sensetion--tk-skeys tk)
-                                              (sensetion--tk-skeys (cdr glob-selected?)))))
+                                               (sensetion--tk-skeys tk)
+                                             (sensetion--tk-skeys (cdr glob-selected?)))))
                                  (propertize (s-join ","
                                                      (mapcar (lambda (sk)
                                                                (cl-first
@@ -633,7 +635,13 @@ number of selected tokens."
                             (prog1 ""
                               (when selected?
                                 (setf (gethash glob-key sel-keys) (cons ix tk)))))
-                           ((or :qf :ex :mwf :def :aux :classif) "")
+                           (:aux
+                            (if (eq (sensetion--tk-action tk) :close)
+                                (setf ignoring? nil)
+                              (when (eq (sensetion--tk-tag tk) :ignore)
+                                (setf ignoring? t)))
+                            "")
+                           ((or :qf :ex :mwf :def :classif) "")
                            (_ (error "Token of kind %s does not exist" kind))))))
       ;;
       (let* ((tks        (sensetion--synset-tokens synset))
