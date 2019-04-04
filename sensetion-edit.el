@@ -19,10 +19,13 @@
 
 
 (defun sensetion--edit-sense (lemma pos1 ix synset)
-  (let* ((st (sensetion--pos->synset-type pos1))
+  (let* ((st  (sensetion--pos->synset-type pos1))
+         (sts (if (member st '("3" "5"))
+                  '("3" "5")
+                (list st)))
          (senses (cl-loop for k being the hash-keys of sensetion--synset-cache
                           using (hash-values v)
-                          when (equal (sensetion--sk-st k) st)
+                          when (member (sensetion--sk-st k) sts)
                           collect (cons k v))))
     (unless senses
       (user-error "No senses for lemma %s with pos %s" lemma pos1))

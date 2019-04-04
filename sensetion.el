@@ -680,9 +680,13 @@ number of selected tokens."
 (defun sensetion--tk-synset-pos (tk)
   "Get pos1 of synsets assigned to TK. If there is more than one
 synset and they have different pos1, return nil."
-  (when-let ((sks   (sensetion--tk-skeys tk))
-             (st    (sensetion--sk-st (cl-first sks)))
-             (same? (seq-every-p (lambda (sk) (equal (sensetion--sk-st sk) st)) (cl-rest sks))))
+  (when-let* ((sks   (sensetion--tk-skeys tk))
+              (st    (sensetion--sk-st (cl-first sks)))
+              (sts    (if (member st '("3" "5"))
+                          '("3" "5")
+                        (list st)))
+              (same? (seq-every-p (lambda (sk) (member (sensetion--sk-st sk) sts))
+                                  (cl-rest sks))))
     (sensetion--synset-type->pos st)))
 
 
