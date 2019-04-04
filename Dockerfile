@@ -1,6 +1,6 @@
 FROM fedora:29
 
-RUN dnf install -y git emacs curl wordnet
+RUN dnf install -y git emacs curl
 
 RUN useradd -ms /bin/bash sensetioner
 
