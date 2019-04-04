@@ -1,3 +1,5 @@
+;; ----------------------------------------------------------------------
+;; copy the whole file if you are new to Emacs and have no customizations
 (require 'package)
 
 (let* ((no-ssl (and (memq system-type '(windows-nt ms-dos))
