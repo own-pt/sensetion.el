@@ -77,7 +77,7 @@
      ;; TODO: randomize completion so that stuff like completing a to
      ;; a_ doesn't happen (as often)
      (trie-complete sensetion--index prefix nil sensetion-number-completions nil nil
-                    (lambda (k _) (substring k 0 (- (length k) 2)))))))
+                    (lambda (k _) (sensetion--lemma*->lemma k))))))
 
 
 (defvar sensetion--index
@@ -658,7 +658,7 @@ number of selected tokens."
    (cl-member lemma
               tk-lemmas
               :test #'equal
-              :key #'lemma*->lemma)
+              :key #'sensetion--lemma*->lemma)
    :where
    (tk-lemmas (sensetion--tk-lemmas tk))))
 
@@ -955,17 +955,11 @@ terms defined by that synset, and the fourth is the gloss."
   (concat lemma "%" synset-type))
 
 
-(defun lemma*->lemma (lemma*)
-  (let ((st (lemma*->st lemma*)))
+(defun sensetion--lemma*->lemma (lemma*)
+  (let ((st (sensetion--lemma*->st lemma*)))
     (if st
         (substring lemma* 0 (- (length lemma*) 2))
       lemma*)))
-
-
-(defun lemma*->st (lemma*)
-  (let ((len (length lemma*)))
-    (when (and (> len 1) (= (elt lemma* (- len 2)) (string-to-char "%")))
-      (substring lemma* (1- len)))))
 
 
 (defun sensetion-move-line-up ()

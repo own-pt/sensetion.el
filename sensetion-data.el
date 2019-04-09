@@ -80,7 +80,7 @@
 (defun sensetion--sk-st (sk)
   (pcase (s-split ":" sk)
     (`(,lemma* ,_ ,_ ,_ ,_)
-     (lemma*->st lemma*))
+     (sensetion--lemma*->st lemma*))
     (_ (error "Malformed sense key %s" sk))))
 
 
@@ -88,6 +88,12 @@
   (concat (sensetion--synset-ofs synset)
           "-"
           (sensetion--synset-pos synset)))
+
+
+(defun sensetion--lemma*->st (lemma*)
+  (let ((len (length lemma*)))
+    (when (and (> len 1) (= (elt lemma* (- len 2)) (string-to-char "%")))
+      (substring lemma* (1- len)))))
 
 
 (provide 'sensetion-data)
