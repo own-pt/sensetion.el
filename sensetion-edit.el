@@ -26,11 +26,12 @@
          (senses (cl-loop for k being the hash-keys of sensetion--synset-cache
                           using (hash-values v)
                           when (member (sensetion--sk-st k) sts)
-                          collect (cons k v))))
-    (unless senses
+                          collect (cons k v)))
+         (ssenses (cl-sort senses #'string< :key #'car)))
+    (unless ssenses
       (user-error "No senses for lemma %s with pos %s" lemma pos1))
     (sensetion--call-hydra lemma st ix
-                  synset senses)))
+                  synset ssenses)))
 
 
 (defun sensetion--call-hydra (lemma st tk-ix synset options)
