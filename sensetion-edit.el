@@ -218,8 +218,10 @@ returns non-nil. None of the arguments may move point."
                                     (cons old-lemma (1+ (length old-lemma)))))
             (coord (sensetion--synset-coord-prop-at-point)))
        (setf (sensetion--tk-lemma tk) lemma)
-       (sensetion--remove-lemmas sensetion--index old-lemma synset coord)
-       (sensetion--index-lemmas sensetion--index lemma coord))
+       (setf sensetion--index
+             (sensetion--remove-lemmas sensetion--index old-lemma synset coord))
+       (setf sensetion--index
+             (sensetion--index-lemmas sensetion--index lemma coord)))
      t))
   "Edit lemma of token of index TK-IX at point and save modified SYNSET.")
 

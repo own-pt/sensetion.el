@@ -8,7 +8,7 @@
 (eval-when-compile (require 'cl-lib))
 (require 'cl-lib)
 (require 'hydra)
-(require 'trie)
+(require 'radix-tree)
 (require 'sensetion-utils)
 (require 'sensetion-data)
 (require 'sensetion-edit)
@@ -70,14 +70,32 @@
   :type  'boolean)
 
 
+(defun sensetion--index-insert (index key val updatefn)
+  (let* ((old (radix-tree-lookup index key))
+         (new (funcall updatefn val old))
+         (index (radix-tree-insert index key new)))
+    index))
+
+(defalias 'sensetion--index-lookup #'radix-tree-lookup)
+
+(defun sensetion---radix-tree-suffixes (index prefix &optional limit)
+  (let ((subtree (radix-tree-subtree index prefix))
+        (suffixes nil))
+    (radix-tree-iter-mappings
+     subtree
+     (lambda (key _)
+       (setq suffixes (cons key suffixes))))
+    (let* ((suffixes (seq-subseq suffixes 0 limit))
+           (lemmas   (mapcar #'sensetion--lemma*->lemma suffixes)))
+      lemmas)))
+
 (defvar sensetion--completion-function
   (completion-table-dynamic
    (lambda (prefix)
      (sensetion--check-index-nonnil)
      ;; TODO: randomize completion so that stuff like completing a to
      ;; a_ doesn't happen (as often)
-     (trie-complete sensetion--index prefix nil sensetion-number-completions nil nil
-                    (lambda (k _) (sensetion--lemma*->lemma k))))))
+     (sensetion---radix-tree-suffixes sensetion--index prefix sensetion-number-completions))))
 
 
 (defvar sensetion--index
@@ -267,36 +285,33 @@ with low confidence."
      (sensetion--beginning-of-buffer))
    (pop-to-buffer result-buffer)
    :where
-   (matches (progn (trie-regexp-search sensetion--index regexp
-                                       nil nil nil filter-fn)
-                   (funcall filter-fn)))
-   (filter-fn (sensetion--regexp-search-filter-fn))
+   (matches (seq-uniq matches))
+   (matches (if pos
+                (mapcan #'cdr (radix-tree-prefixes sensetion--index (concat lemma "%")))
+              (radix-tree-lookup sensetion--index lemma)))
    (result-buffer (generate-new-buffer
-                   (sensetion--create-buffer-name lemma pos)))
-   (regexp (if (equal pos "any")
-               (concat lemma "%?[1234]?")
-             (concat lemma "%?" (sensetion--pos->synset-type pos) "?")))))
+                   (sensetion--create-buffer-name lemma pos)))))
 
 
-(defun sensetion--regexp-search-filter-fn ()
-  "`trie-regexp-search' returns an alist of the keys and their
-  results. In our case the values might get repeated over several
-  keys, which we do not want. So we use `trie-regexp-search'
-  filterfn argument with this closure, which both builds a result
-  in a format we want, and prevents `trie-regexp-search' from
-  building its own result list.
+;; (defun sensetion--regexp-search-filter-fn ()
+;;   "`trie-regexp-search' returns an alist of the keys and their
+;;   results. In our case the values might get repeated over several
+;;   keys, which we do not want. So we use `trie-regexp-search'
+;;   filterfn argument with this closure, which both builds a result
+;;   in a format we want, and prevents `trie-regexp-search' from
+;;   building its own result list.
 
-The result function uniquifies the match values and returns nil;
-when called without arguments will return a list of of two lists:
-one of them contains the unique keys of the matches, and the
-other the unique values."
-  (let ((uniq-vals (make-hash-table :test 'equal)))
-    (lambda (&optional key vals)
-      (if key
-          (progn
-            (mapc (lambda (val) (setf (gethash val uniq-vals) t)) vals)
-            nil)
-        (hash-table-keys uniq-vals)))))
+;; The result function uniquifies the match values and returns nil;
+;; when called without arguments will return a list of of two lists:
+;; one of them contains the unique keys of the matches, and the
+;; other the unique values."
+;;   (let ((uniq-vals (make-hash-table :test 'equal)))
+;;     (lambda (&optional key vals)
+;;       (if key
+;;           (progn
+;;             (mapc (lambda (val) (setf (gethash val uniq-vals) t)) vals)
+;;             nil)
+;;         (hash-table-keys uniq-vals)))))
 
 
 (defun sensetion--create-buffer-name (lemma pos)
@@ -770,8 +785,8 @@ positions, plus global status."
   "Read annotated files and build index associating lemmas* to
 where synset-ids (and thus files) where they appear. Also
 builds the status (how many tokens have been annotated so far)."
-  (let ((index            (make-trie #'<))
-        (lemma->synsets   (make-trie #'<))
+  (let ((index radix-tree-empty) ; lemma -> coords
+        (lemma->synsets   radix-tree-empty)
         (annotatable       0)
         (annotated         0))
     (cl-labels
@@ -787,10 +802,11 @@ builds the status (how many tokens have been annotated so far)."
                              (terms (sensetion--synset-terms synset))
                              (tokens (sensetion--synset-tokens synset)))
                          (mapc (lambda (term)
-                                 (trie-insert lemma->synsets
-                                              term
-                                              (list coord)
-                                              #'append))
+                                 (setq lemma->synsets
+                                  (sensetion--index-insert lemma->synsets
+                                                  term
+                                                  (list coord)
+                                                  #'append)))
                                terms)
                          (mapc (apply-partially #'index-token coord)
                                tokens)))
@@ -804,7 +820,8 @@ builds the status (how many tokens have been annotated so far)."
                                         (sensetion--tk->plist tk)
                                         (car coord)
                                         (cdr coord)))
-                          (sensetion--index-lemmas index lemma coord))
+                          (setq index
+                                (sensetion--index-lemmas index lemma coord)))
                         (when (sensetion--tk-annotated? tk)
                           (cl-incf annotated)))))
       ;;
@@ -816,16 +833,17 @@ builds the status (how many tokens have been annotated so far)."
   ;; lemmas* might be pure ("love") or have pos annotation ("love%2"),
   ;; but we don't care about it here; when retrieving we gotta take
   ;; care of this.
-  (mapc (lambda (lemma)
-          (trie-insert index lemma (list coord) #'append))
-        (s-split "|" lemmas-str t)))
+  (seq-reduce (lambda (index lemma)
+                (sensetion--index-insert index lemma (list coord) #'append))
+              (s-split "|" lemmas-str t)
+              index))
 
 
 (defun sensetion--remove-lemmas (index old-lemma-str synset coord)
   "Remove lemmas in OLD-LEMMA-STR from INDEX if they are not
 present in SYNSET's tokens."
   (sensetion-is
-   (mapc (apply-partially #'remove-lemma tokens) old-lemmas)
+   (seq-reduce (lambda (index lemma) (remove-lemma tokens lemma)) old-lemmas index)
    :where
    (tokens (sensetion--synset-tokens synset))
    (old-lemmas (s-split "|" old-lemma-str t))
@@ -833,8 +851,8 @@ present in SYNSET's tokens."
                  (unless (seq-some (lambda (tk)
                                      (sensetion--tk-has-lemma? tk old-lemma))
                                    tokens)
-                   (trie-insert index old-lemma nil
-                                (lambda (_ old-data) (remove coord old-data)))))))
+                   (sensetion--index-insert index old-lemma nil
+                                   (lambda (_ old-data) (remove coord old-data)))))))
 
 
 (defun sensetion--tk-annotatable? (tk)
@@ -921,7 +939,7 @@ terms defined by that synset, and the fourth is the gloss."
               (error "No matching sensekey for lemma %s in synset %s-%s"
                      lemma (sensetion--synset-ofs synset) (sensetion--synset-pos synset))))
    (synsets  (sensetion--get-synsets coords))
-   (coords   (trie-lookup sensetion--lemma->synsets lemma))
+   (coords   (sensetion--index-lookup sensetion--lemma->synsets lemma))
    (options  (make-hash-table :test 'equal :size 30))
    (lemma (cl-substitute (string-to-char " ")
                          (string-to-char "_")
