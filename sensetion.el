@@ -5,10 +5,10 @@
 (require 's)
 (require 'f)
 (require 'async)
+(require 'emacsql-sqlite)
 (eval-when-compile (require 'cl-lib))
 (require 'cl-lib)
 (require 'hydra)
-(require 'trie)
 (require 'sensetion-utils)
 (require 'sensetion-data)
 (require 'sensetion-edit)
@@ -18,102 +18,28 @@
 ;; https://emacs.stackexchange.com/questions/539/how-do-i-measure-performance-of-elisp-code
 
 
-(defgroup sensetion nil
-  "Support for annotating word senses."
-  :group 'data)
-
-
-(defcustom sensetion-output-buffer-name "sensetion"
-  "Buffer name where sensetion results are displayed."
-  :group 'sensetion
-  :type 'string)
-
-
-(defcustom sensetion-annotation-dir
-  (expand-file-name "~/sensetion-data/")
-  "Path to annotation directory"
-  :group 'sensetion
-  :type 'directory)
-
-
-(defcustom sensetion-index-file
-  (f-join sensetion-annotation-dir ".sensetion-index")
-  "Path to index file."
-  :group 'sensetion
-  :type 'file)
-
-
-(defcustom sensetion-status-file
-  (f-join sensetion-annotation-dir ".sensetion-status")
-  "Path to status file."
-  :group 'sensetion
-  :type 'file)
-
-
-(defcustom sensetion-annotation-file-type
-  "plist"
-  "File type (extension) of annotation files."
-  :group 'sensetion
-  :type 'string)
-
-
-(defcustom sensetion-number-completions
-  15
-  "Number of lemma completions to show in `sensetion-annotate'."
-  :group 'sensetion
-  :type  'integer)
-
-(defcustom sensetion-sense-menu-show-synset-id
-  nil
-  "Show synset id in sense menu during annotation."
-  :group 'sensetion
-  :type  'boolean)
-
-
 (defvar sensetion--completion-function
   (completion-table-dynamic
    (lambda (prefix)
      (sensetion--check-index-nonnil)
      ;; TODO: randomize completion so that stuff like completing a to
      ;; a_ doesn't happen (as often)
-     (trie-complete sensetion--index prefix nil sensetion-number-completions nil nil
+     (trie-complete sensetion--db prefix nil sensetion-number-completions nil nil
                     (lambda (k _) (sensetion--lemma*->lemma k))))))
 
 
-(defvar sensetion--index
-  nil
-  "Index.
-
-  A trie mapping lemmas to sentence ids.")
-
-
-(defvar sensetion--synsetid->line
-  nil
-  "Index.
-
-  A hash-table mapping sentence ids to integers.")
-
-
-(defvar sensetion--lemma->synsets
-  nil
-  "Index.
-
-  A trie mapping lemmas to the synsets that they are terms of.")
-
-
-(defvar sensetion--global-status
-  nil
-  "Global status.
-
-A cons cell where the car is the number of tokens annotated so
-far, and the cdr is the total number of unnanotated tokens.")
+(defvar sensetion--db
+  (when (f-exists? sensetion--db-file)
+    (emacsql-sqlite sensetion--db-file))
+  "Index.")
 
 
 (defvar-local sensetion--local-status
   nil
   "Local status.
 
-A cons cell in the same format as `sensetion--global-status'.")
+A cons cell where the car is the number of tokens annotated so
+far, and the cdr is the total number of annotatable tokens.")
 
 
 (defvar sensetion-mode-map
@@ -136,54 +62,19 @@ A cons cell in the same format as `sensetion--global-status'.")
   "Keymap for `sensetion-mode'.")
 
 
-(defcustom sensetion-unnanotated-colour
-  "salmon"
-  "Colour to display the selected tokens in."
-  :group 'sensetion
-  :type 'color)
-
-
-(defcustom sensetion-previously-annotated-colour
-  "dark green"
-  "Colour to display the tokens which have been previously
-annotated."
-  :group 'sensetion
-  :type 'color)
-
-
-(defcustom sensetion-previously-annotated-unsure-colour
-  "light green"
-  "Colour to display the tokens which have been previously
-annotated with low confidence."
-  :group 'sensetion
-  :type 'color)
-
-
-(defcustom sensetion-currently-annotated-colour
-  "dark blue"
-  "Colour to use in displaying tokens annotated in this batch."
-  :group 'sensetion
-  :type 'color)
-
-
-(defcustom sensetion-currently-annotated-unsure-colour
-  "light blue"
-  "Colour to use in displaying tokens annotated in this batch,
-with low confidence."
-  :group 'sensetion
-  :type 'color)
-
-
 (defvar-local sensetion--lemma
   nil
   "Lemma being annotated in the buffer.")
 
 
 (defvar-local sensetion--synset-cache
-  nil)
+  nil
+  "TODO")
 
 
-(defvar sensetion--index-lock nil "set to t when indexing process is working.")
+(defvar sensetion--index-lock
+  nil
+  "set to t when indexing process is working.")
 
 
 (defcustom sensetion-mode-line '(:eval (sensetion--mode-line-status-text))
@@ -208,15 +99,12 @@ with low confidence."
 
 
 (defun sensetion--mode-line-status-text ()
-  (concat "sensetion"
-          ;; (if sensetion--global-status
-          ;;     (cl-destructuring-bind (done . total) sensetion--global-status
-          ;;       (format "|:%.0f%%" (* 100 (/ (float done) total))))
-          ;;   "")
-          (if sensetion--local-status
-              (cl-destructuring-bind (done . total) sensetion--local-status
-                (format ":%.0f/%.0f" done total))
-            "")))
+  (concat
+   "sensetion"
+   (if sensetion--local-status
+       (cl-destructuring-bind (done . total) sensetion--local-status
+         (format ":%.0f/%.0f" done total))
+     "")))
 
 
 ;;;###autoload
@@ -225,14 +113,14 @@ with low confidence."
   (add-hook 'kill-emacs-hook
             (lambda ()
               (sensetion--write-state)))
-  (if sensetion--index
+  (if sensetion--db
       (call-interactively #'sensetion-annotate)
-      (if (and (f-exists? sensetion-index-file) (f-exists? sensetion-status-file))
-          (progn
-            (sensetion--read-state)
-            (call-interactively #'sensetion-annotate))
-        (sensetion-make-state sensetion-annotation-dir
-                     (sensetion--done-indexing-messager)))))
+    (if (f-exists? sensetion-db-file)
+        (progn
+          (sensetion--read-state)
+          (call-interactively #'sensetion-annotate))
+      (sensetion-make-state sensetion-annotation-dir
+                   (sensetion--done-indexing-messager)))))
 
 
 (cl-defun sensetion--annotation-files (&optional (anno-dir sensetion-annotation-dir))
@@ -241,7 +129,7 @@ with low confidence."
 
 
 (defun sensetion--check-index-nonnil ()
-  (unless sensetion--index
+  (unless sensetion--db
     (user-error "Index is missing. Have you run `M-x sensetion`? If yes, please check your annotation files and call `M-x sensetion-make-index`. If none of that works, report the bug")))
 
 
@@ -267,7 +155,7 @@ with low confidence."
      (sensetion--beginning-of-buffer))
    (pop-to-buffer result-buffer)
    :where
-   (matches (progn (trie-regexp-search sensetion--index regexp
+   (matches (progn (trie-regexp-search sensetion--db regexp
                                        nil nil nil filter-fn)
                    (funcall filter-fn)))
    (filter-fn (sensetion--regexp-search-filter-fn))
@@ -471,7 +359,7 @@ LEMMA.
 You can mark/unmark tokens with `sensetion-toggle-glob-mark'."
   (interactive (list
                 (completing-read "Lemma to annotate: " sensetion--completion-function)))
-  (sensetion--index-lemmas sensetion--index lemma (sensetion--synset-coord-prop-at-point))
+  (sensetion--index-lemmas sensetion--db lemma (sensetion--synset-coord-prop-at-point))
   (sensetion-is
    (sensetion--reinsert-synset-at-point globbed-synset)
    (with-inhibiting-read-only
@@ -846,7 +734,7 @@ present in SYNSET's tokens."
       status)))
 
 
-(cl-defun sensetion--write-state (&key (index sensetion--index)
+(cl-defun sensetion--write-state (&key (index sensetion--db)
                               (status sensetion--global-status)
                               (lemma->synsets sensetion--lemma->synsets))
   (let ((print-circle t))
@@ -861,13 +749,13 @@ present in SYNSET's tokens."
 
 (defun sensetion--read-state ()
   "Read index from `sensetion-index-file', and set
-`sensetion--index'. Read status from `sensetion-status-file' and
+`sensetion--db'. Read status from `sensetion-status-file' and
 set `sensetion--global-status'. "
   ;; TODO: benchmark if f-read is faster (if needed)
   (with-temp-message "Reading index"
     (with-temp-buffer
       (insert-file-contents sensetion-index-file)
-      (setq sensetion--index (read (current-buffer)))
+      (setq sensetion--db (read (current-buffer)))
       (setq sensetion--lemma->synsets (read (current-buffer))))
     (setq sensetion--global-status (read (f-read-text sensetion-status-file))))
   t)
