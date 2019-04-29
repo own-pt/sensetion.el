@@ -83,4 +83,13 @@ itself."
                  (string-to-char " ")
                  str))
 
+(defun sensetion--buffer-intersperse (str &optional before end)
+  (goto-char (point-min))
+  (when before
+    (insert str ?\n)
+    (forward-line 1))
+  (while (not (eobp))
+    (insert str ?\n)
+    (forward-line)))
+
 (provide 'sensetion-utils)
