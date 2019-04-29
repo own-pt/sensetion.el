@@ -73,11 +73,7 @@
 (defvar sensetion--completion-function
   (completion-table-dynamic
    (lambda (prefix)
-     (sensetion--check-index-nonnil)
-     ;; TODO: randomize completion so that stuff like completing a to
-     ;; a_ doesn't happen (as often)
-     (trie-complete sensetion--index prefix nil sensetion-number-completions nil nil
-                    (lambda (k _) (sensetion--lemma*->lemma k))))))
+     (sensetion-es-prefix-lemma prefix sensetion-number-completions))))
 
 
 (defvar sensetion--index
@@ -379,50 +375,51 @@ tokens, and removing the glob token corresponding to the
 collocation."
   (interactive (list (sensetion--tk-ix-prop-at-point)
                      (sensetion--get-synset-at-point)))
-  (sensetion-is
-   (unless ck
-     (user-error "Token is not part of a collocation"))
-   (when (cdr ckeys)
-     (user-error "Please select token which is part of only one collocation"))
-   (sensetion--reinsert-synset-at-point (unglob ck synset))
+  ;; (sensetion-is
+  ;;  (unless ck
+  ;;    (user-error "Token is not part of a collocation"))
+  ;;  (when (cdr ckeys)
+  ;;    (user-error "Please select token which is part of only one collocation"))
+  ;;  (sensetion--reinsert-synset-at-point (unglob ck synset))
    
-   :where
+  ;;  :where
 
-   (unglob (ck synset)
-           (pcase synset
-             ((cl-struct sensetion--synset ofs pos keys gloss tokens)
-              (sensetion--make-synset
-               :ofs ofs
-               :pos pos
-               :keys keys
-               :gloss gloss
-               :tokens
-               (cl-loop
-                for tk in tokens
-                ;; don't collect glob to be removed
-                unless (when (equal ck (sensetion--tk-glob? tk))
-                         ;; handle status update when glob was tagged
-                         (when (sensetion--tk-annotated? tk)
-                           (cl-incf (car sensetion--global-status) -1)
-                           (cl-incf (cdr sensetion--global-status) -1)
-                           (when (sensetion--to-annotate? tk)
-                             (cl-incf (car sensetion--local-status) -1)
-                             (cl-incf (cdr sensetion--local-status) -1)))
-                         t)
-                collect (let ((tk-keys (sensetion--tk-coll-keys tk)))
-                          (cond
-                           ((equal (list ck) tk-keys)
-                            ;; this token only part of one colloc
-                            (setf (sensetion--tk-kind tk) :wf))
-                           ((member ck tk-keys)
-                            ;; this token part of more than one colloc
-                            (setf (sensetion--tk-kind tk)
-                                  (cons :cf (remove ck tk-keys)))))
-                          tk))))))
-   ;; TODO: select which colloc to undo?
-   (ck (cl-first ckeys))
-   (ckeys (sensetion--tk-coll-keys tk))
-   (tk (elt (sensetion--synset-tokens synset) ix))))
+  ;;  (unglob (ck synset)
+  ;;          (pcase synset
+  ;;            ((cl-struct sensetion--synset ofs pos keys gloss tokens)
+  ;;             (sensetion--make-synset
+  ;;              :ofs ofs
+  ;;              :pos pos
+  ;;              :keys keys
+  ;;              :gloss gloss
+  ;;              :tokens
+  ;;              (cl-loop
+  ;;               for tk in tokens
+  ;;               ;; don't collect glob to be removed
+  ;;               unless (when (equal ck (sensetion--tk-glob? tk))
+  ;;                        ;; handle status update when glob was tagged
+  ;;                        (when (sensetion--tk-annotated? tk)
+  ;;                          (cl-incf (car sensetion--global-status) -1)
+  ;;                          (cl-incf (cdr sensetion--global-status) -1)
+  ;;                          (when (sensetion--to-annotate? tk)
+  ;;                            (cl-incf (car sensetion--local-status) -1)
+  ;;                            (cl-incf (cdr sensetion--local-status) -1)))
+  ;;                        t)
+  ;;               collect (let ((tk-keys (sensetion--tk-coll-keys tk)))
+  ;;                         (cond
+  ;;                          ((equal (list ck) tk-keys)
+  ;;                           ;; this token only part of one colloc
+  ;;                           (setf (sensetion--tk-kind tk) :wf))
+  ;;                          ((member ck tk-keys)
+  ;;                           ;; this token part of more than one colloc
+  ;;                           (setf (sensetion--tk-kind tk)
+  ;;                                 (cons :cf (remove ck tk-keys)))))
+  ;;                         tk))))))
+  ;;  ;; TODO: select which colloc to undo?
+  ;;  (ck (cl-first ckeys))
+  ;;  (ckeys (sensetion--tk-coll-keys tk))
+  ;;  (tk (elt (sensetion--synset-tokens synset) ix)))
+  )
 
 
 (defun sensetion--tk-coll-keys (tk)
@@ -487,7 +484,8 @@ You can mark/unmark tokens with `sensetion-toggle-glob-mark'."
                      :pos pos
                      :keys keys
                      :gloss gloss
-                     :tokens globbed-tks))))
+                     ;; :tokens globbed-tks
+		     ))))
    (globbed-tks (cl-loop
                  for tk in (sensetion--synset-tokens synset)
                  for i from 0
@@ -888,7 +886,7 @@ set `sensetion--global-status'. "
                  ("1" "n" "2" "v" "3" "a" "4" "r"))))
 
 
-(defun sensetion--wordnet-lookup (lemma)
+(defun sensetion--wordnet-lookup (lemma pos &optional options)
   "Return hash-table where the keys are synset keys and the
 values are a list where the first element is sense key shown by
 the edit hydra, the second is the synset id, the third are the
@@ -900,11 +898,11 @@ terms defined by that synset, and the fourth is the gloss."
    (index (synset)
           (let ((pos (sensetion--synset-pos synset)))
             (setf (gethash (lemma-sk lemma synset) options)
-                  (list (ix->hydra-key (gethash pos counter 0))
+                  (list (ix->hydra-key counter)
                         (sensetion--synset-id synset)
                         (sensetion--synset-terms synset)
                         (sensetion--synset-gloss synset)))
-            (cl-incf (gethash pos counter 0))))
+            (cl-incf counter)))
    (ix->hydra-key (ix)
                   (format "%s"
                           (if (< ix 9)
@@ -914,15 +912,15 @@ terms defined by that synset, and the fourth is the gloss."
                               ;; reserved 0 for no sense
                               (1+ ix)
                             (char-to-string (+ ix 88)))))
-   (counter (make-hash-table :test 'equal :size 10))
+   (counter 0)
    (lemma-sk (lemma synset)
              (or
-              (car (cl-find lemma (sensetion--synset-keys synset) :test #'equal :key #'cdr))
+              (car (cl-find lemma (cl-mapcar #'cons (sensetion--synset-keys synset) (sensetion--synset-lemmas synset))
+			    :test #'equal :key #'cdr))
               (error "No matching sensekey for lemma %s in synset %s-%s"
                      lemma (sensetion--synset-ofs synset) (sensetion--synset-pos synset))))
-   (synsets  (sensetion--get-synsets coords))
-   (coords   (trie-lookup sensetion--lemma->synsets lemma))
-   (options  (make-hash-table :test 'equal :size 30))
+   (synsets  (cl-sort (sensetion--es-lemma->synsets lemma pos) #'< :key #'sensetion--synset-ofs)) ;FIXME
+   (options  (or options (make-hash-table :test 'equal :size 30)))
    (lemma (cl-substitute (string-to-char " ")
                          (string-to-char "_")
                          lemma))))

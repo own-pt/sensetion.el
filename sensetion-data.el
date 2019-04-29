@@ -10,30 +10,19 @@
 
 (cl-defstruct (sensetion--synset (:constructor nil)
                         (:constructor sensetion--make-synset))
-  ofs pos keys gloss tokens)
+  ofs pos keys lemmas gloss)
 
 
-(defun sensetion--plist->synset (plist)
-  (sensetion--make-synset :ofs (plist-get plist :ofs)
-                 :pos (plist-get plist :pos)
-                 :keys (plist-get plist :keys)
-                 :gloss (plist-get plist :gloss)
-                 :tokens (mapcar #'sensetion--plist->tk
-                                 (plist-get plist :tokens))))
+(defun sensetion--alist->synset (plist)
+  (sensetion--make-synset :ofs (map-elt plist 'ofs nil #'eq)
+                 :pos (map-elt plist 'pos nil #'eq)
+                 :keys (map-elt plist 'keys nil #'eq)
+		 :lemmas (map-elt plist 'lemmas nil #'eq)
+                 :gloss (map-elt plist 'gloss nil #'eq)))
 
 
 (defun sensetion--plist->tk (plist)
   (apply #'sensetion--make-tk plist))
-
-
-(defun sensetion--synset->plist (synset)
-  (pcase synset
-    ((cl-struct sensetion--synset ofs pos keys gloss tokens)
-     (list :ofs ofs
-           :pos pos
-           :keys keys
-           :gloss gloss
-           :tokens (mapcar #'sensetion--tk->plist tokens)))))
 
 
 (defun sensetion--tk->plist (tk)
@@ -65,12 +54,10 @@
   (not (sensetion--tk-unsure tk)))
 
 
-(defun sensetion--synset-terms (synset)
-  (mapcar #'cdr (sensetion--synset-keys synset)))
+(defalias 'sensetion--synset-terms #'sensetion--synset-lemmas)
 
 
-(defun sensetion--synset-senses (synset)
-  (mapcar #'car (sensetion--synset-keys synset)))
+(defalias 'sensetion--synset-senses #'sensetion--synset-keys)
 
 
 (defun sensetion--tk-skeys (tk)
@@ -85,7 +72,7 @@
 
 
 (defun sensetion--synset-id (synset)
-  (concat (sensetion--synset-ofs synset)
+  (concat (number-to-string (sensetion--synset-ofs synset))
           "-"
           (sensetion--synset-pos synset)))
 

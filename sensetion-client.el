@@ -41,15 +41,26 @@
   (let ((json-array-type 'list))
     (json-read)))
 
-(defun sensetion-es-prefix-lemma (prefix)
-  ;; TODO: FIXME
-  (let* ((response (request (f-join sensetion--es-url "_search") :headers sensetion--es-headers :parser #'sensetion--json-read :sync t
-			    :data (format "{\"query\":{\"prefix\" : { \"lemmas\" : \"%s\" }}}" prefix)))
+(defun sensetion--es-request (path data)
+  (let* ((response (request (f-join sensetion--es-url path) :headers sensetion--es-headers :parser #'sensetion--json-read
+			    :sync t :data data))
 	 (data (request-response-data response))
-	 (hits (map-elt (map-elt data 'hits) 'hits))
-	 (docs (mapcar (lambda (hit) (map-elt hit '_source)) hits))
+	 (hits (map-elt (map-elt data 'hits nil #'eq) 'hits nil #'eq))
+	 (docs (mapcar (lambda (hit) (map-elt hit '_source)) hits)))
+    docs))
+
+(defun sensetion-es-prefix-lemma (prefix &optional limit)
+  ;; TODO: FIXME
+  (let* ((hits (sensetion--es-request "_search"
+			     (format "{\"query\":{\"prefix\" : { \"lemmas\" : \"%s\" }}}" prefix)))
 	 (lemmas (seq-mapcat (lambda (doc) (map-elt doc 'lemmas)) docs)))
     (seq-filter (lambda (lemma) (string-prefix-p prefix lemma t)) lemmas)))
+
+
+(defun sensetion--es-lemma->synsets (lemma pos)
+  (let* ((hits (sensetion--es-request "_search"
+			     (format "{\"query\": {\"bool\": { \"filter\": [{\"term\": {\"lemmas\": \"%s\"}}, {\"term\":{ \"pos\" : \"%s\"}}]}}}" lemma pos))))
+    (mapcar #'sensetion--alist->synset hits)))
 
 
 (defun sensetion-es-index-file-lines (url fp)
