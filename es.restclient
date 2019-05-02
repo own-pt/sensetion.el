@@ -1,0 +1,129 @@
+# -*- restclient -*-
+
+## index synsets
+PUT http://localhost:9200/synsets
+Content-Type: application/json
+
+{
+   "mappings": {
+     "properties": {
+       "lemmas": {
+         "type":  "keyword"
+       }
+     }
+   }
+ }
+
+# index docs
+PUT http://localhost:9200/docs
+Content-Type: application/json
+
+{
+  "mappings": {
+    "properties": {
+      "token": {
+        "type" : "nested",
+        "properties": {
+  	  "lemmas" : {"type":  "keyword"}
+	}
+      }
+    }
+  }
+}
+
+# delete synsets
+DELETE http://localhost:9200/synsets/
+Content-Type: application/json
+
+
+# delete docs
+DELETE http://localhost:9200/docs/
+Content-Type: application/json
+
+# index
+# curl -s -H "Content-Type: application/x-ndjson" -XPOST localhost:9200/synsets/_bulk --data-binary "@synsets.json" &> /dev/null ; echo
+# for i in *.json ; do curl -s -H "Content-Type: application/x-ndjson" -XPOST localhost:9200/docs/_bulk --data-binary "@$i" &> /dev/null ; done
+
+GET http://localhost:9200/synsets/_search
+Content-Type: application/json
+
+{
+  "query": {
+    "term" : { "ofs" : 3141756 } 
+  }
+}
+
+# query lemma
+POST http://localhost:9200/synsets/_search
+Content-Type: application/json
+
+{
+    "query": {
+        "term": {
+            "terms": "rock"
+        }
+    }
+}
+
+# query lemma and pos
+GET http://localhost:9200/synsets/_search
+Content-Type: application/json
+
+{
+    "query": {
+        "bool": {
+            "filter": [
+                {
+                    "term": {
+                        "terms": "rock"
+                    }
+                },
+                {
+                    "term": {
+                        "pos": "n"
+                    }
+                }
+            ]
+        }
+    }
+}
+
+# lemma -> sents
+GET http://localhost:9200/docs/_search
+Content-Type: application/json
+
+{
+    "query": {
+        "nested": {
+            "query": {
+                "term": {
+                    "token.lemmas": "be%2"
+                }
+            },
+            "path": "token"
+        }
+    }
+}
+
+# lemma -> sents
+GET http://localhost:9200/docs/_search
+Content-Type: application/json
+
+{
+    "query": {
+        "nested": {
+            "path": "token",
+            "query": {
+                "prefix": {
+                    "token.lemmas": "rock%"
+                }
+            }
+        }
+    }
+}
+
+
+
+# docs stats
+GET http://localhost:9200/docs/_stats
+Content-Type: application/json

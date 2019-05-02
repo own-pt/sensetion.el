@@ -5,8 +5,6 @@
 (require 's)
 (require 'f)
 (require 'async)
-(eval-when-compile (require 'cl-lib))
-(require 'cl-lib)
 (require 'hydra)
 (require 'trie)
 (require 'sensetion-utils)
@@ -29,32 +27,11 @@
   :type 'string)
 
 
-(defcustom sensetion-annotation-dir
-  (expand-file-name "~/sensetion-data/")
-  "Path to annotation directory"
+(defcustom sensetion-backend-url
+  "http://localhost:9200"
+  "URL to backend server."
   :group 'sensetion
-  :type 'directory)
-
-
-(defcustom sensetion-index-file
-  (f-join sensetion-annotation-dir ".sensetion-index")
-  "Path to index file."
-  :group 'sensetion
-  :type 'file)
-
-
-(defcustom sensetion-status-file
-  (f-join sensetion-annotation-dir ".sensetion-status")
-  "Path to status file."
-  :group 'sensetion
-  :type 'file)
-
-
-(defcustom sensetion-annotation-file-type
-  "plist"
-  "File type (extension) of annotation files."
-  :group 'sensetion
-  :type 'string)
+  :type 'url)
 
 
 (defcustom sensetion-number-completions
@@ -62,6 +39,7 @@
   "Number of lemma completions to show in `sensetion-annotate'."
   :group 'sensetion
   :type  'integer)
+
 
 (defcustom sensetion-sense-menu-show-synset-id
   nil
@@ -74,35 +52,6 @@
   (completion-table-dynamic
    (lambda (prefix)
      (sensetion-es-prefix-lemma prefix sensetion-number-completions))))
-
-
-(defvar sensetion--index
-  nil
-  "Index.
-
-  A trie mapping lemmas to sentence ids.")
-
-
-(defvar sensetion--synsetid->line
-  nil
-  "Index.
-
-  A hash-table mapping sentence ids to integers.")
-
-
-(defvar sensetion--lemma->synsets
-  nil
-  "Index.
-
-  A trie mapping lemmas to the synsets that they are terms of.")
-
-
-(defvar sensetion--global-status
-  nil
-  "Global status.
-
-A cons cell where the car is the number of tokens annotated so
-far, and the cdr is the total number of unnanotated tokens.")
 
 
 (defvar-local sensetion--local-status
@@ -177,9 +126,6 @@ with low confidence."
 
 (defvar-local sensetion--synset-cache
   nil)
-
-
-(defvar sensetion--index-lock nil "set to t when indexing process is working.")
 
 
 (defcustom sensetion-mode-line '(:eval (sensetion--mode-line-status-text))

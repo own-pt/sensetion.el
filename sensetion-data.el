@@ -1,67 +1,88 @@
 ;;; sensetion.el --- -*- lexical-binding: t; -*-
 (eval-when-compile (require 'cl-lib))
 (require 'cl-lib)
+(require 'map)
 
-
+;; TODO: maybe use maps all the way
 (cl-defstruct (sensetion--tk (:constructor nil)
                     (:constructor sensetion--make-tk))
-  kind form lemma pos tag senses glob unsure sep type rdf action rend)
+  kind form lemmas tag senses glob unsure meta)
 
 
 (cl-defstruct (sensetion--synset (:constructor nil)
                         (:constructor sensetion--make-synset))
-  ofs pos keys lemmas gloss)
+  ofs pos keys terms gloss)
 
 
-(defun sensetion--alist->synset (plist)
-  (sensetion--make-synset :ofs (map-elt plist 'ofs nil #'eq)
-                 :pos (map-elt plist 'pos nil #'eq)
-                 :keys (map-elt plist 'keys nil #'eq)
-		 :lemmas (map-elt plist 'lemmas nil #'eq)
-                 :gloss (map-elt plist 'gloss nil #'eq)))
+(cl-defstruct (sensetion--sent (:constructor nil)
+		      (:constructor sensetion--make-sent))
+  meta tokens text)
 
 
-(defun sensetion--plist->tk (plist)
-  (apply #'sensetion--make-tk plist))
+(defmacro sensetion--mk-struct-arglist (alist st-fields &optional al-fields)
+  `(list
+    ,@(cl-mapcan
+       (lambda (st-field al-field)
+	 (list (intern (concat ":" (symbol-name st-field)))
+	       `(map-elt ,alist ',al-field nil #'eq)))
+       st-fields (or al-fields st-fields))))
 
 
-(defun sensetion--tk->plist (tk)
-  (pcase tk
-    ((cl-struct sensetion--tk kind form lemma pos tag senses glob sep type rdf unsure action rend)
+(defun sensetion--alist->synset (alist)
+  (apply #'sensetion--make-synset (sensetion--mk-struct-arglist alist (ofs pos keys terms gloss))))
+
+
+(defun sensetion--alist->sent (alist)
+  (apply #'sensetion--make-sent
+	 (sensetion--mk-struct-arglist alist (meta tokens text) (meta token raw-text))))
+
+
+(defun sensetion--alist->tk (alist)
+  (apply #'sensetion--make-tk
+	 (sensetion--mk-struct-arglist
+	  alist
+	  (kind form lemmas tag senses glob unsure meta))))
+
+
+(defun sensetion--sent->alist (sent)
+  (pcase sent
+    ((cl-struct sensetion--sent meta tokens text)
      (cl-mapcan
-      (lambda (k v) (when v (list k v)))
-      '(:kind :action :form :lemma :pos :tag :senses :glob :sep :type :rdf :unsure :rend)
+      (lambda (k v) (when v (cons k v)))
+      '(meta tokens text)
+      (list meta
+	    (mapcar #'sensetion--tk->alist tokens)
+	    text)))))
+
+
+(defun sensetion--tk->alist (tk)
+  (pcase tk
+    ((cl-struct sensetion--tk kind form lemmas tag senses glob unsure meta)
+     (cl-mapcan
+      (lambda (k v) (when v (cons k v)))
+      '(kind form lemma tag senses glob unsure)
       (list kind
-            action
-            form
-            lemma
-            pos
-            ;; "man-now" is a virtual token status, shouldn't be
+	    form
+            lemmas
+	    ;; "man-now" is a virtual token status, shouldn't be
             ;; written to file
             (if (equal tag "man-now")
                 "man"
               tag)
             senses
             glob
-            sep
-            type
-            rdf
-            unsure
-            rend)))))
+	    unsure
+	    meta)))))
 
 
 (defun sensetion--tk-confident-in-anno? (tk)
   (not (sensetion--tk-unsure tk)))
 
 
-(defalias 'sensetion--synset-terms #'sensetion--synset-lemmas)
-
-
 (defalias 'sensetion--synset-senses #'sensetion--synset-keys)
 
 
-(defun sensetion--tk-skeys (tk)
-  (mapcar #'car (sensetion--tk-senses tk)))
+(defalias 'sensetion--tk-skeys #'sensetion--tk-senses)
 
 
 (defun sensetion--sk-st (sk)

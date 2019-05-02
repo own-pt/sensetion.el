@@ -1,5 +1,7 @@
 ;;; sensetion.el --- -*- lexical-binding: t; -*-
 
+(require 'cl-lib)
+
 (defun sensetion--punctuation-no-space-before? (str)
   (gethash
    str
@@ -62,14 +64,6 @@ itself."
             wclauses)))
       (cl-first body))))
 
-;; (defmacro defun/where (name arglist &rest body)
-;;   "
-;; \(fn NAME ARGLIST &optional DOCSTRING DECL &rest BODY)"
-;;   (declare (doc-string 3) (indent 2) (debug defun))
-;;   `(defun ,name ,arglist
-;;      (sensetion-is
-;;       ,@body)))
-
 
 (defun sensetion--goto-line (line &optional start-line)
   (unless start-line
@@ -83,13 +77,5 @@ itself."
                  (string-to-char " ")
                  str))
 
-(defun sensetion--buffer-intersperse (str &optional before end)
-  (goto-char (point-min))
-  (when before
-    (insert str ?\n)
-    (forward-line 1))
-  (while (not (eobp))
-    (insert str ?\n)
-    (forward-line)))
 
 (provide 'sensetion-utils)
