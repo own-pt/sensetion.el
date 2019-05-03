@@ -2,7 +2,6 @@
 (require 'seq)
 (require 'subr-x)
 (require 'ido)
-(require 's)
 (require 'f)
 (require 'async)
 (require 'hydra)
@@ -119,6 +118,13 @@ with low confidence."
   :type 'color)
 
 
+(defcustom sensetion-glob-mark-colour
+  "brown"
+  "Colour to use in mark of tokens to glob."
+  :group 'sensetion
+  :type 'color)
+
+
 (defvar-local sensetion--lemma
   nil
   "Lemma being annotated in the buffer.")
@@ -176,38 +182,15 @@ with low confidence."
      (sensetion-mode)
      (with-inhibiting-read-only
       (setq sensetion--lemma lemma)
-      (setq sensetion--synset-cache (sensetion--wordnet-lookup lemma))
+      (setq sensetion--synset-cache (sensetion--wordnet-lookup lemma "n")) ;FIXME
       (setq sensetion--local-status (sensetion--make-collocations matches)))
      (sensetion--beginning-of-buffer))
    (pop-to-buffer result-buffer)
    :where
    (result-buffer (generate-new-buffer
                    (sensetion--create-buffer-name lemma pos)))
-   (matches (if pos 
-		(sensetion--es-lemma->sents lemma)
-		(sensetion--es-lemma-pos->sents lemma pos)))
+   (matches (sensetion--es-get-sents lemma pos))
    (pos (unless (equal pos "any") pos))))
-
-
-(defun sensetion--regexp-search-filter-fn ()
-  "`trie-regexp-search' returns an alist of the keys and their
-  results. In our case the values might get repeated over several
-  keys, which we do not want. So we use `trie-regexp-search'
-  filterfn argument with this closure, which both builds a result
-  in a format we want, and prevents `trie-regexp-search' from
-  building its own result list.
-
-The result function uniquifies the match values and returns nil;
-when called without arguments will return a list of of two lists:
-one of them contains the unique keys of the matches, and the
-other the unique values."
-  (let ((uniq-vals (make-hash-table :test 'equal)))
-    (lambda (&optional key vals)
-      (if key
-          (progn
-            (mapc (lambda (val) (setf (gethash val uniq-vals) t)) vals)
-            nil)
-        (hash-table-keys uniq-vals)))))
 
 
 (defun sensetion--create-buffer-name (lemma pos)
@@ -217,7 +200,7 @@ other the unique values."
 (defun sensetion--make-collocations (matches)
   "Insert MATCHES at current buffer, return status."
   (sensetion-is
-   (cl-mapc #'go c-syns)
+   (cl-mapc #'go matches)
    (cons done total)
    :where
    (go (sent)
@@ -234,7 +217,7 @@ other the unique values."
 
 (defun sensetion--tk-glob? (tk)
   (pcase (sensetion--tk-kind tk)
-    (`(:glob . ,k)
+    (`(:glob ,k)
      k)))
 
 
@@ -283,7 +266,7 @@ collocation."
   ;;                         (cond
   ;;                          ((equal (list ck) tk-keys)
   ;;                           ;; this token only part of one colloc
-  ;;                           (setf (sensetion--tk-kind tk) :wf))
+  ;;                           (setf (sensetion--tk-kind tk) "wf"))
   ;;                          ((member ck tk-keys)
   ;;                           ;; this token part of more than one colloc
   ;;                           (setf (sensetion--tk-kind tk)
@@ -298,14 +281,14 @@ collocation."
 
 (defun sensetion--tk-coll-keys (tk)
   (pcase (sensetion--tk-kind tk)
-    (`(:cf . ,ks) ks)))
+    (`("cf" . ,ks) ks)))
 
 
 (defun sensetion--mark-glob (beg end ix marked)
   "Marks token to be globbed with the `sensetion-glob' command."
   (with-inhibiting-read-only
    (put-text-property beg end
-                      'face '(:foreground "brown"))
+                      'face `(:foreground ,sensetion-glob-mark-colour))
    (put-text-property (line-end-position) (1+ (line-end-position))
                       'sensetion--to-glob (cons ix marked))))
 
@@ -342,69 +325,71 @@ LEMMA.
 You can mark/unmark tokens with `sensetion-toggle-glob-mark'."
   (interactive (list
                 (completing-read "Lemma to annotate: " sensetion--completion-function)))
-  (sensetion--index-lemmas sensetion--index lemma (sensetion--sent-coord-prop-at-point))
-  (sensetion-is
-   (sensetion--reinsert-sent-at-point globbed-sent)
-   (with-inhibiting-read-only
-    (put-text-property (line-end-position) (1+ (line-end-position))
-                       'sensetion--to-glob nil))
+  ;; (sensetion--index-lemmas sensetion--index lemma (sensetion--sent-coord-prop-at-point))
+  ;; (sensetion-is
+  ;;  (sensetion--reinsert-sent-at-point globbed-sent)
+  ;;  (with-inhibiting-read-only
+  ;;   (put-text-property (line-end-position) (1+ (line-end-position))
+  ;;                      'sensetion--to-glob nil))
 
-   :where
-   
-   (globbed-sent (pcase sent
-                   ((cl-struct sensetion--sent ofs pos keys gloss)
-                    (sensetion--make-sent
-                     :ofs ofs
-                     :pos pos
-                     :keys keys
-                     :gloss gloss
-                     ;; :tokens globbed-tks
-		     ))))
-   (globbed-tks (cl-loop
-                 for tk in (sensetion--sent-tokens sent)
-                 for i from 0
-                 append (cond
-                         ((equal i (cl-first ixs))
-                          ;; insert glob before first token in the
-                          ;; collocation
-                          (list new-glob (glob-tk tk new-k)))
-                         ((cl-member i ixs)
-                          (list (glob-tk tk new-k)))
-                         (t
-                          (list tk)))))
-   (glob-tk (tk key)
-            (let ((cks (sensetion--tk-coll-keys tk)))
-              (setf (sensetion--tk-kind tk)
-                    (cl-list* :cf key cks))
-              ;; TODO: delete senses and make status "un"
-              tk))
-   (new-glob (sensetion--make-tk :lemma lemma :tag "un"
-                        :kind `(:glob . ,new-k) :glob "man"))
-   (ixs   (reverse (get-text-property (line-end-position) 'sensetion--to-glob)))
-   (new-k (char-to-string (1+ max-k)))
-   (max-k (max-key sent))
-   (max-key (sent)
-            (apply #'max
-                   (cons (string-to-char "`")
-                         ;; in case there are no other globs, use "`"
-                         ;; (which results in "a" being the key),
-                         ;; else get the maximum one
-                         (seq-mapcat (lambda (tk)
-                                       (when-let ((keys (sensetion--tk-coll-keys tk)))
-                                         (mapcar #'string-to-char keys)))
-                                     (sensetion--sent-tokens sent)))))
-   (sent  (sensetion--get-sent-at-point))))
+  ;;  :where
+  
+  ;;  (globbed-sent (pcase sent
+  ;;                  ((cl-struct sensetion--sent ofs pos keys gloss)
+  ;;                   (sensetion--make-sent
+  ;;                    :ofs ofs
+  ;;                    :pos pos
+  ;;                    :keys keys
+  ;;                    :gloss gloss
+  ;;                    ;; :tokens globbed-tks
+  ;; 		     ))))
+  ;;  (globbed-tks (cl-loop
+  ;;                for tk in (sensetion--sent-tokens sent)
+  ;;                for i from 0
+  ;;                append (cond
+  ;;                        ((equal i (cl-first ixs))
+  ;;                         ;; insert glob before first token in the
+  ;;                         ;; collocation
+  ;;                         (list new-glob (glob-tk tk new-k)))
+  ;;                        ((cl-member i ixs)
+  ;;                         (list (glob-tk tk new-k)))
+  ;;                        (t
+  ;;                         (list tk)))))
+  ;;  (glob-tk (tk key)
+  ;;           (let ((cks (sensetion--tk-coll-keys tk)))
+  ;;             (setf (sensetion--tk-kind tk)
+  ;;                   (cl-list* :cf key cks))
+  ;;             ;; TODO: delete senses and make status "un"
+  ;;             tk))
+  ;;  (new-glob (sensetion--make-tk :lemma lemma :tag "un"
+  ;;                       :kind `("glob" . ,new-k) :glob "man"))
+  ;;  (ixs   (reverse (get-text-property (line-end-position) 'sensetion--to-glob)))
+  ;;  (new-k (char-to-string (1+ max-k)))
+  ;;  (max-k (max-key sent))
+  ;;  (max-key (sent)
+  ;;           (apply #'max
+  ;;                  (cons (string-to-char "`")
+  ;;                        ;; in case there are no other globs, use "`"
+  ;;                        ;; (which results in "a" being the key),
+  ;;                        ;; else get the maximum one
+  ;;                        (seq-mapcat (lambda (tk)
+  ;;                                      (when-let ((keys (sensetion--tk-coll-keys tk)))
+  ;;                                        (mapcar #'string-to-char keys)))
+  ;;                                    (sensetion--sent-tokens sent)))))
+  ;;  (sent  (sensetion--get-sent-at-point)))
+  )
 
 
 (defun sensetion--reinsert-sent-at-point (sent)
   "Delete current line, save SENT to its file, and insert SENT."
-  (let ((coord (sensetion--sent-coord-prop-at-point)))
-    (sensetion--save-sent sent coord))
-  (with-inhibiting-read-only
-   (atomic-change-group
-     (delete-region (line-beginning-position) (line-end-position))
-     (seq-let (line _) (sensetion--sent-colloc sent)
-       (insert line)))))
+  ;; (let ((coord (sensetion--sent-coord-prop-at-point)))
+  ;;   (sensetion--save-sent sent coord))
+  ;; (with-inhibiting-read-only
+  ;;  (atomic-change-group
+  ;;    (delete-region (line-beginning-position) (line-end-position))
+  ;;    (seq-let (line _) (sensetion--sent-colloc sent)
+  ;;      (insert line))))
+  )
 
 ;; TODO: when annotating glob, check if token is part of more than one
 ;; colloc
@@ -421,8 +406,7 @@ number of selected tokens."
         ;; stores selected glob tokens and their indices by their key;
         ;; this is used to highlight their constituent tokens and edit
         ;; them properly
-        (sel-keys (make-hash-table :test 'equal))
-        (ignoring?   nil))
+        (sel-keys (make-hash-table :test 'equal)))
     (cl-labels
         ((sel-tk-props (tk &optional ix)
                        (cl-list* 'sensetion--selected t
@@ -451,18 +435,16 @@ number of selected tokens."
                               (glob-selected?
                                (unless (cdr ckeys)
                                  ;; don't highlight token part of more than one colloc
-                                 (gethash (cl-first ckeys) sel-keys)))
-                              (punct-before? (and form-str
-                                                  (sensetion--punctuation-no-space-before? form-str))))
+                                 (gethash (cl-first ckeys) sel-keys))))
                          (when selected?
                            (cl-incf total)
                            (when (sensetion--tk-annotated? tk)
                              (cl-incf done)))
                          (pcase kind
-                           ((or :wf `(:cf . ,_))
+                           ((seq (or "wf" "cf"))
                             (concat
                              ;; spacing
-                             (if punct-before? "" " ")
+                             " "
                              ;; collocation index
                              (if ckeys
                                  (propertize (s-join "," ckeys)
@@ -475,20 +457,21 @@ number of selected tokens."
                                     form-str
                                     'sensetion--tk-ix ix
                                     (cond
-                                     (ignoring? nil)
                                      (glob-selected?
                                       (sel-tk-props (cdr glob-selected?)
                                                     (car glob-selected?)))
                                      (selected?
                                       (sel-tk-props tk))))
+			     ;; pos script
                              (if-let ((_ selected?)
-                                      (pos (or (sensetion--tk-sent-pos tk)
+                                      (pos (or (sensetion--tk-senses-pos tk)
                                                (sensetion--tk-pos tk))))
                                  (propertize pos
                                              'display '(raise 0.4)
                                              'invisible 'sensetion--scripts
                                              'face '(:height 0.6))
                                "")
+			     ;; sense scripts
                              (if-let ((_ (or selected?
                                              glob-selected?))
                                       (sks (if selected?
@@ -497,31 +480,23 @@ number of selected tokens."
                                  (propertize (s-join ","
                                                      (mapcar (lambda (sk)
                                                                (cl-first
-                                                                (gethash sk sensetion--sent-cache)))
+                                                                (gethash sk sensetion--synset-cache)))
                                                              sks))
                                              'display '(raise 0.4)
                                              'invisible 'sensetion--scripts
                                              'face '(:height 0.6))
                                "")))
-                           (`(:glob . ,glob-key)
+                           (`("glob" ,glob-key)
                             (prog1 ""
                               (when selected?
                                 (setf (gethash glob-key sel-keys) (cons ix tk)))))
-                           (:aux
-                            (if (eq (sensetion--tk-action tk) :close)
-                                (setf ignoring? nil)
-                              (when (eq (sensetion--tk-tag tk) :ignore)
-                                (setf ignoring? t)))
-                            "")
-                           ((or :qf :ex :mwf :def :classif) "")
+                           ((seq (or "aux" "qf" "ex" "mwf" "def" "classif")) "")
                            (_ (error "Token of kind %s does not exist" kind))))))
       ;;
       (let* ((tks        (sensetion--sent-tokens sent))
-             (tks-colloc (seq-map-indexed #'token-colloc tks))
-             (terms      (sensetion--sent-terms sent))
-             (pos        (sensetion--sent-pos sent)))
+             (tks-colloc (seq-map-indexed #'token-colloc tks)))
         (list
-         (apply #'concat "(" pos ") " (s-join "," terms) " |" tks-colloc)
+         (apply #'concat tks-colloc)
          (cons done total))))))
 
 
@@ -535,21 +510,13 @@ number of selected tokens."
    (tk-lemmas (sensetion--tk-lemmas tk))))
 
 
-(defun sensetion--tk-lemmas (tk)
-  (sensetion-is
-   (when lemma-str
-     (s-split "|" lemma-str t))
-   :where
-   (lemma-str (sensetion--tk-lemma tk))))
-
-
 (cl-defun sensetion--to-annotate? (tk &optional (lemma sensetion--lemma))
   (and (sensetion--tk-annotatable? tk)
        (sensetion--tk-has-lemma? tk lemma)
        (null (sensetion--tk-coll-keys tk))))
 
 
-(defun sensetion--tk-synset-pos (tk)
+(defun sensetion--tk-senses-pos (tk)
   "Get pos1 of synsets assigned to TK. If there is more than one
 synset and they have different pos1, return nil."
   (when-let* ((sks   (sensetion--tk-skeys tk))
@@ -580,17 +547,6 @@ synset and they have different pos1, return nil."
 
 (defun sensetion--selected? (point)
   (get-text-property point 'sensetion--selected))
-
-
-(defun sensetion--coordinates (coord)
-  (sensetion-is
-   (list
-    (f-join sensetion-annotation-dir fname)
-    line)
-   :where
-   (fname (concat fbase "." sensetion-annotation-file-type))
-   (line  (cdr coord))
-   (fbase (number-to-string (car coord)))))
 
 
 (defun sensetion--sent-coord-prop-at-point ()
@@ -664,13 +620,12 @@ terms defined by that synset, and the fourth is the gloss."
    options
    :where
    (index (synset)
-          (let ((pos (sensetion--synset-pos synset)))
-            (setf (gethash (lemma-sk lemma synset) options)
-                  (list (ix->hydra-key counter)
-                        (sensetion--synset-id synset)
-                        (sensetion--synset-terms synset)
-                        (sensetion--synset-gloss synset)))
-            (cl-incf counter)))
+          (setf (gethash (lemma-sk lemma synset) options)
+		(list (ix->hydra-key counter)
+		      (sensetion--synset-id synset)
+		      (sensetion--synset-terms synset)
+		      (sensetion--synset-gloss synset)))
+	  (cl-incf counter))
    (ix->hydra-key (ix)
                   (format "%s"
                           (if (< ix 9)
@@ -683,11 +638,11 @@ terms defined by that synset, and the fourth is the gloss."
    (counter 0)
    (lemma-sk (lemma synset)
              (or
-              (car (cl-find lemma (cl-mapcar #'cons (sensetion--synset-keys synset) (sensetion--synset-lemmas synset))
+              (car (cl-find lemma (cl-mapcar #'cons (sensetion--synset-keys synset) (sensetion--synset-terms synset))
 			    :test #'equal :key #'cdr))
               (error "No matching sensekey for lemma %s in synset %s-%s"
                      lemma (sensetion--synset-ofs synset) (sensetion--synset-pos synset))))
-   (synsets  (cl-sort (sensetion--es-lemma->synsets lemma pos) #'< :key #'sensetion--synset-ofs)) ;FIXME
+   (synsets  (cl-sort (sensetion--es-lemma->synsets lemma pos) #'< :key #'sensetion--synset-ofs))
    (options  (or options (make-hash-table :test 'equal :size 30)))
    (lemma    (cl-substitute (string-to-char " ")
                             (string-to-char "_")

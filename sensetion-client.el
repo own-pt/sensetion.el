@@ -6,6 +6,7 @@
 (require 'map)
 (require 'seq)
 
+(require 'sensetion-data)
 (require 'sensetion-utils)
 
 
@@ -47,12 +48,13 @@
 
 
 (defun sensetion--es-get-sents (lemma &optional pos)
-  (if pos
-      (sensetion--es-lemma-pos->sents lemma pos)
-    (sensetion--lemma->sents lemma)))
+  (let ((docs (if pos
+		  (sensetion--es-lemma-pos->sents lemma pos)
+		(sensetion--lemma->sents lemma))))
+    (mapcar #'sensetion--alist->sent docs)))
 
 
-(defun sensetion--es-lemma-pos->sents (lemma pos)
+(defun sensetion--es-lemma-pos->docs (lemma pos)
   (let* ((template "{\"query\": {\"nested\": {\"query\": {\"regexp\":
                     {\"token.lemmas\": \"%s(%%%s)?\"}}, \"path\": \"token\" }}}")
 	 (query (format template lemma (sensetion--pos->synset-type pos)))
@@ -60,7 +62,7 @@
     hits))
 
 
-(defun sensetion--es-lemma->sents (lemma)
+(defun sensetion--es-lemma->docs (lemma)
   (let* ((template "{\"query\": {\"nested\": {\"path\": \"token\",
                        \"query\": {\"regexp\": {\"token.lemmas\": \"%s(%%[1-4])?\"}}}}}")
 	 (query (format template lemma))

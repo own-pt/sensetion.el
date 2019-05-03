@@ -2,11 +2,12 @@
 (eval-when-compile (require 'cl-lib))
 (require 'cl-lib)
 (require 'map)
+(require 's)
 
 ;; TODO: maybe use maps all the way
 (cl-defstruct (sensetion--tk (:constructor nil)
                     (:constructor sensetion--make-tk))
-  kind form lemmas tag senses glob unsure meta)
+  kind form lemmas pos tag senses glob unsure meta)
 
 
 (cl-defstruct (sensetion--synset (:constructor nil)
@@ -19,29 +20,23 @@
   id meta tokens text)
 
 
-(defmacro sensetion--mk-struct-arglist (alist st-fields &optional al-fields)
-  `(list
-    ,@(cl-mapcan
-       (lambda (st-field al-field)
-	 (list (intern (concat ":" (symbol-name st-field)))
-	       `(map-elt ,alist ',al-field nil #'eq)))
-       st-fields (or al-fields st-fields))))
-
-
 (defun sensetion--alist->synset (alist)
-  (apply #'sensetion--make-synset (sensetion--mk-struct-arglist alist (ofs pos keys terms gloss))))
+  (pcase alist
+    ((map ofs pos keys terms gloss)
+     (sensetion--make-synset :ofs ofs :pos pos :keys keys :terms terms :gloss gloss))))
 
 
 (defun sensetion--alist->sent (alist)
-  (apply #'sensetion--make-sent
-	 (sensetion--mk-struct-arglist alist (id meta tokens text) (id meta token raw-text))))
+  (pcase alist
+    ((map id meta token raw-text)
+     (sensetion--make-sent :id id :meta meta :tokens (mapcar #'sensetion--alist->tk token) :text raw-text))))
 
 
 (defun sensetion--alist->tk (alist)
-  (apply #'sensetion--make-tk
-	 (sensetion--mk-struct-arglist
-	  alist
-	  (kind form lemmas tag senses glob unsure meta))))
+  (pcase alist
+    ((map kind form lemmas pos tag senses glob unsure meta)
+     (sensetion--make-tk :kind (s-split ":" kind t) :form form :lemmas lemmas :pos pos
+		:tag tag :senses senses :glob glob :unsure unsure :meta meta))))
 
 
 (defun sensetion--sent->alist (sent)
@@ -58,13 +53,14 @@
 
 (defun sensetion--tk->alist (tk)
   (pcase tk
-    ((cl-struct sensetion--tk kind form lemmas tag senses glob unsure meta)
+    ((cl-struct sensetion--tk kind form lemmas pos tag senses glob unsure meta)
      (cl-mapcan
       (lambda (k v) (when v (cons k v)))
-      '(kind form lemma tag senses glob unsure)
-      (list kind
+      '(kind form lemmas pos tag senses glob unsure)
+      (list (s-join ":" kind)
 	    form
             lemmas
+	    pos
 	    ;; "man-now" is a virtual token status, shouldn't be
             ;; written to file
             (if (equal tag "man-now")
