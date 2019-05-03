@@ -11,8 +11,14 @@ This project intends to finish the word-sense annotations of the
 
 
 * Installation
+
 See the =INSTALL= file.
 
+* Customization
+
+- sensetion-sense-menu-show-synset-id :: set this variable to =true=
+     to show the synset ids in the list of synsets during the
+     annotation.
 
 * Usage
 Use =M-x sensetion= to start annotating. If this is the first time you
