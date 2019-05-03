@@ -72,7 +72,7 @@ A cons cell in the same format as `sensetion--global-status'.")
     (define-key map "m" #'sensetion-toggle-glob-mark)
     (define-key map "g" #'sensetion-glob)
     (define-key map "v" #'sensetion-toggle-scripts)
-    (define-key map "." #'sensetion-edit-synset)
+    (define-key map "." #'sensetion-edit-sent)
     (define-key map "?" #'sensetion-edit-unsure)
     (define-key map "i" #'sensetion-edit-ignore)
     (define-key map [C-down] #'sensetion-move-line-down)
@@ -135,10 +135,11 @@ with low confidence."
   :risky t)
 
 
-(define-derived-mode sensetion-mode fundamental-mode "sensetion"
+(define-derived-mode sensetion-mode special-mode "sensetion"
   "sensetion-mode is a major mode for annotating senses."
+  :group 'sensetion
   (setq-local sentence-end ".$$") ;; to be able to use M-a and M-e to jump
-  (setq-local buffer-read-only t)
+  ;; (setq-local buffer-read-only t)
   (visual-line-mode 1)
   (setq-local buffer-invisibility-spec nil)
   (setq-local minor-mode-alist nil)
@@ -151,10 +152,6 @@ with low confidence."
 
 (defun sensetion--mode-line-status-text ()
   (concat "sensetion"
-          ;; (if sensetion--global-status
-          ;;     (cl-destructuring-bind (done . total) sensetion--global-status
-          ;;       (format "|:%.0f%%" (* 100 (/ (float done) total))))
-          ;;   "")
           (if sensetion--local-status
               (cl-destructuring-bind (done . total) sensetion--local-status
                 (format ":%.0f/%.0f" done total))
@@ -162,29 +159,7 @@ with low confidence."
 
 
 ;;;###autoload
-(defun sensetion ()
-  (interactive)
-  (add-hook 'kill-emacs-hook
-            (lambda ()
-              (sensetion--write-state)))
-  (if sensetion--index
-      (call-interactively #'sensetion-annotate)
-      (if (and (f-exists? sensetion-index-file) (f-exists? sensetion-status-file))
-          (progn
-            (sensetion--read-state)
-            (call-interactively #'sensetion-annotate))
-        (sensetion-make-state sensetion-annotation-dir
-                     (sensetion--done-indexing-messager)))))
-
-
-(cl-defun sensetion--annotation-files (&optional (anno-dir sensetion-annotation-dir))
-  (f-files anno-dir
-           (lambda (f) (equal (f-ext f) sensetion-annotation-file-type))))
-
-
-(defun sensetion--check-index-nonnil ()
-  (unless sensetion--index
-    (user-error "Index is missing. Have you run `M-x sensetion`? If yes, please check your annotation files and call `M-x sensetion-make-index`. If none of that works, report the bug")))
+(defalias 'sensetion #'sensetion-annotate)
 
 
 (defun sensetion-annotate (lemma &optional pos)
@@ -192,9 +167,6 @@ with low confidence."
    (list (completing-read "Lemma to annotate: " sensetion--completion-function)
          (ido-completing-read "PoS tag? " '("a" "r" "v" "n" "any") nil t nil nil "any")))
   (unless lemma (user-error "Must provide lemma"))
-  (sensetion--check-index-nonnil)
-  ;; using regexp just to get all pos combinations
-  ;; TODO: add $ to regexp (there's no need, I think)
   (sensetion-is
    (unless matches
      (if pos
@@ -209,15 +181,12 @@ with low confidence."
      (sensetion--beginning-of-buffer))
    (pop-to-buffer result-buffer)
    :where
-   (matches (progn (trie-regexp-search sensetion--index regexp
-                                       nil nil nil filter-fn)
-                   (funcall filter-fn)))
-   (filter-fn (sensetion--regexp-search-filter-fn))
    (result-buffer (generate-new-buffer
                    (sensetion--create-buffer-name lemma pos)))
-   (regexp (if (equal pos "any")
-               (concat lemma "%?[1234]?")
-             (concat lemma "%?" (sensetion--pos->synset-type pos) "?")))))
+   (matches (if pos 
+		(sensetion--es-lemma->sents lemma)
+		(sensetion--es-lemma-pos->sents lemma pos)))
+   (pos (unless (equal pos "any") pos))))
 
 
 (defun sensetion--regexp-search-filter-fn ()
@@ -245,61 +214,20 @@ other the unique values."
   (format "*%s@%s@%s*" sensetion-output-buffer-name (or pos "") lemma))
 
 
-(defun sensetion--get-synsets (coords)
-  (mapcar #'cl-second (sensetion--get-coords-synsets coords)))
-
-(defun sensetion--get-coords-synsets (coords)
-  (sensetion-is
-   (mapcan (lambda (gr)
-             (go (cl-first gr)
-                 (srt-lines gr)))
-           coords-by)
-   :where
-   (srt-lines (gr)
-              (sort (mapcar #'cl-second (cl-rest gr)) #'<))
-   (go (fp lines)
-       (with-temp-buffer
-         (insert-file-contents fp)
-         (cl-loop for curr in lines
-                  for prev in (cons 0 lines)
-                  collect
-                  (progn
-                    (sensetion--goto-line curr prev)
-                    (let ((plist (read (thing-at-point 'line t))))
-                      (list (cons (sensetion--filename->ix fp) curr) (sensetion--plist->synset plist)))))))
-   (coords-by (seq-group-by #'car coords))
-   (coords (mapcar #'sensetion--coordinates coords))))
-
-
-(defun sensetion--get-synset (coord)
-  (cl-first (sensetion--get-synsets (list coord))))
-
-
-(defun sensetion--get-synset-at-point ()
-  (sensetion-is
-   (unless coord
-     (user-error "Not at synset line"))
-   (sensetion--get-synset coord)
-   :where
-   (coord (sensetion--synset-coord-prop-at-point))))
-
-
 (defun sensetion--make-collocations (matches)
   "Insert MATCHES at current buffer, return status."
   (sensetion-is
    (cl-mapc #'go c-syns)
    (cons done total)
    :where
-   (go (coord-synset)
-       (seq-let (coord synset) coord-synset
-           (seq-let (tokens-line status)
-               (sensetion--synset-colloc synset sensetion--lemma)
-             (insert tokens-line
-                     ;; no need to add it all the time
-                     (propertize "\n" 'sensetion--synset-coord coord))
+   (go (sent)
+       (seq-let (tokens-line status)
+           (sensetion--sent-colloc sent sensetion--lemma)
+         (insert tokens-line
+                 ;; no need to add it all the time
+                 (propertize "\n"))
              (cl-incf done (car status))
-             (cl-incf total (cdr status)))))
-   (c-syns (sensetion--get-coords-synsets matches))
+             (cl-incf total (cdr status))))
    (total   0)
    (done    0)))
 
@@ -310,30 +238,30 @@ other the unique values."
      k)))
 
 
-;; TODO: unglobbing (or any kind of editing that calls synset-colloc)
+;; TODO: unglobbing (or any kind of editing that calls sent-colloc)
 ;; turns just annotated tokens into previously annotated tokens
-(defun sensetion-unglob (ix synset)
-  "If token of index IX in SYNSET at point is part of collocation,
+(defun sensetion-unglob (ix sent)
+  "If token of index IX in SENT at point is part of collocation,
 unglob it and reinsert the sentence in the buffer.
 
 Unglobbing means making all tokens in the collocation normal
 tokens, and removing the glob token corresponding to the
 collocation."
   (interactive (list (sensetion--tk-ix-prop-at-point)
-                     (sensetion--get-synset-at-point)))
+                     (sensetion--get-sent-at-point)))
   ;; (sensetion-is
   ;;  (unless ck
   ;;    (user-error "Token is not part of a collocation"))
   ;;  (when (cdr ckeys)
   ;;    (user-error "Please select token which is part of only one collocation"))
-  ;;  (sensetion--reinsert-synset-at-point (unglob ck synset))
+  ;;  (sensetion--reinsert-sent-at-point (unglob ck sent))
    
   ;;  :where
 
-  ;;  (unglob (ck synset)
-  ;;          (pcase synset
-  ;;            ((cl-struct sensetion--synset ofs pos keys gloss tokens)
-  ;;             (sensetion--make-synset
+  ;;  (unglob (ck sent)
+  ;;          (pcase sent
+  ;;            ((cl-struct sensetion--sent ofs pos keys gloss tokens)
+  ;;             (sensetion--make-sent
   ;;              :ofs ofs
   ;;              :pos pos
   ;;              :keys keys
@@ -364,7 +292,7 @@ collocation."
   ;;  ;; TODO: select which colloc to undo?
   ;;  (ck (cl-first ckeys))
   ;;  (ckeys (sensetion--tk-coll-keys tk))
-  ;;  (tk (elt (sensetion--synset-tokens synset) ix)))
+  ;;  (tk (elt (sensetion--sent-tokens sent) ix)))
   )
 
 
@@ -414,18 +342,18 @@ LEMMA.
 You can mark/unmark tokens with `sensetion-toggle-glob-mark'."
   (interactive (list
                 (completing-read "Lemma to annotate: " sensetion--completion-function)))
-  (sensetion--index-lemmas sensetion--index lemma (sensetion--synset-coord-prop-at-point))
+  (sensetion--index-lemmas sensetion--index lemma (sensetion--sent-coord-prop-at-point))
   (sensetion-is
-   (sensetion--reinsert-synset-at-point globbed-synset)
+   (sensetion--reinsert-sent-at-point globbed-sent)
    (with-inhibiting-read-only
     (put-text-property (line-end-position) (1+ (line-end-position))
                        'sensetion--to-glob nil))
 
    :where
    
-   (globbed-synset (pcase synset
-                   ((cl-struct sensetion--synset ofs pos keys gloss)
-                    (sensetion--make-synset
+   (globbed-sent (pcase sent
+                   ((cl-struct sensetion--sent ofs pos keys gloss)
+                    (sensetion--make-sent
                      :ofs ofs
                      :pos pos
                      :keys keys
@@ -433,7 +361,7 @@ You can mark/unmark tokens with `sensetion-toggle-glob-mark'."
                      ;; :tokens globbed-tks
 		     ))))
    (globbed-tks (cl-loop
-                 for tk in (sensetion--synset-tokens synset)
+                 for tk in (sensetion--sent-tokens sent)
                  for i from 0
                  append (cond
                          ((equal i (cl-first ixs))
@@ -454,8 +382,8 @@ You can mark/unmark tokens with `sensetion-toggle-glob-mark'."
                         :kind `(:glob . ,new-k) :glob "man"))
    (ixs   (reverse (get-text-property (line-end-position) 'sensetion--to-glob)))
    (new-k (char-to-string (1+ max-k)))
-   (max-k (max-key synset))
-   (max-key (synset)
+   (max-k (max-key sent))
+   (max-key (sent)
             (apply #'max
                    (cons (string-to-char "`")
                          ;; in case there are no other globs, use "`"
@@ -464,26 +392,26 @@ You can mark/unmark tokens with `sensetion-toggle-glob-mark'."
                          (seq-mapcat (lambda (tk)
                                        (when-let ((keys (sensetion--tk-coll-keys tk)))
                                          (mapcar #'string-to-char keys)))
-                                     (sensetion--synset-tokens synset)))))
-   (synset  (sensetion--get-synset-at-point))))
+                                     (sensetion--sent-tokens sent)))))
+   (sent  (sensetion--get-sent-at-point))))
 
 
-(defun sensetion--reinsert-synset-at-point (synset)
-  "Delete current line, save SYNSET to its file, and insert SYNSET."
-  (let ((coord (sensetion--synset-coord-prop-at-point)))
-    (sensetion--save-synset synset coord))
+(defun sensetion--reinsert-sent-at-point (sent)
+  "Delete current line, save SENT to its file, and insert SENT."
+  (let ((coord (sensetion--sent-coord-prop-at-point)))
+    (sensetion--save-sent sent coord))
   (with-inhibiting-read-only
    (atomic-change-group
      (delete-region (line-beginning-position) (line-end-position))
-     (seq-let (line _) (sensetion--synset-colloc synset)
+     (seq-let (line _) (sensetion--sent-colloc sent)
        (insert line)))))
 
 ;; TODO: when annotating glob, check if token is part of more than one
 ;; colloc
 
-(cl-defun sensetion--synset-colloc (synset &optional (lemma sensetion--lemma))
+(cl-defun sensetion--sent-colloc (sent &optional (lemma sensetion--lemma))
   "Return a list whose first element is a propertized string
-representing SYNSET's tokens for display in sensetion buffer, and
+representing SENT's tokens for display in sensetion buffer, and
 whose second element is a status pair, whose car is the number of
 selected tokens already annotated and whose cdr is the total
 number of selected tokens."
@@ -554,7 +482,7 @@ number of selected tokens."
                                      (selected?
                                       (sel-tk-props tk))))
                              (if-let ((_ selected?)
-                                      (pos (or (sensetion--tk-synset-pos tk)
+                                      (pos (or (sensetion--tk-sent-pos tk)
                                                (sensetion--tk-pos tk))))
                                  (propertize pos
                                              'display '(raise 0.4)
@@ -569,7 +497,7 @@ number of selected tokens."
                                  (propertize (s-join ","
                                                      (mapcar (lambda (sk)
                                                                (cl-first
-                                                                (gethash sk sensetion--synset-cache)))
+                                                                (gethash sk sensetion--sent-cache)))
                                                              sks))
                                              'display '(raise 0.4)
                                              'invisible 'sensetion--scripts
@@ -588,10 +516,10 @@ number of selected tokens."
                            ((or :qf :ex :mwf :def :classif) "")
                            (_ (error "Token of kind %s does not exist" kind))))))
       ;;
-      (let* ((tks        (sensetion--synset-tokens synset))
+      (let* ((tks        (sensetion--sent-tokens sent))
              (tks-colloc (seq-map-indexed #'token-colloc tks))
-             (terms      (sensetion--synset-terms synset))
-             (pos        (sensetion--synset-pos synset)))
+             (terms      (sensetion--sent-terms sent))
+             (pos        (sensetion--sent-pos sent)))
         (list
          (apply #'concat "(" pos ") " (s-join "," terms) " |" tks-colloc)
          (cons done total))))))
@@ -665,8 +593,8 @@ synset and they have different pos1, return nil."
    (fbase (number-to-string (car coord)))))
 
 
-(defun sensetion--synset-coord-prop-at-point ()
-  (get-char-property (line-end-position) 'sensetion--synset-coord))
+(defun sensetion--sent-coord-prop-at-point ()
+  (get-char-property (line-end-position) 'sensetion--sent-coord))
 
 
 (cl-defun sensetion--tk-ix-prop-at-point (&optional (point (point)))
@@ -675,85 +603,6 @@ synset and they have different pos1, return nil."
        (user-error "No token at point"))
    :where
    (ix (get-char-property point 'sensetion--tk-ix))))
-
-(defalias 'sensetion-make-index #'sensetion-make-state)
-
-(defun sensetion-make-state (anno-dir callback)
-  "Read annotated files and build index of lemmas* and their
-positions, plus global status."
-  (interactive
-   (list (or sensetion-annotation-dir
-             (read-file-name "Path to annotation directory: " nil nil t))
-         (sensetion--done-indexing-messager)))
-  (if sensetion--index-lock
-      (user-error "Indexing process already started; please wait while it finishes")
-    (message "Please wait while we index files; a box will pop up when finished.")
-    (atomic-change-group
-      (setq sensetion--index-lock t)
-      (async-start `(lambda ()
-                      ,(async-inject-variables (regexp-opt '("load-path" "sensetion-index-file" "sensetion-status-file" "sensetion-annotation-file-type")))
-                      (require 'sensetion)
-                      (seq-let (index lemma->synsets status)
-                          (sensetion--make-state (sensetion--annotation-files ,anno-dir))
-                        (sensetion--write-state :index index
-                                       :status status
-                                       :lemma->synsets lemma->synsets)
-                        t))
-                   (lambda (x)
-                     (sensetion--read-state)
-                     (setq sensetion--index-lock nil)
-                     (funcall callback x))))))
-
-
-(defun sensetion--done-indexing-messager ()
-  (lambda (_)
-    (message-box "Done indexing files. You may call `sensetion-annotate' now")))
-
-
-(defun sensetion--make-state (files)
-  "Read annotated files and build index associating lemmas* to
-where synset-ids (and thus files) where they appear. Also
-builds the status (how many tokens have been annotated so far)."
-  (let ((index            (make-trie #'<))
-        (lemma->synsets   (make-trie #'<))
-        (annotatable       0)
-        (annotated         0))
-    (cl-labels
-        ((run (f)
-              (sensetion--map-file-lines f
-                           (lambda (lno l)
-                             (index-synset (sensetion--filename->ix f)
-                                           lno
-                                           (sensetion--plist->synset (read l))))))
-
-         (index-synset (ix lno synset)
-                       (let ((coord (cons ix lno))
-                             (terms (sensetion--synset-terms synset))
-                             (tokens (sensetion--synset-tokens synset)))
-                         (mapc (lambda (term)
-                                 (trie-insert lemma->synsets
-                                              term
-                                              (list coord)
-                                              #'append))
-                               terms)
-                         (mapc (apply-partially #'index-token coord)
-                               tokens)))
-
-         (index-token (coord tk)
-                      (when (sensetion--tk-annotatable? tk)
-                        (cl-incf annotatable)
-                        (let ((lemma (sensetion--tk-lemma tk)))
-                          (unless lemma
-                            (user-error "No lemma for tk %s at file %s, line %s"
-                                        (sensetion--tk->plist tk)
-                                        (car coord)
-                                        (cdr coord)))
-                          (sensetion--index-lemmas index lemma coord))
-                        (when (sensetion--tk-annotated? tk)
-                          (cl-incf annotated)))))
-      ;;
-      (mapc #'run files)
-      (list index lemma->synsets (cons annotated annotatable)))))
 
 
 (defun sensetion--index-lemmas (index lemmas-str coord)
@@ -788,33 +637,6 @@ present in SYNSET's tokens."
            status
            '("man" "man-now" "un" "auto"))
       status)))
-
-
-(cl-defun sensetion--write-state (&key (index sensetion--index)
-                              (status sensetion--global-status)
-                              (lemma->synsets sensetion--lemma->synsets))
-  (let ((print-circle t))
-    (with-temp-file sensetion-index-file
-      (prin1 index (current-buffer))
-      (prin1 lemma->synsets (current-buffer))))
-  (f-write (with-output-to-string (prin1 status))
-           'utf-8
-           sensetion-status-file)
-  t)
-
-
-(defun sensetion--read-state ()
-  "Read index from `sensetion-index-file', and set
-`sensetion--index'. Read status from `sensetion-status-file' and
-set `sensetion--global-status'. "
-  ;; TODO: benchmark if f-read is faster (if needed)
-  (with-temp-message "Reading index"
-    (with-temp-buffer
-      (insert-file-contents sensetion-index-file)
-      (setq sensetion--index (read (current-buffer)))
-      (setq sensetion--lemma->synsets (read (current-buffer))))
-    (setq sensetion--global-status (read (f-read-text sensetion-status-file))))
-  t)
 
 
 (defun sensetion--pos->synset-type (pos)
@@ -867,24 +689,14 @@ terms defined by that synset, and the fourth is the gloss."
                      lemma (sensetion--synset-ofs synset) (sensetion--synset-pos synset))))
    (synsets  (cl-sort (sensetion--es-lemma->synsets lemma pos) #'< :key #'sensetion--synset-ofs)) ;FIXME
    (options  (or options (make-hash-table :test 'equal :size 30)))
-   (lemma (cl-substitute (string-to-char " ")
-                         (string-to-char "_")
-                         lemma))))
+   (lemma    (cl-substitute (string-to-char " ")
+                            (string-to-char "_")
+                            lemma))))
 
 
 (defun sensetion--tk-annotated? (tk)
   (member (sensetion--tk-tag tk)
           '("man" "auto" "man-now")))
-
-
-(defun sensetion--save-synset (synset coord)
-  (seq-let (fp line) (sensetion--coordinates coord)
-    (with-temp-file fp
-      (insert-file-contents fp)
-      (forward-line line)
-      (atomic-change-group
-        (delete-region (line-beginning-position) (line-end-position))
-        (prin1 (sensetion--synset->plist synset) (current-buffer))))))
 
 
 ;; TODO: refactor prop names as variables

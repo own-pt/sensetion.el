@@ -16,7 +16,7 @@
 
 (cl-defstruct (sensetion--sent (:constructor nil)
 		      (:constructor sensetion--make-sent))
-  meta tokens text)
+  id meta tokens text)
 
 
 (defmacro sensetion--mk-struct-arglist (alist st-fields &optional al-fields)
@@ -34,7 +34,7 @@
 
 (defun sensetion--alist->sent (alist)
   (apply #'sensetion--make-sent
-	 (sensetion--mk-struct-arglist alist (meta tokens text) (meta token raw-text))))
+	 (sensetion--mk-struct-arglist alist (id meta tokens text) (id meta token raw-text))))
 
 
 (defun sensetion--alist->tk (alist)
@@ -46,11 +46,12 @@
 
 (defun sensetion--sent->alist (sent)
   (pcase sent
-    ((cl-struct sensetion--sent meta tokens text)
+    ((cl-struct sensetion--sent id meta tokens text)
      (cl-mapcan
       (lambda (k v) (when v (cons k v)))
       '(meta tokens text)
-      (list meta
+      (list id
+	    meta
 	    (mapcar #'sensetion--tk->alist tokens)
 	    text)))))
 

@@ -20,12 +20,24 @@
 	     (synset->json plist synset-out)
 	     (sentence->json plist out))))))
 
+
+(defun index-json (id out)
+  (yason:encode
+   (alexandria:alist-hash-table
+    `(("index" . ,(alexandria:alist-hash-table `(("_id" . ,id)) :test 'equal))) :test 'equal)
+   out)
+  (terpri out))
+
+(defun ofs-pos->synset-id (ofs pos)
+  (format nil "~a-~a" ofs pos))
+
+
 (defun synset->json (plist out)
-  (index-json out)
   (let ((ofs (read-from-string (getf plist :ofs)))
 	(pos (getf plist :pos))
 	(keys-lemmas (getf plist :keys))
 	(gloss (getf plist :gloss)))
+    (index-json (ofs-pos->synset-id ofs pos) out)
     (yason:encode
      (alexandria:alist-hash-table
       `(("ofs" . ,ofs)
@@ -37,28 +49,21 @@
      out)
     (terpri out)))
 
-(defun index-json (out)
-  (yason:encode
-   (alexandria:alist-hash-table
-    `(("index" . ,(make-hash-table :test 'equal))) :test 'equal)
-   out)
-  (terpri out))
 
 (defun sentence->json (plist out)
-  (index-json out)
   (let ((ofs (read-from-string (getf plist :ofs)))
 	(pos (getf plist :pos))
 	(tokens (getf plist :tokens))
 	(gloss (getf plist :gloss)))
-    (yason:encode
-     (alexandria:alist-hash-table
-      `(("meta" . ,(alexandria:alist-hash-table
-		    `(("ofs" . ,ofs)
-		      ("pos" . ,pos)) :test 'equal))
-	("token" . ,(mapcar #'token->json tokens))
-	("raw_text" . ,gloss))
-      :test 'equal)
-     out)
+    (let ((id (ofs-pos->synset-id ofs pos)))
+      (index-json id out)
+      (yason:encode
+       (alexandria:alist-hash-table
+	`(("id" . ,id)
+	  ("token" . ,(mapcar #'token->json tokens))
+	  ("raw_text" . ,gloss))
+	:test 'equal)
+       out))
     (terpri out)))
 
 (defun symbol->string (sym)

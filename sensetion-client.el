@@ -53,9 +53,17 @@
 
 
 (defun sensetion--es-lemma-pos->sents (lemma pos)
-  (let* ((template "{\"query\": {\"nested\": {\"query\": {\"term\":
-                    {\"token.lemmas\": \"%s%%%s\"}}, \"path\": \"token\" }}}")
+  (let* ((template "{\"query\": {\"nested\": {\"query\": {\"regexp\":
+                    {\"token.lemmas\": \"%s(%%%s)?\"}}, \"path\": \"token\" }}}")
 	 (query (format template lemma (sensetion--pos->synset-type pos)))
+	 (hits (sensetion--es-request "docs/_search" query)))
+    hits))
+
+
+(defun sensetion--es-lemma->sents (lemma)
+  (let* ((template "{\"query\": {\"nested\": {\"path\": \"token\",
+                       \"query\": {\"regexp\": {\"token.lemmas\": \"%s(%%[1-4])?\"}}}}}")
+	 (query (format template lemma))
 	 (hits (sensetion--es-request "docs/_search" query)))
     hits))
 

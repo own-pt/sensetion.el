@@ -105,7 +105,7 @@ Content-Type: application/json
     }
 }
 
-# lemma -> sents
+# prefix lemma -> sents
 GET http://localhost:9200/docs/_search
 Content-Type: application/json
 
@@ -122,8 +122,30 @@ Content-Type: application/json
     }
 }
 
+# regexp lemma -> sents
+GET http://localhost:9200/docs/_search
+Content-Type: application/json
 
+{
+    "query": {
+        "nested": {
+            "path": "token",
+            "query": {
+                "regexp": {
+                    "token.lemmas": "rock(%[1-4])?"
+                }
+            }
+        }
+    }
+}
+
+
+# synsets stats
+GET http://localhost:9200/synsets/_stats
+Content-Type: application/json
 
 # docs stats
 GET http://localhost:9200/docs/_stats
 Content-Type: application/json
+
+
