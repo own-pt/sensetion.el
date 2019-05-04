@@ -78,4 +78,9 @@ itself."
                  str))
 
 
+(defsubst put-text-property-eol (property value &optional object)
+  (put-text-property (line-end-position) (1+ (line-end-position))
+		     property value object))
+
+
 (provide 'sensetion-utils)

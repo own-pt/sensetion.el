@@ -95,6 +95,18 @@
           (sensetion--synset-pos synset)))
 
 
+(defun sensetion--make-lemma* (lemma &optional synset-type)
+  (if synset-type
+      (concat lemma "%" synset-type)
+    lemma))
+
+
+(defun sensetion--lemma*->lemma (lemma*)
+  (let ((st (sensetion--lemma*->st lemma*)))
+    (if st
+        (substring lemma* 0 (- (length lemma*) 2))
+      lemma*)))
+
 (defun sensetion--lemma*->st (lemma*)
   (let ((len (length lemma*)))
     (when (and (> len 1) (= (elt lemma* (- len 2)) (string-to-char "%")))

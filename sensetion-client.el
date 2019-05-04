@@ -35,8 +35,8 @@
   ;; TODO: FIXME
   (let* ((template "{\"query\":{\"prefix\" : { \"terms\" : \"%s\" }}}")
 	 (hits (sensetion--es-request "_search" (format  template prefix)))
-	 (terms (seq-mapcat (lambda (doc) (map-elt doc 'terms)) docs)))
-    (seq-filter (lambda (lemma) (string-prefix-p prefix lemma t)) terms)))
+	 (terms (seq-mapcat (lambda (doc) (map-elt doc 'terms)) hits)))
+    (seq-subseq (seq-filter (lambda (lemma) (string-prefix-p prefix lemma t)) terms) 0 limit)))
 
 
 (defun sensetion--es-lemma->synsets (lemma pos)
@@ -49,8 +49,8 @@
 
 (defun sensetion--es-get-sents (lemma &optional pos)
   (let ((docs (if pos
-		  (sensetion--es-lemma-pos->sents lemma pos)
-		(sensetion--lemma->sents lemma))))
+		  (sensetion--es-lemma-pos->docs lemma pos)
+		(sensetion--es-lemma->docs lemma))))
     (mapcar #'sensetion--alist->sent docs)))
 
 
