@@ -172,7 +172,7 @@ with low confidence."
 
 (defun sensetion-annotate (lemma &optional pos)
   (interactive
-   (list (completing-read "Lemma to annotate: " sensetion--completion-function)
+   (list (sensetion--completing-read-lemma)
          (ido-completing-read "PoS tag? " '("a" "r" "v" "n" "any") nil t nil nil "any")))
   (unless lemma (user-error "Must provide lemma"))
   (sensetion-is
@@ -328,8 +328,8 @@ LEMMA.
 
 You can mark/unmark tokens with `sensetion-toggle-glob-mark'."
   (interactive (list
-                (completing-read "Lemma to annotate: " sensetion--completion-function)
-		(ido-completing-read "PoS tag? " '("a" "r" "v" "n") nil t nil nil)))
+                (sensetion--completing-read-lemma)
+		(sensetion--completing-read-pos)))
   (sensetion-is
    (sensetion--reinsert-sent-at-point globbed-sent)
    (with-inhibiting-read-only
@@ -560,15 +560,6 @@ synset and they have different pos1, return nil."
    (ix (get-char-property point 'sensetion--tk-ix))))
 
 
-(defun sensetion--index-lemmas (index lemmas-str coord)
-  ;; lemmas* might be pure ("love") or have pos annotation ("love%2"),
-  ;; but we don't care about it here; when retrieving we gotta take
-  ;; care of this.
-  (mapc (lambda (lemma)
-          (trie-insert index lemma (list coord) #'append))
-        (s-split "|" lemmas-str t)))
-
-
 (defun sensetion--tk-annotatable? (tk)
   ;; TODO: make status keywords
   (let ((status (sensetion--tk-tag tk)))
@@ -625,7 +616,7 @@ terms defined by that synset, and the fourth is the gloss."
 			    :test #'equal :key #'cdr))
               (error "No matching sensekey for lemma %s in synset %s-%s"
                      lemma (sensetion--synset-ofs synset) (sensetion--synset-pos synset))))
-   (synsets  (cl-sort (sensetion--es-lemma->synsets lemma pos) #'< :key #'sensetion--synset-ofs))
+   (synsets  (cl-sort (sensetion--es-lemma->synsets lemma pos) #'string< :key #'sensetion--synset-id))
    (options  (or options (make-hash-table :test 'equal :size 30)))
    (lemma    (cl-substitute (string-to-char " ")
                             (string-to-char "_")

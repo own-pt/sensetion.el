@@ -1,24 +1,31 @@
 ;;; sensetion.el --- -*- lexical-binding: t; -*-
+(require 'ido)
 (require 'sensetion-data)
 
 
 (defalias 'sensetion-edit #'sensetion-annotate)
 
-(defun sensetion-edit-sense (lemma ix pos synset)
+
+(defun sensetion--completing-read-pos ()
+  (ido-completing-read "Token PoS tag: "
+		       '("n" "v" "a" "r")
+                       nil t nil nil))
+
+
+(defun sensetion-edit-sense (lemma ix pos sent)
   (interactive (list (buffer-local-value 'sensetion--lemma (current-buffer))
                      (or (get-char-property (point) 'sensetion--glob-ix)
                          (sensetion--tk-ix-prop-at-point))
-                     (ido-completing-read "Token PoS tag: " '("n" "v" "a" "r")
-                                          nil t nil nil)
-                     (sensetion--get-synset-at-point)))
+                     (sensetion--completing-read-pos)
+                     (sensetion--get-sent-at-point)))
   (unless (sensetion--selected? (point))
     (user-error "Token at point not selected for annotation"))
   (unless lemma
     (error "No local sensetion--lemma; please report bug"))
-  (sensetion--edit-sense lemma pos ix synset))
+  (sensetion--edit-sense lemma pos ix sent))
 
 
-(defun sensetion--edit-sense (lemma pos1 ix synset)
+(defun sensetion--edit-sense (lemma pos1 ix sent)
   (let* ((st  (sensetion--pos->synset-type pos1))
          (sts (if (member st '("3" "5"))
                   '("3" "5")
@@ -27,19 +34,19 @@
                           using (hash-values v)
                           when (member (sensetion--sk-st k) sts)
                           collect (cons k v)))
-         (ssenses (cl-sort senses #'string< :key #'car)))
+         (ssenses (cl-sort senses #'string< :key #'cl-third)))
     (unless ssenses
       (user-error "No senses for lemma %s with pos %s" lemma pos1))
     (sensetion--call-hydra lemma st ix
-                  synset ssenses)))
+                  sent ssenses)))
 
 
-(defun sensetion--call-hydra (lemma st tk-ix synset options)
+(defun sensetion--call-hydra (lemma st tk-ix sent options)
   (call-interactively
-   (eval (sensetion--edit-hydra-maker lemma st tk-ix synset options))))
+   (eval (sensetion--edit-hydra-maker lemma st tk-ix sent options))))
 
 
-(defun sensetion--edit-hydra-maker (lemma st tk-ix synset options)
+(defun sensetion--edit-hydra-maker (lemma st tk-ix sent options)
   "Creates interactive editing hydra on-the-fly."
   (sensetion-is
    `(defhydra hydra-senses (:color blue)
@@ -58,7 +65,7 @@
                                       ,tk
                                       ,sk)
                       (sensetion--edit-reinsert-state-call
-                       ,tk-ix ,synset ,lemma ,st ',options))
+                       ,tk-ix ,sent ,lemma ,st ',options))
                    (sense-help-text sk sid terms gloss)
                    :column "Pick sense:")))
          options))
@@ -77,97 +84,87 @@
           (setf (sensetion--tk-senses tk) nil)
           (setf (sensetion--tk-tag tk) "man-now")
           t))
-      ,tk-ix ,synset))
+      ,tk-ix ,sent))
    (pres-skeys (sensetion--tk-skeys tk))
-   (tk (elt (sensetion--synset-tokens synset) tk-ix))))
+   (tk (elt (sensetion--sent-tokens sent) tk-ix))))
 
 
 (defun sensetion--toggle-sense (lemma tk sk)
   "Called by `sensetion--edit-hydra-maker'. Only used for side-effects."
   (let* ((orig (sensetion--tk-senses tk))
-         (present? (cl-member sk orig :key #'car :test #'equal))
+         (present? (member sk orig))
          (senses (if present?
-                     (cl-remove sk orig :key #'car :test #'equal)
-                   (cons (cons sk lemma) orig))))
+                     (cl-remove sk orig)
+                   (cons sk orig))))
     (unless (sensetion--tk-annotated? tk)
-      (cl-incf (car sensetion--global-status) 1)
       (cl-incf (car sensetion--local-status) 1))
     (if (and present? (null (cdr orig)))
-        (warn "Can't remove last sense")
+        (user-error "Can't remove last sense")
       (setf (sensetion--tk-senses tk)
             senses)
       (setf (sensetion--tk-tag tk)
             "man-now"))))
 
 
-(defun sensetion--edit-reinsert-state-call (tk-ix synset &optional lemma st options)
+(defun sensetion--edit-reinsert-state-call (tk-ix sent &optional lemma st options)
   (let ((point (point)))
-    (sensetion--reinsert-synset-at-point synset)
+    (sensetion--reinsert-sent-at-point sent)
     (goto-char point))
   (when (and lemma st options)
-    (sensetion--call-hydra lemma st tk-ix synset options)))
+    (sensetion--call-hydra lemma st tk-ix sent options)))
 
 
-;; ;; ;; ;; edit source synset
+;; ;; ;; ;; edit source sent
 (defvar-local sensetion--edit-file-annotation-buffer nil "Buffer where file is displayed for annotation")
-(defvar-local sensetion--edit-file-coord nil "Coordinates for the synset being edited in this buffer")
 
-
-(defun sensetion-edit-synset (coord obuffer)
-  "Edit data file corresponding to synset at point in the current OBUFFER.
-
-The data file corresponds to COORD coordinates."
-  (interactive (list (sensetion--synset-coord-prop-at-point)
-                     (buffer-name)))
-  (let ((synset (sensetion--get-synset coord)))
-    (sensetion--edit-synset
-     synset
-     coord
-     (get-buffer (sensetion--make-edit-buffer-name synset))
+(defun sensetion-edit-sent (obuffer)
+  "Edit data file corresponding to sent at point in the current OBUFFER."
+  (interactive (list (buffer-name)))
+  (let ((sent (sensetion--get-sent-at-point)))
+    (sensetion--edit-sent
+     sent
+     (get-buffer (sensetion--make-edit-buffer-name sent))
      obuffer)))
 
 
-(defun sensetion--edit-synset (synset coord mbuffer obuffer)
-  (let ((buffer (or mbuffer (generate-new-buffer (sensetion--make-edit-buffer-name synset)))))
+(defun sensetion--edit-sent (sent mbuffer obuffer)
+  (let ((buffer (or mbuffer (generate-new-buffer (sensetion--make-edit-buffer-name sent)))))
     (unless mbuffer
       (with-current-buffer buffer
-        (prin1 (sensetion--synset->plist synset) (current-buffer))
+        (prin1 (sensetion--sent->alist sent) (current-buffer))
         (sensetion--beginning-of-buffer)
         (indent-pp-sexp 1)
         (sensetion-edit-mode)
         (setq-local sensetion--edit-file-annotation-buffer obuffer)
-        (setq-local sensetion--edit-file-coord coord)
         (set-buffer-modified-p nil)))
     (pop-to-buffer buffer nil t)))
 
 
-(defun sensetion--make-edit-buffer-name (synset)
-  (format "*%s:sensetion-edit*" (sensetion--synset-id synset)))
+(defun sensetion--make-edit-buffer-name (sent)
+  (format "*%s:sensetion-edit*" (sensetion--sent-id sent)))
 
 
-(defun sensetion--refresh-synset (synset coord &optional buffer)
+(defun sensetion--refresh-sent (sent &optional buffer)
   (catch 'sensetion--exit
     (sensetion--map-buffer-lines
      (lambda (lno line)
-       (when-let* ((last-pos (1- (length line)))
-                   (line-coord (get-char-property last-pos 'sensetion--synset-coord line))
-                   (_ (equal coord line-coord)))
-         (sensetion--reinsert-synset-at-point synset)
+       (when-let* ((line-sent (sensetion--get-sent-at-point))
+                   (_ (equal (sensetion--sent-id sent) (sensetion--sent-id line-sent))))
+         (sensetion--reinsert-sent-at-point sent)
          (throw 'sensetion--exit t)))
      buffer)))
 
 
 (defun sensetion--save-edit (&optional force)
   (when (buffer-modified-p (current-buffer))
-    (when (or force (y-or-n-p "Save synset? "))
+    (when (or force (y-or-n-p "Save sent? "))
       (save-excursion
         (sensetion--beginning-of-buffer)
-        (let ((file-coord sensetion--edit-file-coord)
-              (anno-buffer sensetion--edit-file-annotation-buffer)
-              (synset (sensetion--plist->synset (read (thing-at-point 'sexp t)))))
-          (sensetion--save-synset synset file-coord)
-          (set-buffer-modified-p nil)
-          (sensetion--refresh-synset synset file-coord anno-buffer)))))
+        (let ((anno-buffer sensetion--edit-file-annotation-buffer)
+              (sent (sensetion--alist->sent (read (thing-at-point 'sexp t)))))
+	  (atomic-change-group
+            (set-buffer-modified-p nil)
+            (sensetion--refresh-sent sent anno-buffer))))))
   t)
 
 
@@ -180,13 +177,13 @@ The data file corresponds to COORD coordinates."
 (defun sensetion--edit-function (before-save-fn &optional after-save-fn)
   "Creates function to edit token at point.
 
-Get token and synset at point, call BEFORE-SAVE-FN with them as
-arguments, save synset and call AFTER-SAVE-FN if BEFORE-SAVE-FN
+Get token and sent at point, call BEFORE-SAVE-FN with them as
+arguments, save sent and call AFTER-SAVE-FN if BEFORE-SAVE-FN
 returns non-nil. None of the arguments may move point."
-  (lambda (tk-ix synset &optional glob-ix)
+  (lambda (tk-ix sent &optional glob-ix)
     (interactive
      (list (sensetion--tk-ix-prop-at-point)
-           (sensetion--get-synset-at-point)
+           (sensetion--get-sent-at-point)
            (get-char-property (point) 'sensetion--glob-ix)))
     (let* ((point      (point))
            (use-glob? (when glob-ix (ido-completing-read "Edit glob or token? "
@@ -195,33 +192,36 @@ returns non-nil. None of the arguments may move point."
            (tk-ix (if (equal use-glob? "token")
                       glob-ix
                     tk-ix))
-           (tk         (elt (sensetion--synset-tokens synset) tk-ix))
+           (tk         (elt (sensetion--sent-tokens sent) tk-ix))
            (prev-anno? (sensetion--tk-annotated? tk)))
       (atomic-change-group
-        (let* ((to-save? (funcall before-save-fn tk synset))
+        (let* ((to-save? (funcall before-save-fn tk sent))
                (curr-anno? (sensetion--tk-annotated? tk)))
           (when (and (not prev-anno?) curr-anno?)
-            (cl-incf (car sensetion--global-status) 1)
             (cl-incf (car sensetion--local-status) 1))
           (when to-save?
-            (sensetion--reinsert-synset-at-point synset)
+            (sensetion--reinsert-sent-at-point sent)
             (when after-save-fn
-              (funcall after-save-fn tk synset))))
+              (funcall after-save-fn tk sent))))
         (goto-char point)))))
+
+
+(defun sensetion--completing-read-lemma (&optional initial-input)
+  (completing-read "Lemma to annotate: "
+		   sensetion--completion-function
+		   nil t initial-input))
 
 
 (defalias 'sensetion-edit-lemma
   (sensetion--edit-function
-   (lambda (tk synset)
-     (let* ((old-lemma (sensetion--tk-lemma tk))
-            (lemma     (read-string "Assign lemma to token: "
-                                    (cons old-lemma (1+ (length old-lemma)))))
-            (coord (sensetion--synset-coord-prop-at-point)))
-       (setf (sensetion--tk-lemma tk) lemma)
-       (sensetion--remove-lemmas sensetion--index old-lemma synset coord)
-       (sensetion--index-lemmas sensetion--index lemma coord))
+   (lambda (tk sent)
+     (let* ((lemmas (sensetion--tk-lemmas tk))
+	    (lemma (sensetion--completing-read-lemma))
+	    (pos (sensetion--completing-read-pos))
+	    (lemma* (sensetion--make-lemma* lemma (sensetion--pos->synset-type pos))))
+       (setf (sensetion--tk-lemmas tk) (cons lemma* lemmas)))
      t))
-  "Edit lemma of token of index TK-IX at point and save modified SYNSET.")
+  "Edit lemma of token of index TK-IX at point and save modified SENT.")
 
 
 (defalias 'sensetion-edit-unsure
@@ -242,11 +242,9 @@ returns non-nil. None of the arguments may move point."
    (lambda (tk _)
      (unless (sensetion--tk-annotatable? tk)
        (user-error "Token already ignored"))
-     (cl-incf (cdr sensetion--global-status) -1)
-     (cl-incf (cdr sensetion--local-status) -1)
      (when (sensetion--tk-annotated? tk)
-       (cl-incf (car sensetion--global-status) -1)
        (cl-incf (car sensetion--local-status) -1))
+     (cl-incf (cdr sensetion--local-status) -1)
      (setf (sensetion--tk-tag tk) "ignore")
      (setf (sensetion--tk-senses tk) nil)
      t))

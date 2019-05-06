@@ -60,8 +60,8 @@
       (yason:encode
        (alexandria:alist-hash-table
 	`(("id" . ,id)
-	  ("token" . ,(mapcar #'token->json tokens))
-	  ("raw_text" . ,gloss))
+	  ("tokens" . ,(mapcar #'token->json tokens))
+	  ("text" . ,gloss))
 	:test 'equal)
        out))
     (terpri out)))

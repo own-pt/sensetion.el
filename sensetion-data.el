@@ -28,8 +28,8 @@
 
 (defun sensetion--alist->sent (alist)
   (pcase alist
-    ((map id meta token raw-text)
-     (sensetion--make-sent :id id :meta meta :tokens (mapcar #'sensetion--alist->tk token) :text raw-text))))
+    ((map id meta tokens text)
+     (sensetion--make-sent :id id :meta meta :tokens (mapcar #'sensetion--alist->tk tokens) :text text))))
 
 
 (defun sensetion--alist->tk (alist)
@@ -43,8 +43,8 @@
   (pcase sent
     ((cl-struct sensetion--sent id meta tokens text)
      (cl-mapcan
-      (lambda (k v) (when v (cons k v)))
-      '(meta tokens text)
+      (lambda (k v) (when v (list (cons k v))))
+      '(id meta tokens text)
       (list id
 	    meta
 	    (mapcar #'sensetion--tk->alist tokens)
@@ -55,17 +55,13 @@
   (pcase tk
     ((cl-struct sensetion--tk kind form lemmas pos tag senses glob unsure meta)
      (cl-mapcan
-      (lambda (k v) (when v (cons k v)))
+      (lambda (k v) (when v (list (cons k v))))
       '(kind form lemmas pos tag senses glob unsure)
       (list (s-join ":" kind)
 	    form
             lemmas
 	    pos
-	    ;; "man-now" is a virtual token status, shouldn't be
-            ;; written to file
-            (if (equal tag "man-now")
-                "man"
-              tag)
+	    tag
             senses
             glob
 	    unsure

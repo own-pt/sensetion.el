@@ -21,7 +21,7 @@ Content-Type: application/json
 {
   "mappings": {
     "properties": {
-      "token": {
+      "tokens": {
         "type" : "nested",
         "properties": {
   	  "lemmas" : {"type":  "keyword"}
@@ -97,10 +97,10 @@ Content-Type: application/json
         "nested": {
             "query": {
                 "term": {
-                    "token.lemmas": "be%2"
+                    "tokens.lemmas": "be%2"
                 }
             },
-            "path": "token"
+            "path": "tokens"
         }
     }
 }
@@ -112,10 +112,10 @@ Content-Type: application/json
 {
     "query": {
         "nested": {
-            "path": "token",
+            "path": "tokens",
             "query": {
                 "prefix": {
-                    "token.lemmas": "rock%"
+                    "tokens.lemmas": "rock%"
                 }
             }
         }
@@ -129,10 +129,10 @@ Content-Type: application/json
 {
     "query": {
         "nested": {
-            "path": "token",
+            "path": "tokens",
             "query": {
                 "regexp": {
-                    "token.lemmas": "rock(%[1-4])?"
+                    "tokens.lemmas": "rock(%[1-4])?"
                 }
             }
         }
@@ -148,4 +148,7 @@ Content-Type: application/json
 GET http://localhost:9200/docs/_stats
 Content-Type: application/json
 
+#
+GET http://localhost:9200/docs/_doc/1354925-a
+Content-Type: application/json
 

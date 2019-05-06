@@ -36,7 +36,7 @@
   (let* ((template "{\"query\":{\"prefix\" : { \"terms\" : \"%s\" }}}")
 	 (hits (sensetion--es-request "_search" (format  template prefix)))
 	 (terms (seq-mapcat (lambda (doc) (map-elt doc 'terms)) hits)))
-    (seq-subseq (seq-filter (lambda (lemma) (string-prefix-p prefix lemma t)) terms) 0 limit)))
+    (seq-take (seq-filter (lambda (lemma) (string-prefix-p prefix lemma t)) terms) limit)))
 
 
 (defun sensetion--es-lemma->synsets (lemma pos)
@@ -56,15 +56,15 @@
 
 (defun sensetion--es-lemma-pos->docs (lemma pos)
   (let* ((template "{\"query\": {\"nested\": {\"query\": {\"regexp\":
-                    {\"token.lemmas\": \"%s(%%%s)?\"}}, \"path\": \"token\" }}}")
+                    {\"tokens.lemmas\": \"%s(%%%s)?\"}}, \"path\": \"tokens\" }}}")
 	 (query (format template lemma (sensetion--pos->synset-type pos)))
 	 (hits (sensetion--es-request "docs/_search" query)))
     hits))
 
 
 (defun sensetion--es-lemma->docs (lemma)
-  (let* ((template "{\"query\": {\"nested\": {\"path\": \"token\",
-                       \"query\": {\"regexp\": {\"token.lemmas\": \"%s(%%[1-4])?\"}}}}}")
+  (let* ((template "{\"query\": {\"nested\": {\"path\": \"tokens\",
+                       \"query\": {\"regexp\": {\"tokens.lemmas\": \"%s(%%[1-4])?\"}}}}}")
 	 (query (format template lemma))
 	 (hits (sensetion--es-request "docs/_search" query)))
     hits))
