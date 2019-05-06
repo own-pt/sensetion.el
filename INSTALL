@@ -2,7 +2,14 @@
 #+TITLE: Install sensetion.el
 
 You can install it yourself, or use the docker image. If installing
-manually, note that you need Emacs version 26 or higher.
+manually, note that you might need Emacs version 26 or higher.
+
+* Dependencies
+- [[https://curl.haxx.se/download.html][curl]] -- you probably already have it installed
+- [[https://www.elastic.co/downloads/elasticsearch][elastic search]]
+
+* Data
+- TODO
 
 * Emacs beginner installation
 - Download and install emacs -- instructions [[https://www.gnu.org/software/emacs/][here]].
@@ -10,8 +17,6 @@ manually, note that you need Emacs version 26 or higher.
   know what your home directory is, you can run
   : emacs --batch --eval '(print (expand-file-name "~/"))' --kill
   in your terminal; the resulting path is your home directory.
-- Place the annotation data in a directory called =sensetion-data= in
-  your home directory.
 - Copy the file =.emacs.d/init.el= in this repository to an =.emacs.d=
   directory in your home directory (if it doesn't exist yet, create
   it).
@@ -20,8 +25,6 @@ manually, note that you need Emacs version 26 or higher.
 
 * Manual installation
 - Clone this repository -- preferentially to your home directory.
-- Download the annotation files -- preferentially to a
-  =sensetion-data= directory in your home directory.
 - The file at =.emacs.d/init.el= in this repository has comments
   specifying code you should include in your init file to have
   sensetion.el running smoothly. In summary you must install

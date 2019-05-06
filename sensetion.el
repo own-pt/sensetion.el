@@ -143,6 +143,20 @@ with low confidence."
   :risky t)
 
 
+(defun sensetion--save-annotation-buffer (&optional force?)
+  (when (or force? (y-or-n-p "Save annotations? "))
+    (let ((modified-sents nil))
+      (sensetion--map-buffer-lines
+       (lambda (lno line)
+	 (let* ((last      (1- (length line)))
+		(modified? (get-text-property last 'sensetion--sent-modified? line)))
+	   (when modified?
+	     (let ((sent (get-text-property last 'sensetion--sent line)))
+	       (unless sent (error "No sentence at line %s" lno))
+	       (setf modified-sents (cons sent modified-sents)))))))
+      (sensetion--es-update-modified-sents modified-sents))))
+
+
 (define-derived-mode sensetion-mode special-mode "sensetion"
   "sensetion-mode is a major mode for annotating senses."
   :group 'sensetion
@@ -155,7 +169,8 @@ with low confidence."
             (setq buffer-display-table (make-display-table)))
         ?\n [?\n?\n])
   (setq-local mode-name '(:eval (sensetion--mode-line-status-text)))
-  (setq-local write-contents-functions (list (lambda () t))))
+  (add-hook 'kill-buffer-hook 'sensetion--save-annotation-buffer nil t)
+  (setq-local write-contents-functions (list (lambda () (sensetion--save-annotation-buffer t)))))
 
 
 (defun sensetion--mode-line-status-text ()
@@ -385,6 +400,7 @@ You can mark/unmark tokens with `sensetion-toggle-glob-mark'."
   "Delete current line, save SENT to its file, and insert SENT."
   (with-inhibiting-read-only
    (sensetion--store-sent sent)
+   (put-text-property-eol 'sensetion--sent-modified? t)
    (atomic-change-group
      (delete-region (line-beginning-position) (line-end-position))
      (seq-let (line _) (sensetion--sent-colloc sent)

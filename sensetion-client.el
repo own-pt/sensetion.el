@@ -1,5 +1,7 @@
 ;;; sensetion.el --- -*- lexical-binding: t; -*-
 
+(eval-when-compile 'cl-lib)
+(require 'cl-lib)
 (require 'json)
 (require 'request)
 (require 'f)
@@ -18,32 +20,39 @@
     (json-read)))
 
 (cl-defun sensetion--es-request-debug-fn (&key data error-thrown &allow-other-keys)
-  (print error-thrown)
-  (print data))
+  (let ((inhibit-message t))
+    (message "%s" (json-encode-alist data)))
+  (message "Done %s "
+	   (cl-case (map-elt data 'errors 'unsure #'eq)
+	     (:json-false "with no errors")
+	     (t  "with errors"))))
 
 
-(defun sensetion--es-request (path data &optional debug)
+(cl-defun sensetion--es-request (path data &key (type "GET") params (sync t) debug)
   (let* ((response (request (string-join (list sensetion-backend-url path) "/")
 			    :headers sensetion--es-headers :parser #'sensetion--json-read
-			    :sync t :data data :error (when debug #'sensetion--es-request-debug-fn)))
+			    :params params
+			    :sync t :data data :complete (when debug #'sensetion--es-request-debug-fn)))
 	 (data (request-response-data response))
 	 (hits (map-elt (map-elt data 'hits nil #'eq) 'hits nil #'eq))
 	 (docs (mapcar (lambda (hit) (map-elt hit '_source)) hits)))
     docs))
 
+
 (defun sensetion-es-prefix-lemma (prefix &optional limit)
-  ;; TODO: FIXME
   (let* ((template "{\"query\":{\"prefix\" : { \"terms\" : \"%s\" }}}")
-	 (hits (sensetion--es-request "_search" (format  template prefix)))
+	 (hits (sensetion--es-request "_search" (format  template prefix)
+			     :params `(("size" . ,(if limit (number-to-string limit) "10000")))))
 	 (terms (seq-mapcat (lambda (doc) (map-elt doc 'terms)) hits)))
-    (seq-take (seq-filter (lambda (lemma) (string-prefix-p prefix lemma t)) terms) limit)))
+    (seq-filter (lambda (lemma) (string-prefix-p prefix lemma t)) terms)))
 
 
 (defun sensetion--es-lemma->synsets (lemma pos)
   (let* ((template "{\"query\": {\"bool\": { \"filter\": [{\"term\":
                            {\"terms\": \"%s\"}}, {\"term\":{ \"pos\" : \"%s\"}}]}}}")
 	 (hits (sensetion--es-request "_search"
-			     (format template lemma pos))))
+			     (format template lemma pos)
+			     :params '(("size" . "10000")))))
     (mapcar #'sensetion--alist->synset hits)))
 
 
@@ -58,7 +67,8 @@
   (let* ((template "{\"query\": {\"nested\": {\"query\": {\"regexp\":
                     {\"tokens.lemmas\": \"%s(%%%s)?\"}}, \"path\": \"tokens\" }}}")
 	 (query (format template lemma (sensetion--pos->synset-type pos)))
-	 (hits (sensetion--es-request "docs/_search" query)))
+	 (hits (sensetion--es-request "docs/_search" query
+			     :params '(("size" . "10000")))))
     hits))
 
 
@@ -66,8 +76,35 @@
   (let* ((template "{\"query\": {\"nested\": {\"path\": \"tokens\",
                        \"query\": {\"regexp\": {\"tokens.lemmas\": \"%s(%%[1-4])?\"}}}}}")
 	 (query (format template lemma))
-	 (hits (sensetion--es-request "docs/_search" query)))
+	 (hits (sensetion--es-request "docs/_search" query
+			     :params '(("size" . "10000")))))
     hits))
+
+
+(defun sensetion--remove-man-now (sent)
+  (cl-labels
+      ((remove-man-now (tk)
+		       (pcase tk
+			 ((cl-struct sensetion--tk tag)
+			  (when (equal (sensetion--tk-tag tk) "man-now")
+			    (setf (sensetion--tk-tag tk) "man"))))
+		       tk))
+    (pcase sent
+      ((cl-struct sensetion--sent tokens)
+       (setf (sensetion--sent-tokens sent) (mapcar #'remove-man-now tokens))))
+    sent))
+
+
+(defun sensetion--es-update-modified-sents (sents)
+  (let* ((sents (mapcar #'sensetion--remove-man-now sents))
+	 (updates (mapcan (lambda (sent)
+			    (list (json-encode-alist `((index . ((_id . ,(sensetion--sent-id sent))))))
+				  (json-encode-alist (sensetion--sent->alist sent))))
+			  sents))
+	 ;; PERF: use mapconcat?
+	 (data (concat (string-join updates "\n") "\n")))
+    (when updates
+      (sensetion--es-request "docs/_bulk" data :type "POST" :sync nil :debug t))))
 
 
 (provide 'sensetion-client)
