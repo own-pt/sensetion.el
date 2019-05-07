@@ -1,50 +1,31 @@
 # -*- restclient -*-
 
 ## index synsets
-PUT http://localhost:9200/synsets
+PUT http://localhost:9200/sensetion-synsets
 Content-Type: application/json
 
-{
-   "mappings": {
-     "properties": {
-       "terms": {
-         "type":  "keyword"
-       }
-     }
-   }
- }
+{"mappings": {"properties": {"terms": {"type":  "keyword"} } } }
 
 # index docs
-PUT http://localhost:9200/docs
+PUT http://localhost:9200/sensetion-docs
 Content-Type: application/json
 
-{
-  "mappings": {
-    "properties": {
-      "tokens": {
-        "type" : "nested",
-        "properties": {
-  	  "lemmas" : {"type":  "keyword"}
-	}
-      }
-    }
-  }
-}
+{"mappings":{"properties":{"tokens":{"type":"nested","properties":{"lemmas":{"type":"keyword"}}}}}}
 
 # delete synsets
-DELETE http://localhost:9200/synsets/
+DELETE http://localhost:9200/sensetion-synsets/
 Content-Type: application/json
 
 
 # delete docs
-DELETE http://localhost:9200/docs/
+DELETE http://localhost:9200/sensetion-docs/
 Content-Type: application/json
 
 # index
-# curl -s -H "Content-Type: application/x-ndjson" -XPOST localhost:9200/synsets/_bulk --data-binary "@synsets.json" &> /dev/null ; echo
-# for i in *.json ; do curl -s -H "Content-Type: application/x-ndjson" -XPOST localhost:9200/docs/_bulk --data-binary "@$i" &> /dev/null ; done
+# curl -s -H "Content-Type: application/x-ndjson" -XPOST localhost:9200/sensetion-synsets/_bulk --data-binary "@synsets.json" &> /dev/null ; echo
+# for i in *.json ; do curl -s -H "Content-Type: application/x-ndjson" -XPOST localhost:9200/sensetion-docs/_bulk --data-binary "@$i" &> /dev/null ; done
 
-GET http://localhost:9200/synsets/_search
+GET http://localhost:9200/sensetion-synsets/_search
 Content-Type: application/json
 
 {
@@ -54,7 +35,7 @@ Content-Type: application/json
 }
 
 # query lemma
-POST http://localhost:9200/synsets/_search
+POST http://localhost:9200/sensetion-synsets/_search
 Content-Type: application/json
 
 {
@@ -66,7 +47,7 @@ Content-Type: application/json
 }
 
 # query lemma and pos
-GET http://localhost:9200/synsets/_search
+GET http://localhost:9200/sensetion-synsets/_search
 Content-Type: application/json
 
 {
@@ -89,7 +70,7 @@ Content-Type: application/json
 }
 
 # lemma -> sents
-GET http://localhost:9200/docs/_search
+GET http://localhost:9200/sensetion-docs/_search
 Content-Type: application/json
 
 {
@@ -106,7 +87,7 @@ Content-Type: application/json
 }
 
 # prefix lemma -> sents
-GET http://localhost:9200/docs/_search
+GET http://localhost:9200/sensetion-docs/_search
 Content-Type: application/json
 
 {
@@ -123,7 +104,7 @@ Content-Type: application/json
 }
 
 # regexp lemma -> sents
-GET http://localhost:9200/docs/_search
+GET http://localhost:9200/sensetion-docs/_search
 Content-Type: application/json
 
 {
@@ -141,14 +122,14 @@ Content-Type: application/json
 
 
 # synsets stats
-GET http://localhost:9200/synsets/_stats
+GET http://localhost:9200/sensetion-synsets/_stats
 Content-Type: application/json
 
 # docs stats
-GET http://localhost:9200/docs/_stats
+GET http://localhost:9200/sensetion-docs/_stats
 Content-Type: application/json
 
 #
-GET http://localhost:9200/docs/_doc/1354925-a
+GET http://localhost:9200/sensetion-docs/_doc/447909-a
 Content-Type: application/json
 

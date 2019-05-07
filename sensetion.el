@@ -28,10 +28,17 @@
 
 
 (defcustom sensetion-backend-url
-  "http://localhost:9200"
+  "http://localhost"
   "URL to backend server."
   :group 'sensetion
   :type 'url)
+
+
+(defcustom sensetion-backend-port
+  9200
+  "Port used by backend server."
+  :group 'sensetion
+  :type 'integer)
 
 
 (defcustom sensetion-number-completions

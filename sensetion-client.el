@@ -29,7 +29,7 @@
 
 
 (cl-defun sensetion--es-request (path data &key (type "GET") params (sync t) debug)
-  (let* ((response (request (string-join (list sensetion-backend-url path) "/")
+  (let* ((response (request (format "%s:%s/%s" sensetion-backend-url sensetion-backend-port path)
 			    :headers sensetion--es-headers :parser #'sensetion--json-read
 			    :params params
 			    :sync t :data data :complete (when debug #'sensetion--es-request-debug-fn)))
@@ -41,7 +41,7 @@
 
 (defun sensetion-es-prefix-lemma (prefix &optional limit)
   (let* ((template "{\"query\":{\"prefix\" : { \"terms\" : \"%s\" }}}")
-	 (hits (sensetion--es-request "_search" (format  template prefix)
+	 (hits (sensetion--es-request "sensetion-synsets/_search" (format  template prefix)
 			     :params `(("size" . ,(if limit (number-to-string limit) "10000")))))
 	 (terms (seq-mapcat (lambda (doc) (map-elt doc 'terms)) hits)))
     (seq-filter (lambda (lemma) (string-prefix-p prefix lemma t)) terms)))
@@ -50,7 +50,7 @@
 (defun sensetion--es-lemma->synsets (lemma pos)
   (let* ((template "{\"query\": {\"bool\": { \"filter\": [{\"term\":
                            {\"terms\": \"%s\"}}, {\"term\":{ \"pos\" : \"%s\"}}]}}}")
-	 (hits (sensetion--es-request "_search"
+	 (hits (sensetion--es-request "sensetion-synsets/_search"
 			     (format template lemma pos)
 			     :params '(("size" . "10000")))))
     (mapcar #'sensetion--alist->synset hits)))
@@ -67,7 +67,7 @@
   (let* ((template "{\"query\": {\"nested\": {\"query\": {\"regexp\":
                     {\"tokens.lemmas\": \"%s(%%%s)?\"}}, \"path\": \"tokens\" }}}")
 	 (query (format template lemma (sensetion--pos->synset-type pos)))
-	 (hits (sensetion--es-request "docs/_search" query
+	 (hits (sensetion--es-request "sensetion-docs/_search" query
 			     :params '(("size" . "10000")))))
     hits))
 
@@ -76,7 +76,7 @@
   (let* ((template "{\"query\": {\"nested\": {\"path\": \"tokens\",
                        \"query\": {\"regexp\": {\"tokens.lemmas\": \"%s(%%[1-4])?\"}}}}}")
 	 (query (format template lemma))
-	 (hits (sensetion--es-request "docs/_search" query
+	 (hits (sensetion--es-request "sensetion-docs/_search" query
 			     :params '(("size" . "10000")))))
     hits))
 
@@ -104,7 +104,7 @@
 	 ;; PERF: use mapconcat?
 	 (data (concat (string-join updates "\n") "\n")))
     (when updates
-      (sensetion--es-request "docs/_bulk" data :type "POST" :sync nil :debug t))))
+      (sensetion--es-request "sensetion-docs/_bulk" data :type "POST" :sync nil :debug t))))
 
 
 (provide 'sensetion-client)
