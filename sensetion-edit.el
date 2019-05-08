@@ -216,10 +216,13 @@ returns non-nil. None of the arguments may move point."
   (sensetion--edit-function
    (lambda (tk sent)
      (let* ((lemmas (sensetion--tk-lemmas tk))
-	    (lemma (sensetion--completing-read-lemma))
-	    (pos (sensetion--completing-read-pos))
-	    (lemma* (sensetion--make-lemma* lemma (sensetion--pos->synset-type pos))))
-       (setf (sensetion--tk-lemmas tk) (cons lemma* lemmas)))
+	    (lemmas-str (s-join "," lemmas))
+	    (new-lemmas
+	     (completing-read-multiple
+	      "Edit lemma: "
+	      sensetion--completion-function nil nil
+	      (cons lemmas-str (1+ (length lemmas-str))))))
+       (setf (sensetion--tk-lemmas tk) new-lemmas))
      t))
   "Edit lemma of token of index TK-IX at point and save modified SENT.")
 
