@@ -58,7 +58,7 @@
 (defvar sensetion--completion-function
   (completion-table-dynamic
    (lambda (prefix)
-     (sensetion-es-prefix-lemma prefix sensetion-number-completions))))
+     (sensetion-es-prefix-lemma prefix))))
 
 
 (defvar-local sensetion--local-status
@@ -206,7 +206,7 @@ with low confidence."
      (sensetion-mode)
      (with-inhibiting-read-only
       (setq sensetion--lemma lemma)
-      (setq sensetion--synset-cache (sensetion--wordnet-lookup lemma "n")) ;FIXME
+      (setq sensetion--synset-cache (sensetion--wordnet-lookup-lemma lemma nil))
       (setq sensetion--local-status (sensetion--make-collocations matches)))
      (sensetion--beginning-of-buffer))
    (pop-to-buffer result-buffer)
@@ -607,7 +607,16 @@ synset and they have different pos1, return nil."
                  ("1" "n" "2" "v" "3" "a" "4" "r"))))
 
 
-(defun sensetion--wordnet-lookup (lemma pos &optional options)
+(defun sensetion--wordnet-lookup-lemma (lemma &optional pos)
+  (let ((lemma (cl-substitute (string-to-char " ")
+                              (string-to-char "_")
+                              lemma :test #'eq))
+	(pos (if pos (list pos) '("n" "v" "r" "a"))))
+    (seq-reduce (lambda (options pos) (sensetion--wordnet-lookup-lemma-pos lemma pos options))
+		pos nil)))
+
+
+(defun sensetion--wordnet-lookup-lemma-pos (lemma pos &optional options)
   "Return hash-table where the keys are synset keys and the
 values are a list where the first element is sense key shown by
 the edit hydra, the second is the synset id, the third are the
@@ -640,10 +649,7 @@ terms defined by that synset, and the fourth is the gloss."
               (error "No matching sensekey for lemma %s in synset %s-%s"
                      lemma (sensetion--synset-ofs synset) (sensetion--synset-pos synset))))
    (synsets  (cl-sort (sensetion--es-lemma->synsets lemma pos) #'string< :key #'sensetion--synset-id))
-   (options  (or options (make-hash-table :test 'equal :size 30)))
-   (lemma    (cl-substitute (string-to-char " ")
-                            (string-to-char "_")
-                            lemma))))
+   (options  (or options (make-hash-table :test 'equal :size 30)))))
 
 
 (defun sensetion--tk-annotated? (tk)
@@ -695,7 +701,7 @@ terms defined by that synset, and the fourth is the gloss."
   ("/" sensetion-edit-sense "Edit token senses" :column "Edit")
   ("i" sensetion-edit-ignore "Ignore token" :column "Edit")
   ("?" sensetion-edit-unsure "Mark annotation as unsure" :column "Edit")
-  ("." sensetion-edit-synset "Edit data file" :column "Edit")
+  ("." sensetion-edit-sent "Edit data file" :column "Edit")
   ("m" sensetion-toggle-glob-mark "(Un)Mark token for globbing" :column "Globbing")
   ("g" sensetion-glob "Glob marked tokens" :column "Globbing")
   ("u" sensetion-unglob "Unglob token's collocation" :column "Globbing")

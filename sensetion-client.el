@@ -14,6 +14,8 @@
 
 (defvar sensetion--es-headers '(("Content-Type" . "application/json")))
 
+(defvar sensetion--es-size-params '(("size" . "10000")))
+
 
 (defsubst sensetion--json-read ()
   (let ((json-array-type 'list))
@@ -39,10 +41,10 @@
     docs))
 
 
-(defun sensetion-es-prefix-lemma (prefix &optional limit)
+(defun sensetion-es-prefix-lemma (prefix)
   (let* ((template "{\"query\":{\"prefix\" : { \"terms\" : \"%s\" }}}")
-	 (hits (sensetion--es-request "sensetion-synsets/_search" (format  template prefix)
-			     :params `(("size" . ,(if limit (number-to-string limit) "10000")))))
+	 (hits (sensetion--es-request "sensetion-synsets/_search" (format template prefix)
+			     :params sensetion--es-size-params))
 	 (terms (seq-mapcat (lambda (doc) (map-elt doc 'terms)) hits)))
     (seq-filter (lambda (lemma) (string-prefix-p prefix lemma t)) terms)))
 
@@ -52,7 +54,7 @@
                            {\"terms\": \"%s\"}}, {\"term\":{ \"pos\" : \"%s\"}}]}}}")
 	 (hits (sensetion--es-request "sensetion-synsets/_search"
 			     (format template lemma pos)
-			     :params '(("size" . "10000")))))
+			     :params sensetion--es-size-params)))
     (mapcar #'sensetion--alist->synset hits)))
 
 
@@ -68,7 +70,7 @@
                     {\"tokens.lemmas\": \"%s(%%%s)?\"}}, \"path\": \"tokens\" }}}")
 	 (query (format template lemma (sensetion--pos->synset-type pos)))
 	 (hits (sensetion--es-request "sensetion-docs/_search" query
-			     :params '(("size" . "10000")))))
+			     :params sensetion--es-size-params)))
     hits))
 
 
@@ -77,7 +79,7 @@
                        \"query\": {\"regexp\": {\"tokens.lemmas\": \"%s(%%[1-4])?\"}}}}}")
 	 (query (format template lemma))
 	 (hits (sensetion--es-request "sensetion-docs/_search" query
-			     :params '(("size" . "10000")))))
+			     :params sensetion--es-size-params)))
     hits))
 
 
