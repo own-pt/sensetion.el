@@ -16,7 +16,9 @@
 
 
 (cl-defstruct (sensetion--sent (:constructor nil)
-		      (:constructor sensetion--make-sent))
+		      (:constructor sensetion--make-sent)
+		      (:copier nil)
+		      (:copier sensetion--copy-sent))
   id meta tokens text)
 
 

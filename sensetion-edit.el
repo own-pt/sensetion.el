@@ -3,9 +3,6 @@
 (require 'sensetion-data)
 
 
-(defalias 'sensetion-edit #'sensetion-annotate)
-
-
 (defun sensetion--completing-read-pos ()
   (ido-completing-read "Token PoS tag: "
 		       '("n" "v" "a" "r")
@@ -26,23 +23,18 @@
 
 
 (defun sensetion--edit-sense (lemma pos1 ix sent)
-  (let* ((st  (sensetion--pos->synset-type pos1))
-         (sts (if (member st '("3" "5"))
-                  '("3" "5")
-                (list st)))
-         (senses (alist-get pos1 (gethash lemma sensetion--synset-cache) nil nil #'equal)))
+  (let ((senses (sensetion--cache-lemma->senses lemma pos1)))
     (unless senses
       (user-error "No senses for lemma %s with pos %s" lemma pos1))
-    (sensetion--call-hydra lemma st ix
-                  sent senses)))
+    (sensetion--call-hydra lemma ix sent senses)))
 
 
-(defun sensetion--call-hydra (lemma st tk-ix sent options)
+(defun sensetion--call-hydra (lemma tk-ix sent options)
   (call-interactively
-   (eval (sensetion--edit-hydra-maker lemma st tk-ix sent options))))
+   (eval (sensetion--edit-hydra-maker lemma tk-ix sent options))))
 
 
-(defun sensetion--edit-hydra-maker (lemma st tk-ix sent options)
+(defun sensetion--edit-hydra-maker (lemma tk-ix sent options)
   "Creates interactive editing hydra on-the-fly."
   (sensetion-is
    `(defhydra hydra-senses (:color blue)
@@ -61,7 +53,7 @@
                                       ,tk
                                       ,sk)
                       (sensetion--edit-reinsert-state-call
-                       ,tk-ix ,sent ,lemma ,st ',options))
+                       ,tk-ix ,sent ,lemma ',options))
                    (sense-help-text sk sid terms gloss)
                    :column "Pick sense:")))
          options))
@@ -90,28 +82,28 @@
   (let* ((orig (sensetion--tk-senses tk))
          (present? (member sk orig))
          (senses (if present?
-                     (cl-remove sk orig)
+                     (remove sk orig)
                    (cons sk orig))))
     (unless (sensetion--tk-annotated? tk)
       (cl-incf (car sensetion--local-status) 1))
     (if (and present? (null (cdr orig)))
         (user-error "Can't remove last sense")
-      (setf (sensetion--tk-senses tk)
-            senses)
-      (setf (sensetion--tk-tag tk)
-            "man-now"))))
+      (setf (sensetion--tk-senses tk) senses)
+      (setf (sensetion--tk-tag tk) "man-now"))))
 
 
-(defun sensetion--edit-reinsert-state-call (tk-ix sent &optional lemma st options)
+(defun sensetion--edit-reinsert-state-call (tk-ix sent &optional lemma options)
   (let ((point (point)))
     (sensetion--reinsert-sent-at-point sent)
     (goto-char point))
-  (when (and lemma st options)
-    (sensetion--call-hydra lemma st tk-ix sent options)))
+  (when (and lemma options)
+    (sensetion--call-hydra lemma tk-ix sent options)))
 
 
 ;; ;; ;; ;; edit source sent
-(defvar-local sensetion--edit-file-annotation-buffer nil "Buffer where file is displayed for annotation")
+(defvar-local sensetion--edit-file-annotation-buffer
+  nil
+  "Buffer where file is displayed for annotation")
 
 (defun sensetion-edit-sent (obuffer)
   "Edit data file corresponding to sent at point in the current OBUFFER."
@@ -227,8 +219,8 @@ returns non-nil. None of the arguments may move point."
   ;; TODO: allow this anywhere?
   (sensetion--edit-function
    (lambda (tk _)
-     (let ((st (sensetion--tk-tag tk)))
-       (when (member st '("un"))
+     (let ((tag (sensetion--tk-tag tk)))
+       (when (member tag '("un"))
          (user-error "Can't be unsure about unnanotated token")))
      (cl-callf not (sensetion--tk-unsure tk))
      t))

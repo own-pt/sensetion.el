@@ -143,34 +143,21 @@ with low confidence."
   :risky t)
 
 
-(defun sensetion--save-annotation-buffer (&optional force?)
-  (when (or force? (y-or-n-p "Save annotations? "))
-    (let ((modified-sents nil))
-      (sensetion--map-buffer-lines
-       (lambda (lno line)
-	 (let* ((last      (1- (length line)))
-		(modified? (get-text-property last 'sensetion--sent-modified? line)))
-	   (when modified?
-	     (let ((sent (get-text-property last 'sensetion--sent line)))
-	       (unless sent (error "No sentence at line %s" lno))
-	       (setf modified-sents (cons sent modified-sents)))))))
-      (sensetion--es-update-modified-sents modified-sents))))
-
-
 (define-derived-mode sensetion-mode special-mode "sensetion"
   "sensetion-mode is a major mode for annotating senses."
   :group 'sensetion
-  (setq-local sentence-end ".$$") ;; to be able to use M-a and M-e to jump
-  ;; (setq-local buffer-read-only t)
+  (setq-local sentence-end ".$") ;; to be able to use M-a and M-e to jump
   (visual-line-mode 1)
   (setq-local buffer-invisibility-spec nil)
   (setq-local minor-mode-alist nil)
+  ;; show one newline as two newlines; having one sentence per line is
+  ;; convenient, but having no separation between sentences is
+  ;; confusing
   (aset (or buffer-display-table
             (setq buffer-display-table (make-display-table)))
         ?\n [?\n?\n])
-  (setq-local mode-name '(:eval (sensetion--mode-line-status-text)))
-  (add-hook 'kill-buffer-hook 'sensetion--save-annotation-buffer nil t)
-  (setq-local write-contents-functions (list (lambda () (sensetion--save-annotation-buffer t)))))
+  ;; customize mode line
+  (setq-local mode-name '(:eval (sensetion--mode-line-status-text))))
 
 
 (defun sensetion--mode-line-status-text ()
@@ -186,6 +173,9 @@ with low confidence."
 
 
 (defun sensetion-annotate (lemma &optional pos)
+  "Create targeted annotation buffer, where several sentences
+containing tokens with LEMMA and optionally POS are displayed for
+annotation."
   (interactive
    (list (sensetion--completing-read-lemma)
          (ido-completing-read "PoS tag? " '("a" "r" "v" "n" "any") nil t nil nil "any")))
@@ -199,7 +189,7 @@ with low confidence."
      (sensetion-mode)
      (with-inhibiting-read-only
       (setq sensetion--lemma lemma)
-      (setq sensetion--synset-cache (sensetion--wordnet-lookup-lemma lemma nil))
+      (setq sensetion--synset-cache (sensetion--wordnet-lookup-lemma lemma))
       (setq sensetion--local-status (sensetion--make-collocations matches)))
      (sensetion--beginning-of-buffer))
    (pop-to-buffer result-buffer)
@@ -225,7 +215,7 @@ with low confidence."
            (colloc sent)
          (insert tokens-line
                  ;; no need to add it all the time
-                 (propertize "\n" 'sensetion--sent sent))
+                 (propertize "\n" 'sensetion--sent-id (sensetion--sent-id sent)))
          (cl-incf done (car status))
          (cl-incf total (cdr status))))
    (colloc (sent)
@@ -236,11 +226,12 @@ with low confidence."
 
 
 (defun sensetion--get-sent-at-point ()
-  (get-text-property (line-end-position) 'sensetion--sent))
+  (let ((sent-id (sensetion--get-text-property-eol 'sensetion--sent-id)))
+    (sensetion--alist->sent (sensetion--es-id->sent sent-id))))
 
 
-(defun sensetion--store-sent (sent)
-  (put-text-property-eol 'sensetion--sent sent))
+(defun sensetion--update-sent (sent)
+  (sensetion--es-update-modified-sent sent))
 
 
 (defun sensetion--tk-glob? (tk)
@@ -313,7 +304,7 @@ collocation."
   (with-inhibiting-read-only
    (put-text-property beg end
                       'face `(:foreground ,sensetion-glob-mark-colour))
-   (put-text-property-eol 'sensetion--to-glob (cons ix marked))))
+   (sensetion--put-text-property-eol 'sensetion--to-glob (cons ix marked))))
 
 
 (defun sensetion--tks-to-glob-prop ()
@@ -322,7 +313,7 @@ collocation."
 
 (defun sensetion--unmark-glob (beg end ix marked)
   (with-inhibiting-read-only
-   (put-text-property-eol 'sensetion--to-glob (cl-remove ix marked))
+   (sensetion--put-text-property-eol 'sensetion--to-glob (cl-remove ix marked))
    (remove-text-properties beg end '(face nil))))
 
 
@@ -340,37 +331,35 @@ command."
       (sensetion--mark-glob beg end ix marked))))
 
 
-(defun sensetion-glob (lemma pos)
-  "Glob all tokens marked to be globbed, assigning it lemma
-LEMMA.
+(defun sensetion-glob (lemma pos ixs-to-glob sent)
+  "Glob all tokens in SENT whose indices are in IXS-TO-GLOB,
+assigning the resulting glob token LEMMA and POS.
 
 You can mark/unmark tokens with `sensetion-toggle-glob-mark'."
   (interactive (list
                 (sensetion--completing-read-lemma)
-		(sensetion--completing-read-pos)))
+		(sensetion--completing-read-pos)
+		(reverse (sensetion--get-text-property-eol 'sensetion--to-glob))
+		(sensetion--get-sent-at-point)))
   (sensetion-is
    (sensetion--reinsert-sent-at-point globbed-sent)
    (with-inhibiting-read-only
-    (put-text-property-eol 'sensetion--to-glob nil))
+    (sensetion--put-text-property-eol 'sensetion--to-glob nil))
 
    :where
   
-   (globbed-sent (pcase sent
-                   ((cl-struct sensetion--sent id meta text)
-                    (sensetion--make-sent
-                     :id id
-                     :meta meta
-                     :tokens globbed-tks
-                     :text text))))
+   (globbed-sent (progn
+		   (setf (sensetion--sent-tokens sent) globbed-tks)
+		   sent))
    (globbed-tks (cl-loop
                  for tk in (sensetion--sent-tokens sent)
                  for i from 0
                  append (cond
-                         ((equal i (cl-first ixs))
+                         ((equal i (cl-first ixs-to-glob))
                           ;; insert glob before first token in the
                           ;; collocation
                           (list new-glob (glob-tk tk new-k)))
-                         ((cl-member i ixs)
+                         ((cl-member i ixs-to-glob)
                           (list (glob-tk tk new-k)))
                          (t
                           (list tk)))))
@@ -383,7 +372,6 @@ You can mark/unmark tokens with `sensetion-toggle-glob-mark'."
    (new-glob (sensetion--make-tk :lemmas (list (sensetion--make-lemma* lemma st)) :tag "un"
                         :kind `("glob" ,new-k) :glob "man"))
    (st (sensetion--pos->synset-type pos))
-   (ixs   (reverse (get-text-property (line-end-position) 'sensetion--to-glob)))
    (new-k (char-to-string (1+ max-k)))
    (max-k (max-key sent))
    (max-key (sent)
@@ -395,19 +383,18 @@ You can mark/unmark tokens with `sensetion-toggle-glob-mark'."
                          (seq-mapcat (lambda (tk)
                                        (when-let ((keys (sensetion--tk-coll-keys tk)))
                                          (mapcar #'string-to-char keys)))
-                                     (sensetion--sent-tokens sent)))))
-   (sent  (sensetion--get-sent-at-point))))
+                                     (sensetion--sent-tokens sent)))))))
 
 
 (defun sensetion--reinsert-sent-at-point (sent)
-  "Delete current line, save SENT to its file, and insert SENT."
+  "Save SENT, delete current line (where previous version of sent
+was linearized), and reinsert SENT."
   (with-inhibiting-read-only
-   (sensetion--store-sent sent)
-   (put-text-property-eol 'sensetion--sent-modified? t)
    (atomic-change-group
      (delete-region (line-beginning-position) (line-end-position))
      (seq-let (line _) (sensetion--sent-colloc sent)
-       (insert line)))))
+       (insert line)))
+   (sensetion--update-sent sent)))
 
 ;; TODO: when annotating glob, check if token is part of more than one
 ;; colloc
@@ -494,8 +481,8 @@ number of selected tokens."
                              (if-let ((_ (or selected?
                                              glob-selected?))
                                       (tk-sks (if selected?
-                                               (sensetion--tk-skeys tk)
-                                             (sensetion--tk-skeys (cdr glob-selected?)))))
+						  (sensetion--tk-skeys tk)
+						(sensetion--tk-skeys (cdr glob-selected?)))))
 				 ;; should prob become sense number
 				 ;; when that info is available
                                  (propertize (s-join ","
@@ -512,8 +499,10 @@ number of selected tokens."
                             (prog1 ""
                               (when selected?
                                 (setf (gethash glob-key sel-keys) (cons ix tk)))))
-                           ((seq (or "aux" "qf" "ex" "mwf" "def" "classif")) "")
-                           (_ (error "Token of kind %s does not exist" kind))))))
+			   ;; TODO: this could one day be used to
+			   ;; customize how other kinds of tokens are
+			   ;; shown
+                           (_ "")))))
       ;;
       (let* ((tks        (sensetion--sent-tokens sent))
              (tks-colloc (seq-map-indexed #'token-colloc tks)))
@@ -569,10 +558,6 @@ synset and they have different pos1, return nil."
 
 (defun sensetion--selected? (point)
   (get-text-property point 'sensetion--selected))
-
-
-(defun sensetion--sent-coord-prop-at-point ()
-  (get-char-property (line-end-position) 'sensetion--sent-coord))
 
 
 (cl-defun sensetion--tk-ix-prop-at-point (&optional (point (point)))
@@ -692,10 +677,6 @@ gloss."
    (forward-line 1)
    (transpose-lines 1)
    (forward-line -1)))
-
-
-(defun sensetion--filename->ix (fp)
-  (string-to-number (f-base fp)))
 
 
 (defun sensetion-toggle-scripts ()
