@@ -59,9 +59,10 @@
 
 
 (defun sensetion--es-get-sents (lemma &optional pos)
-  (let ((docs (if pos
-		  (sensetion--es-lemma-pos->docs lemma pos)
-		(sensetion--es-lemma->docs lemma))))
+  (let* ((lemma (cl-substitute ?_ ?  lemma :test #'eq))
+	 (docs (if pos
+		   (sensetion--es-lemma-pos->docs lemma pos)
+		 (sensetion--es-lemma->docs lemma))))
     (mapcar #'sensetion--alist->sent docs)))
 
 

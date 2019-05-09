@@ -3,9 +3,9 @@
 (require 'subr-x)
 (require 'ido)
 (require 'f)
+(require 'map)
 (require 'async)
 (require 'hydra)
-(require 'trie)
 (require 'sensetion-utils)
 (require 'sensetion-data)
 (require 'sensetion-client)
@@ -39,13 +39,6 @@
   "Port used by backend server."
   :group 'sensetion
   :type 'integer)
-
-
-(defcustom sensetion-number-completions
-  15
-  "Number of lemma completions to show in `sensetion-annotate'."
-  :group 'sensetion
-  :type  'integer)
 
 
 (defcustom sensetion-sense-menu-show-synset-id
@@ -229,12 +222,15 @@ with low confidence."
    :where
    (go (sent)
        (seq-let (tokens-line status)
-           (sensetion--sent-colloc sent sensetion--lemma)
+           (colloc sent)
          (insert tokens-line
                  ;; no need to add it all the time
                  (propertize "\n" 'sensetion--sent sent))
-             (cl-incf done (car status))
-             (cl-incf total (cdr status))))
+         (cl-incf done (car status))
+         (cl-incf total (cdr status))))
+   (colloc (sent)
+	   (sensetion--sent-colloc sent senses))
+   (senses (sensetion--cache-lemma->senses sensetion--lemma))
    (total   0)
    (done    0)))
 
@@ -416,7 +412,7 @@ You can mark/unmark tokens with `sensetion-toggle-glob-mark'."
 ;; TODO: when annotating glob, check if token is part of more than one
 ;; colloc
 
-(cl-defun sensetion--sent-colloc (sent &optional (lemma sensetion--lemma))
+(cl-defun sensetion--sent-colloc (sent &optional senses (lemma sensetion--lemma))
   "Return a list whose first element is a propertized string
 representing SENT's tokens for display in sensetion buffer, and
 whose second element is a status pair, whose car is the number of
@@ -428,7 +424,8 @@ number of selected tokens."
         ;; stores selected glob tokens and their indices by their key;
         ;; this is used to highlight their constituent tokens and edit
         ;; them properly
-        (sel-keys (make-hash-table :test 'equal)))
+        (sel-keys (make-hash-table :test 'equal))
+	(senses (or senses (sensetion--cache-lemma->senses lemma))))
     (cl-labels
         ((sel-tk-props (tk &optional ix)
                        (cl-list* 'sensetion--selected t
@@ -496,14 +493,17 @@ number of selected tokens."
 			     ;; sense scripts
                              (if-let ((_ (or selected?
                                              glob-selected?))
-                                      (sks (if selected?
+                                      (tk-sks (if selected?
                                                (sensetion--tk-skeys tk)
                                              (sensetion--tk-skeys (cdr glob-selected?)))))
+				 ;; should prob become sense number
+				 ;; when that info is available
                                  (propertize (s-join ","
                                                      (mapcar (lambda (sk)
-                                                               (cl-first
-                                                                (gethash sk sensetion--synset-cache)))
-                                                             sks))
+							       (cl-first
+								(map-elt senses sk
+									 nil #'equal)))
+                                                             tk-sks))
                                              'display '(raise 0.4)
                                              'invisible 'sensetion--scripts
                                              'face '(:height 0.6))
@@ -608,30 +608,36 @@ synset and they have different pos1, return nil."
 
 
 (defun sensetion--wordnet-lookup-lemma (lemma &optional pos)
+  "(hash-table ,lemma ((,pos (,sense-key ,hydra-index ,synset-id ,terms ,gloss) ...) ...)"
   (let ((lemma (cl-substitute (string-to-char " ")
                               (string-to-char "_")
                               lemma :test #'eq))
-	(pos (if pos (list pos) '("n" "v" "r" "a"))))
-    (seq-reduce (lambda (options pos) (sensetion--wordnet-lookup-lemma-pos lemma pos options))
-		pos nil)))
+	(poses (if pos (list pos) '("n" "v" "r" "a")))
+	(options (make-hash-table :test 'equal :size 100)))
+    (setf (gethash lemma options)
+	  (mapcar
+	   (lambda (pos)
+	     (cons pos (sensetion--wordnet-lookup-lemma-pos lemma pos)))
+	   poses))
+    options))
 
 
-(defun sensetion--wordnet-lookup-lemma-pos (lemma pos &optional options)
-  "Return hash-table where the keys are synset keys and the
-values are a list where the first element is sense key shown by
-the edit hydra, the second is the synset id, the third are the
-terms defined by that synset, and the fourth is the gloss."
+(defun sensetion--wordnet-lookup-lemma-pos (lemma pos)
+  "Return list of lists where each element list is composed by a
+sense key, the sense key/index shown by the edit hydra, the
+synset id, the terms defined by that synset, and the synset's
+gloss."
   (sensetion-is
-   (seq-mapn #'index synsets)
-   options
+   (mapcar #'go synsets)
    :where
-   (index (synset)
-          (setf (gethash (lemma-sk lemma synset) options)
-		(list (ix->hydra-key counter)
-		      (sensetion--synset-id synset)
-		      (sensetion--synset-terms synset)
-		      (sensetion--synset-gloss synset)))
-	  (cl-incf counter))
+   (go (synset)
+       (prog1
+	   (list (lemma-sk lemma synset)
+		 (ix->hydra-key counter)
+		 (sensetion--synset-id synset)
+		 (sensetion--synset-terms synset)
+		 (sensetion--synset-gloss synset))
+	 (cl-incf counter)))
    (ix->hydra-key (ix)
                   (format "%s"
                           (if (< ix 9)
@@ -648,8 +654,14 @@ terms defined by that synset, and the fourth is the gloss."
 			    :test #'equal :key #'cdr))
               (error "No matching sensekey for lemma %s in synset %s-%s"
                      lemma (sensetion--synset-ofs synset) (sensetion--synset-pos synset))))
-   (synsets  (cl-sort (sensetion--es-lemma->synsets lemma pos) #'string< :key #'sensetion--synset-id))
-   (options  (or options (make-hash-table :test 'equal :size 30)))))
+   (synsets  (cl-sort (sensetion--es-lemma->synsets lemma pos) #'string< :key #'sensetion--synset-id))))
+
+
+(defun sensetion--cache-lemma->senses (lemma &optional pos)
+  (let ((senses-by-pos (gethash lemma sensetion--synset-cache nil)))
+    (if pos
+	(alist-get pos senses-by-pos nil nil #'equal)
+	(seq-mapcat #'cdr senses-by-pos))))
 
 
 (defun sensetion--tk-annotated? (tk)

@@ -30,15 +30,11 @@
          (sts (if (member st '("3" "5"))
                   '("3" "5")
                 (list st)))
-         (senses (cl-loop for k being the hash-keys of sensetion--synset-cache
-                          using (hash-values v)
-                          when (member (sensetion--sk-st k) sts)
-                          collect (cons k v)))
-         (ssenses (cl-sort senses #'string< :key #'cl-third)))
-    (unless ssenses
+         (senses (alist-get pos1 (gethash lemma sensetion--synset-cache) nil nil #'equal)))
+    (unless senses
       (user-error "No senses for lemma %s with pos %s" lemma pos1))
     (sensetion--call-hydra lemma st ix
-                  sent ssenses)))
+                  sent senses)))
 
 
 (defun sensetion--call-hydra (lemma st tk-ix sent options)
