@@ -302,8 +302,7 @@ collocation."
 (defun sensetion--mark-glob (beg end ix marked)
   "Marks token to be globbed with the `sensetion-glob' command."
   (with-inhibiting-read-only
-   (put-text-property beg end
-                      'face `(:foreground ,sensetion-glob-mark-colour))
+   (add-face-text-property beg end '(:underline t))
    (sensetion--put-text-property-eol 'sensetion--to-glob (cons ix marked))))
 
 
@@ -314,15 +313,13 @@ collocation."
 (defun sensetion--unmark-glob (beg end ix marked)
   (with-inhibiting-read-only
    (sensetion--put-text-property-eol 'sensetion--to-glob (cl-remove ix marked))
-   (remove-text-properties beg end '(face nil))))
+   (add-face-text-property beg end '(:underline nil))))
 
 
 (defun sensetion-toggle-glob-mark (beg end)
   "Mark or unmark token to be globbed with the `sensetion-glob'
 command."
   (interactive (sensetion--tk-points))
-  (unless (and beg end)
-    (user-error "No token at point"))
   (let* ((ix (sensetion--tk-ix-prop-at-point beg))
          (marked (sensetion--tks-to-glob-prop))
          (marked? (cl-member ix marked)))
@@ -656,10 +653,18 @@ gloss."
 
 ;; TODO: refactor prop names as variables
 (cl-defun sensetion--tk-points (&optional (point (point)))
-  (list (previous-single-property-change point 'sensetion--tk-ix
-                                         nil (line-beginning-position))
-        (next-single-property-change point 'sensetion--tk-ix
-                                     nil (line-end-position))))
+  (cond
+   ((get-text-property point 'sensetion--tk-ix))	; point at tk
+   ((get-char-property point 'sensetion--tk-ix)	; point just before tk (note
+					; that get-text's and
+					; get-char's behaviours differ
+    (cl-incf point))
+   (t (user-error "No token at point")))
+  (let ((end (next-single-property-change point 'sensetion--tk-ix
+					  nil (line-end-position))))
+    (list (previous-single-property-change end 'sensetion--tk-ix
+                                           nil (line-beginning-position))
+          end)))
 
 
 (defun sensetion-move-line-up ()
