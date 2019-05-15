@@ -15,7 +15,7 @@
 ;; TODO: benchmark stuff with
 ;; https://emacs.stackexchange.com/questions/539/how-do-i-measure-performance-of-elisp-code
 
-
+;;; Customizations
 (defgroup sensetion nil
   "Support for annotating word senses."
   :group 'data)
@@ -52,40 +52,6 @@
   "Show synset id in sense menu during annotation."
   :group 'sensetion
   :type  'boolean)
-
-
-(defvar sensetion--completion-function
-  (completion-table-dynamic
-   (lambda (prefix)
-     (sensetion-es-prefix-lemma prefix))))
-
-
-(defvar-local sensetion--local-status
-  nil
-  "Local status.
-
-A cons cell where the car is the number of tokens annotated so
-far, and the cdr is the number of annotatable tokens.")
-
-
-(defvar sensetion-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map "s" #'sensetion-hydra/body)
-    (define-key map "<" #'sensetion-previous-selected)
-    (define-key map ">" #'sensetion-next-selected)
-    (define-key map "/" #'sensetion-edit-sense)
-    (define-key map "u" #'sensetion-unglob)
-    (define-key map "l" #'sensetion-edit-lemma)
-    (define-key map "m" #'sensetion-toggle-glob-mark)
-    (define-key map "g" #'sensetion-glob)
-    (define-key map "v" #'sensetion-toggle-scripts)
-    (define-key map "." #'sensetion-edit-sent)
-    (define-key map "?" #'sensetion-edit-unsure)
-    (define-key map "i" #'sensetion-edit-ignore)
-    (define-key map [C-down] #'sensetion-move-line-down)
-    (define-key map [C-up] #'sensetion-move-line-up)
-    map)
-  "Keymap for `sensetion-mode'.")
 
 
 (defcustom sensetion-unnanotated-colour
@@ -133,20 +99,51 @@ with low confidence."
   :type 'color)
 
 
+(defcustom sensetion-mode-line '(:eval (sensetion--mode-line-status-text))
+  ""
+  :group 'sensetion
+  :type 'sexp
+  :risky t)
+
+
+;;; Vars
+
+
 (defvar-local sensetion--lemma
   nil
   "Lemma being annotated in the buffer.")
+
+
+(defvar-local sensetion--local-status
+  nil
+  "Local status.
+
+A cons cell where the car is the number of tokens annotated so
+far, and the cdr is the number of annotatable tokens.")
 
 
 (defvar-local sensetion--synset-cache
   nil)
 
 
-(defcustom sensetion-mode-line '(:eval (sensetion--mode-line-status-text))
-  ""
-  :group 'sensetion
-  :type 'sexp
-  :risky t)
+(defvar sensetion-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map "s" #'sensetion-hydra/body)
+    (define-key map "<" #'sensetion-previous-selected)
+    (define-key map ">" #'sensetion-next-selected)
+    (define-key map "/" #'sensetion-edit-sense)
+    (define-key map "u" #'sensetion-unglob)
+    (define-key map "l" #'sensetion-edit-lemma)
+    (define-key map "m" #'sensetion-toggle-glob-mark)
+    (define-key map "g" #'sensetion-glob)
+    (define-key map "v" #'sensetion-toggle-scripts)
+    (define-key map "." #'sensetion-edit-sent)
+    (define-key map "?" #'sensetion-edit-unsure)
+    (define-key map "i" #'sensetion-edit-ignore)
+    (define-key map [C-down] #'sensetion-move-line-down)
+    (define-key map [C-up] #'sensetion-move-line-up)
+    map)
+  "Keymap for `sensetion-mode'.")
 
 
 (define-derived-mode sensetion-mode special-mode "sensetion"
@@ -163,7 +160,7 @@ with low confidence."
             (setq buffer-display-table (make-display-table)))
         ?\n [?\n?\n])
   ;; customize mode line
-  (setq-local mode-name '(:eval (sensetion--mode-line-status-text))))
+  (setq-local mode-name sensetion-mode-line))
 
 
 (defun sensetion--mode-line-status-text ()
@@ -172,6 +169,12 @@ with low confidence."
               (cl-destructuring-bind (done . total) sensetion--local-status
                 (format ":%.0f/%.0f" done total))
             "")))
+
+
+(defvar sensetion--completion-function
+  (completion-table-dynamic
+   (lambda (prefix)
+     (sensetion-es-prefix-lemma prefix))))
 
 
 ;;;###autoload
