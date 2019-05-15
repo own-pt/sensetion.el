@@ -27,6 +27,12 @@
   :type 'string)
 
 
+(defcustom sensetion-elasticsearch-path
+  nil
+  :group 'sensetion
+  :type (choice file (const nil)))
+
+
 (defcustom sensetion-backend-url
   "http://localhost"
   "URL to backend server."
