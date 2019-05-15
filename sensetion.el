@@ -21,7 +21,8 @@
   :group 'data)
 
 
-(defcustom sensetion-output-buffer-name "sensetion"
+(defcustom sensetion-output-buffer-name
+  "sensetion"
   "Buffer name where sensetion results are displayed."
   :group 'sensetion
   :type 'string)
@@ -29,8 +30,9 @@
 
 (defcustom sensetion-elasticsearch-path
   nil
+  "Path to elasticsearch executable."
   :group 'sensetion
-  :type (choice file (const nil)))
+  :type '(choice file (const nil)))
 
 
 (defcustom sensetion-backend-url
@@ -126,6 +128,16 @@ far, and the cdr is the number of annotatable tokens.")
   nil)
 
 
+ (defvar-local sensetion--buffer-modified-sents
+  (make-hash-table :size 1000 :test 'equal)
+  "Map from sent-ids to booleans.")
+
+
+(defvar-local sensetion--buffer-logfile
+  nil
+  "Filepath to log of current annotation session.")
+
+
 (defvar sensetion-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map "s" #'sensetion-hydra/body)
@@ -199,6 +211,7 @@ annotation."
      (with-inhibiting-read-only
       (setq sensetion--lemma lemma)
       (setq sensetion--synset-cache (sensetion--wordnet-lookup-lemma lemma))
+      (setq sensetion--buffer-logfile (sensetion--buffer-logfile lemma))
       (setq sensetion--local-status (sensetion--make-collocations matches)))
      (sensetion--beginning-of-buffer))
    (pop-to-buffer result-buffer)
@@ -207,6 +220,14 @@ annotation."
                    (sensetion--create-buffer-name lemma pos)))
    (matches (sensetion--es-get-sents lemma pos))
    (pos (unless (equal pos "any") pos))))
+
+
+(defun sensetion--buffer-logfile (lemma)
+  (let ((fp (f-join user-emacs-directory
+		    "sensetion"
+		    (format "%s-%s" lemma (float-time)))))
+    (f-mkdir (f-dirname fp))
+    fp))
 
 
 (defun sensetion--create-buffer-name (lemma pos)
@@ -239,8 +260,37 @@ annotation."
     (sensetion--alist->sent (sensetion--es-id->sent sent-id))))
 
 
-(defun sensetion--update-sent (sent)
+(cl-defun sensetion--update-sent (sent &optional (mod-sents sensetion--buffer-modified-sents)
+			                (logfile sensetion--buffer-logfile))
+  (let* ((sent-id (sensetion--sent-id sent))
+	 (modified? (gethash sent-id mod-sents)))
+    (unless modified?
+      (with-temp-buffer
+	(prin1 (sensetion--sent->alist sent) (current-buffer))
+	(insert "\n")
+	(let ((save-silently t))
+	  (append-to-file (point-min) (point-max) logfile)))
+      (setf (gethash sent-id mod-sents) t)))
   (sensetion--es-update-modified-sent sent))
+
+
+(cl-defun sensetion--create-log-diff (&optional (logfile sensetion--buffer-logfile))
+  (sensetion-is
+   (with-current-buffer old-b
+     (insert-file-contents logfile))
+   (sensetion--map-buffer-lines #'go old-b)
+   (ediff-buffers old-b new-b)
+   :where
+   (go (_ line)
+       (let* ((sent-id  (cdr (read (subseq line 1))))
+	      (new-sent (sensetion--es-id->sent sent-id)))
+	 (with-temp-buffer
+	   (prin1 new-sent (current-buffer))
+	   (insert "\n")
+	   (append-to-buffer new-b (point-min) (point-max)))))
+   (new-b (generate-new-buffer fname))
+   (old-b (generate-new-buffer fname))
+   (fname (f-filename logfile))))
 
 
 (defun sensetion--tk-glob? (tk)
