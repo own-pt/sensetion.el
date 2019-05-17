@@ -3,6 +3,8 @@
 (require 'subr-x)
 (require 'ido)
 (require 'f)
+(require 'ansi-color)
+(require 'diff-mode)
 (require 'map)
 (require 'async)
 (require 'hydra)
@@ -15,13 +17,14 @@
 ;; TODO: benchmark stuff with
 ;; https://emacs.stackexchange.com/questions/539/how-do-i-measure-performance-of-elisp-code
 
-
+;;; Customizations
 (defgroup sensetion nil
   "Support for annotating word senses."
   :group 'data)
 
 
-(defcustom sensetion-output-buffer-name "sensetion"
+(defcustom sensetion-output-buffer-name
+  "sensetion"
   "Buffer name where sensetion results are displayed."
   :group 'sensetion
   :type 'string)
@@ -29,8 +32,9 @@
 
 (defcustom sensetion-elasticsearch-path
   nil
+  "Path to elasticsearch executable."
   :group 'sensetion
-  :type (choice file (const nil)))
+  :type '(choice file (const nil)))
 
 
 (defcustom sensetion-backend-url
@@ -52,40 +56,6 @@
   "Show synset id in sense menu during annotation."
   :group 'sensetion
   :type  'boolean)
-
-
-(defvar sensetion--completion-function
-  (completion-table-dynamic
-   (lambda (prefix)
-     (sensetion-es-prefix-lemma prefix))))
-
-
-(defvar-local sensetion--local-status
-  nil
-  "Local status.
-
-A cons cell where the car is the number of tokens annotated so
-far, and the cdr is the number of annotatable tokens.")
-
-
-(defvar sensetion-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map "s" #'sensetion-hydra/body)
-    (define-key map "<" #'sensetion-previous-selected)
-    (define-key map ">" #'sensetion-next-selected)
-    (define-key map "/" #'sensetion-edit-sense)
-    (define-key map "u" #'sensetion-unglob)
-    (define-key map "l" #'sensetion-edit-lemma)
-    (define-key map "m" #'sensetion-toggle-glob-mark)
-    (define-key map "g" #'sensetion-glob)
-    (define-key map "v" #'sensetion-toggle-scripts)
-    (define-key map "." #'sensetion-edit-sent)
-    (define-key map "?" #'sensetion-edit-unsure)
-    (define-key map "i" #'sensetion-edit-ignore)
-    (define-key map [C-down] #'sensetion-move-line-down)
-    (define-key map [C-up] #'sensetion-move-line-up)
-    map)
-  "Keymap for `sensetion-mode'.")
 
 
 (defcustom sensetion-unnanotated-colour
@@ -133,20 +103,61 @@ with low confidence."
   :type 'color)
 
 
+(defcustom sensetion-mode-line '(:eval (sensetion--mode-line-status-text))
+  ""
+  :group 'sensetion
+  :type 'sexp
+  :risky t)
+
+
+;;; Vars
+
+
 (defvar-local sensetion--lemma
   nil
   "Lemma being annotated in the buffer.")
+
+
+(defvar-local sensetion--local-status
+  nil
+  "Local status.
+
+A cons cell where the car is the number of tokens annotated so
+far, and the cdr is the number of annotatable tokens.")
 
 
 (defvar-local sensetion--synset-cache
   nil)
 
 
-(defcustom sensetion-mode-line '(:eval (sensetion--mode-line-status-text))
-  ""
-  :group 'sensetion
-  :type 'sexp
-  :risky t)
+ (defvar-local sensetion--buffer-modified-sents
+  (make-hash-table :size 1000 :test 'equal)
+  "Map from sent-ids to booleans.")
+
+
+(defvar-local sensetion--buffer-logfile
+  nil
+  "Filepath to log of current annotation session.")
+
+
+(defvar sensetion-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map "s" #'sensetion-hydra/body)
+    (define-key map "<" #'sensetion-previous-selected)
+    (define-key map ">" #'sensetion-next-selected)
+    (define-key map "/" #'sensetion-edit-sense)
+    (define-key map "u" #'sensetion-unglob)
+    (define-key map "l" #'sensetion-edit-lemma)
+    (define-key map "m" #'sensetion-toggle-glob-mark)
+    (define-key map "g" #'sensetion-glob)
+    (define-key map "v" #'sensetion-toggle-scripts)
+    (define-key map "." #'sensetion-edit-sent)
+    (define-key map "?" #'sensetion-edit-unsure)
+    (define-key map "i" #'sensetion-edit-ignore)
+    (define-key map [C-down] #'sensetion-move-line-down)
+    (define-key map [C-up] #'sensetion-move-line-up)
+    map)
+  "Keymap for `sensetion-mode'.")
 
 
 (define-derived-mode sensetion-mode special-mode "sensetion"
@@ -162,8 +173,9 @@ with low confidence."
   (aset (or buffer-display-table
             (setq buffer-display-table (make-display-table)))
         ?\n [?\n?\n])
+  (add-hook 'kill-buffer-hook 'sensetion--create-log-diff nil t)
   ;; customize mode line
-  (setq-local mode-name '(:eval (sensetion--mode-line-status-text))))
+  (setq-local mode-name sensetion-mode-line))
 
 
 (defun sensetion--mode-line-status-text ()
@@ -172,6 +184,12 @@ with low confidence."
               (cl-destructuring-bind (done . total) sensetion--local-status
                 (format ":%.0f/%.0f" done total))
             "")))
+
+
+(defvar sensetion--completion-function
+  (completion-table-dynamic
+   (lambda (prefix)
+     (sensetion-es-prefix-lemma prefix))))
 
 
 ;;;###autoload
@@ -196,6 +214,7 @@ annotation."
      (with-inhibiting-read-only
       (setq sensetion--lemma lemma)
       (setq sensetion--synset-cache (sensetion--wordnet-lookup-lemma lemma))
+      (setq sensetion--buffer-logfile (sensetion--buffer-logfile lemma))
       (setq sensetion--local-status (sensetion--make-collocations matches)))
      (sensetion--beginning-of-buffer))
    (pop-to-buffer result-buffer)
@@ -204,6 +223,14 @@ annotation."
                    (sensetion--create-buffer-name lemma pos)))
    (matches (sensetion--es-get-sents lemma pos))
    (pos (unless (equal pos "any") pos))))
+
+
+(defun sensetion--buffer-logfile (lemma)
+  (let ((fp (f-join user-emacs-directory
+		    "sensetion"
+		    (format "%s-%s.curr" lemma (float-time)))))
+    (f-mkdir (f-dirname fp))
+    fp))
 
 
 (defun sensetion--create-buffer-name (lemma pos)
@@ -236,8 +263,45 @@ annotation."
     (sensetion--alist->sent (sensetion--es-id->sent sent-id))))
 
 
-(defun sensetion--update-sent (sent)
+(cl-defun sensetion--update-sent (sent &optional (mod-sents sensetion--buffer-modified-sents)
+			                (logfile sensetion--buffer-logfile))
+  (let* ((sent-id   (sensetion--sent-id sent))
+	 (modified? (gethash sent-id mod-sents)))
+    (unless modified?
+      (let ((old-sent (sensetion--es-id->sent sent-id)))
+	(with-temp-buffer
+	  (prin1 old-sent (current-buffer))
+	  (terpri (current-buffer))
+	  (let ((save-silently t)) 	; no minibuffer logging
+	    (append-to-file (point-min) (point-max) logfile))))
+      (setf (gethash sent-id mod-sents) t)))
   (sensetion--es-update-modified-sent sent))
+
+
+(cl-defun sensetion--create-log-diff (&optional (logfile sensetion--buffer-logfile))
+  (sensetion-is
+   (sensetion--map-file-lines logfile #'go)
+   (with-current-buffer new-b
+     (write-region (point-min) (point-max) new-f))
+   (if (executable-find "git")
+       (prog1
+	   (call-process "git" nil diff-b t
+			 "diff" "--no-index" "--color-words=\\w+" "-U0" logfile new-f)
+	 (with-current-buffer diff-b
+	   (diff-mode)
+	   (ansi-color-apply-on-region (point-min) (point-max))) ; or else unreadable with word-diff
+	 (display-buffer diff-b))
+     (user-error "Please make sure you have `git' in your PATH"))
+   :where
+   (new-f (f-swap-ext logfile "new"))
+   (go (_ line)
+       (let* ((sent-id  (cdr (read (substring line 1)))) ; substring -> doesn't reade whole sentence
+	      (new-sent (sensetion--es-id->sent sent-id)))
+	 (prin1 new-sent new-b)
+	 (terpri new-b)))
+   (diff-b (generate-new-buffer (format "*diff:%s*" fname)))
+   (new-b  (generate-new-buffer fname))
+   (fname  (f-filename logfile))))
 
 
 (defun sensetion--tk-glob? (tk)
