@@ -46,6 +46,11 @@ itself."
 
 
 (defmacro sensetion-is (&rest body)
+  (declare (debug ([&rest [&not ":where"] form]
+			 &optional
+			 gate ":where"
+			       &rest (&define name def-form)
+			       (&define name lambda-list def-body))))
   (seq-let (body wclauses)
       (-split-when (lambda (c) (eq :where c)) body)
     (let ((body
