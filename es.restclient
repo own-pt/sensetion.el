@@ -4,13 +4,55 @@
 PUT http://localhost:9200/sensetion-synsets
 Content-Type: application/json
 
-{"mappings": {"properties": {"terms": {"type":  "keyword"} } } }
+{
+    "mappings": {
+        "properties": {
+            "gloss": {
+                "enabled": false
+            },
+            "terms": {
+                "type": "keyword"
+            }
+        }
+    }
+}
 
 # index docs
 PUT http://localhost:9200/sensetion-docs
 Content-Type: application/json
 
-{"mappings":{"properties":{"tokens":{"type":"nested","properties":{"lemmas":{"type":"keyword"}}}}}}
+{
+    "mappings": {
+        "properties": {
+            "tokens": {
+                "properties": {
+                    "form": {
+                        "enabled": false
+                    },
+                    "tag": {
+                        "enabled": false
+                    },
+                    "kind": {
+                        "enabled": false
+                    },
+                    "meta": {
+                        "enabled": false
+                    },
+                    "lemmas": {
+                        "type": "keyword"
+                    }
+                },
+                "type": "nested"
+            },
+            "text": {
+                "enabled": false
+            },
+            "id": {
+                "type": "keyword"
+            }
+        }
+    }
+}
 
 # delete synsets
 DELETE http://localhost:9200/sensetion-synsets/
@@ -30,7 +72,7 @@ Content-Type: application/json
 
 {
   "query": {
-    "term" : { "ofs" : 3141756 } 
+    "term" : { "ofs" : 3141756 }
   }
 }
 
@@ -117,7 +159,10 @@ Content-Type: application/json
                 }
             }
         }
-    }
+    },
+    "sort" : [
+    "id"
+    ]
 }
 
 
@@ -132,4 +177,3 @@ Content-Type: application/json
 #
 GET http://localhost:9200/sensetion-docs/_doc/447909-a
 Content-Type: application/json
-

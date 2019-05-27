@@ -7,7 +7,7 @@
 ;; TODO: maybe use maps all the way
 (cl-defstruct (sensetion--tk (:constructor nil)
                     (:constructor sensetion--make-tk))
-  kind form lemmas pos tag senses glob unsure meta)
+  kind form lemmas tag senses glob unsure meta)
 
 
 (cl-defstruct (sensetion--synset (:constructor nil)
@@ -36,8 +36,8 @@
 
 (defun sensetion--alist->tk (alist)
   (pcase alist
-    ((map kind form lemmas pos tag senses glob unsure meta)
-     (sensetion--make-tk :kind (s-split ":" kind t) :form form :lemmas lemmas :pos pos
+    ((map kind form lemmas tag senses glob unsure meta)
+     (sensetion--make-tk :kind (s-split ":" kind t) :form form :lemmas lemmas
 		:tag tag :senses senses :glob glob :unsure unsure :meta meta))))
 
 
@@ -55,14 +55,13 @@
 
 (defun sensetion--tk->alist (tk)
   (pcase tk
-    ((cl-struct sensetion--tk kind form lemmas pos tag senses glob unsure meta)
+    ((cl-struct sensetion--tk kind form lemmas tag senses glob unsure meta)
      (cl-mapcan
       (lambda (k v) (when v (list (cons k v))))
-      '(kind form lemmas pos tag senses glob unsure)
+      '(kind form lemmas tag senses glob unsure meta)
       (list (s-join ":" kind)
 	    form
             lemmas
-	    pos
 	    tag
             senses
             glob

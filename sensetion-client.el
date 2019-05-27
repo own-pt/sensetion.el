@@ -48,19 +48,28 @@
 
 
 (defun sensetion-es-prefix-lemma (prefix)
-  (let* ((template "{\"query\":{\"prefix\" : { \"terms\" : \"%s\" }}}")
-	 (hits (sensetion--es-query "sensetion-synsets/_search"
-			   (format template prefix)
-			   :params sensetion--es-size-params))
+  (let* ((query `((query
+		   (prefix
+		    (terms . ,prefix)))))
+	 (query (json-encode-alist query))
+	 (hits  (sensetion--es-query "sensetion-synsets/_search"
+			    query
+			    :params sensetion--es-size-params))
 	 (terms (seq-mapcat (lambda (doc) (map-elt doc 'terms)) hits)))
     (seq-filter (lambda (lemma) (string-prefix-p prefix lemma t)) terms)))
 
 
 (defun sensetion--es-lemma->synsets (lemma pos)
-  (let* ((template "{\"query\": {\"bool\": { \"filter\": [{\"term\":
-                           {\"terms\": \"%s\"}}, {\"term\":{ \"pos\" : \"%s\"}}]}}}")
+  (let* ((query `((query
+		   (bool
+		    (filter .
+			    [((term
+			       (terms . ,lemma)))
+			     ((term
+			       (pos . ,pos)))])))))
+	 (query (json-encode-alist query))
 	 (hits (sensetion--es-query "sensetion-synsets/_search"
-			   (format template lemma pos)
+			   query
 			   :params sensetion--es-size-params)))
     (mapcar #'sensetion--alist->synset hits)))
 
@@ -80,19 +89,29 @@
 
 
 (defun sensetion--es-lemma-pos->docs (lemma pos)
-  (let* ((template "{\"query\": {\"nested\": {\"query\": {\"regexp\":
-                    {\"tokens.lemmas\": \"%s(%%%s)?\"}}, \"path\": \"tokens\" }}}")
-	 (query (format template lemma (sensetion--pos->synset-type pos)))
-	 (hits (sensetion--es-query "sensetion-docs/_search"
-			   query
-			   :params sensetion--es-size-params)))
+  (let* ((query `((query
+		   (nested
+		    (path . "tokens")
+		    (query
+		     (regexp
+		      (tokens\.lemmas . ,(format "%s(%%%s)?" lemma (sensetion--pos->synset-type pos)))))))
+		  (sort . ("id"))))
+	 (query (json-encode-alist query))
+	 (hits  (sensetion--es-query "sensetion-docs/_search"
+			    query
+			    :params sensetion--es-size-params)))
     hits))
 
 
 (defun sensetion--es-lemma->docs (lemma)
-  (let* ((template "{\"query\": {\"nested\": {\"path\": \"tokens\",
-                       \"query\": {\"regexp\": {\"tokens.lemmas\": \"%s(%%[1-4])?\"}}}}}")
-	 (query (format template lemma))
+  (let* ((query `((query
+		   (nested
+		    (path . "tokens")
+		    (query
+		     (regexp
+		      (tokens\.lemmas . ,(format "%s(%%[1-4])?" lemma))))))
+		  (sort . ("id"))))
+	 (query (json-encode-alist query))
 	 (hits (sensetion--es-query "sensetion-docs/_search"
 			   query
 			   :params sensetion--es-size-params)))

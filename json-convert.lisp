@@ -73,27 +73,27 @@
   (mapcan (lambda (elem) (if (null (cdr elem)) nil (list elem))) alist))
 
 (defun token->json (plist)
-  (let ((h (alexandria:plist-hash-table plist))
-	(kind (getf plist :kind)))
+  (let* ((h (alexandria:plist-hash-table plist))
+	 (kind (getf plist :kind))
+	 (metas (loop
+		  for key being the hash-keys of h
+		  for val being the hash-values of h
+		  unless (member key '(:form :lemma :glob :kind :senses :unsure :tag))
+		    collect (cons (symbol->string key)
+				  (if (symbolp val)
+				      (symbol->string val)
+				      val)))))
     (alexandria:alist-hash-table
      (alist-remove-empty
-      `(("form" . ,(gethash :form h))
-	("lemmas" . ,(uiop:split-string (gethash :lemma h) :separator '(#\|)))
-	("kind" . ,(if (consp kind)
+      `(("kind" . ,(if (consp kind)
 		       (format nil "~{~A~^:~}" (cons (symbol->string (car kind))
 						     (if (listp (cdr kind)) (cdr kind) (list (cdr kind)))))
 		       (symbol->string kind)))
-	("senses" . ,(mapcar #'car (gethash :senses h)))
-	("unsure" . ,(gethash :unsure h))
+	("form" . ,(gethash :form h))
+	("lemmas" . ,(uiop:split-string (gethash :lemma h) :separator '(#\|)))
 	("tag" . ,(symbol->string (gethash :tag h "ignore")))
+	("senses" . ,(mapcar #'car (gethash :senses h)))
 	("glob" . ,(gethash :glob h))
-	("meta" . ,(alexandria:alist-hash-table
-		    (loop
-		      for key being the hash-keys of h
-		      for val being the hash-values of h
-		      unless (member key '(:form :lemma :glob :kind :senses :unsure :tag))
-			collect (cons (symbol->string key)
-				      (if (symbolp val)
-					  (symbol->string val)
-					  val)))))))
+	("unsure" . ,(gethash :unsure h))
+	("meta" . ,(when metas (alexandria:alist-hash-table metas)))))
      :test 'equal)))
