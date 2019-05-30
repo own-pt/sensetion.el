@@ -76,13 +76,13 @@ def to_json(obj):
     return json.dumps(obj, sort_keys=True, ensure_ascii=False)
 
 def go_doc(fp,tkz):
+    fname = os.path.basename(os.path.splitext(fp)[0])
+    if '-' in fname:
+        raise Error("Filename shouldn't contain '-' character.")
     with open(fp, 'r') as infile:
-        for ix,line in enumerate(infile):
-            fname = os.path.basename(os.path.splitext(fp)[0])
-            if '-' in fname:
-                raise Error("Filename shouldn't contain '-' character.")
+        for ix, line in enumerate(infile):
             sent_id = '{}-{}'.format(fname, ix)
-            yield sent_id, to_json(go_sent(line, sent_id, tkz))
+            yield sent_id, to_json(go_sent(line.rstrip('\n'), sent_id, tkz))
 
 @click.command()
 @click.option('-c', '--config', 'tokenization_config', type=click.Path(exists=True), required=True, help = "path to a .set file used by the tokenization algorithm. See https://pydelphin.readthedocs.io/en/latest/api/delphin.repp.html#delphin.repp.REPP.from_config")
