@@ -1,10 +1,17 @@
 # -*- mode:org -*-
+please create a virtual environment and run
+: pip install -r requirements.txt
+
 * touch.py
 prepare sentences for input to =sensetion.el= and elastic
 search. provide one or more files with one sentence per line.
 #+BEGIN_SRC sh
 python3 touch.py --help
 #+END_SRC
+
+you'll need to [[https://www.nltk.org/data.html][download wordnet data from NLTK]] and have configuration
+file for the REPP tokenizer; there is one at =pet/repp.set= at
+http://svn.delph-in.net/erg/trunk.
 
 * es-dump.py
 dump all documents in a given elasticsearch server to a chosen directory.

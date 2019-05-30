@@ -42,7 +42,7 @@ There are two things you can do about this warning:
 (use-package flycheck  :defer t :ensure t)
 (use-package s         :defer t :ensure t)
 (use-package f         :defer t :ensure t)
-(use-package trie      :defer t :ensure t)
+(use-package request   :defer t :ensure t)
 (use-package async     :defer t :ensure t)
 
 (use-package sensetion
@@ -58,7 +58,5 @@ There are two things you can do about this warning:
   ;; editing like this (where lispy-mode is activated when
   ;; `sensetion-edit-mode' is on):
   ; :hook (sensetion-edit-mode . lispy-mode)
-
-  ;; change path to annotation files directory here
-  :custom (sensetion-annotation-dir "~/sensetion-data/"))
+  )
 

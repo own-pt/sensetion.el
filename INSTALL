@@ -7,11 +7,17 @@ manually, note that you might need Emacs version 26 or higher.
 * Dependencies
 - [[https://curl.haxx.se/download.html][curl]] -- you probably already have it installed
 - [[https://www.elastic.co/downloads/elasticsearch][elastic search]]
+- (optional) python 3 and some libraries (see =utils/requirements.txt=)
 
 
 * Data
-TODO
+You can produce data to be used by this annotation interface using a
+Python script; see =utils/README=. The data will need to be inserted
+into elasticsearch at the index =sensetion-docs=, like so:
+: curl -s -H "Content-Type: application/x-ndjson" -XPOST localhost:9200/sensetion-docs/_bulk --data-binary "@repsol.json" &> /dev/null ; echo
 
+You must already have wordnet data at the =sensetion-synsets=
+elastisearch index.
 
 * Emacs beginner installation
 - Download and install emacs -- instructions [[https://www.gnu.org/software/emacs/][here]].
@@ -38,13 +44,13 @@ TODO
 - Restart emacs (or reload or your init file).
 
 
-* Docker installation
-- install docker for your platform.
-- clone this repository.
-- run
-  : docker build -t sensetion .
-  in the root directory of the repository.
-- run
-  : docker run -it -v /path/to/annotation/files:/home/sensetioner/sensetion-data sensetion emacs
-  to start annotating. Remember to change the path to the annotation
-  files to the appropriate directory.
+# * Docker installation
+# - install docker for your platform.
+# - clone this repository.
+# - run
+#   : docker build -t sensetion .
+#   in the root directory of the repository.
+# - run
+#   : docker run -it -v /path/to/annotation/files:/home/sensetioner/sensetion-data sensetion emacs
+#   to start annotating. Remember to change the path to the annotation
+#   files to the appropriate directory.
