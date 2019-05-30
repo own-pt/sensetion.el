@@ -63,8 +63,12 @@ Content-Type: application/json
 DELETE http://localhost:9200/sensetion-docs/
 Content-Type: application/json
 
-# index
+## index synsets
 # curl -s -H "Content-Type: application/x-ndjson" -XPOST localhost:9200/sensetion-synsets/_bulk --data-binary "@synsets.json" &> /dev/null ; echo
+## index documents
+## if only one file:
+# curl -s -H "Content-Type: application/x-ndjson" -XPOST localhost:9200/sensetion-docs/_bulk --data-binary "@repsol.json" &> /dev/null ; echo
+## if many, all in one directory with extension json:
 # for i in *.json ; do curl -s -H "Content-Type: application/x-ndjson" -XPOST localhost:9200/sensetion-docs/_bulk --data-binary "@$i" &> /dev/null ; done
 
 GET http://localhost:9200/sensetion-synsets/_search

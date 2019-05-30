@@ -2,14 +2,6 @@
 
 (require 'cl-lib)
 
-(defun sensetion--punctuation-no-space-before? (str)
-  (gethash
-   str
-   #s(hash-table size 45 test equal rehash-size 1.5 rehash-threshold 0.8125
-                 purecopy t data
-                 ("." t "," t ":" t "!" t "?" t "'" t "]" t ")" t "..." t "»" t))))
-
-
 (defun sensetion--beginning-of-buffer ()
   (goto-char (point-min)))
 
