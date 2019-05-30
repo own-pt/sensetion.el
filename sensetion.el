@@ -103,10 +103,18 @@ with low confidence."
   :type 'color)
 
 
-(defcustom sensetion-mode-line '(:eval (sensetion--mode-line-status-text))
-  ""
+(defcustom sensetion-mode-line
+  '(:eval (sensetion--mode-line-status-text))
+  "Modeline customization for `sensetion-mode'."
   :group 'sensetion
   :type 'sexp
+  :risky t)
+
+
+(defcustom sensetion-end-session-hook nil
+  "Functions run when annotation buffer is closed."
+  :group 'sensetion
+  :type 'list
   :risky t)
 
 
@@ -173,7 +181,7 @@ far, and the cdr is the number of annotatable tokens.")
   (aset (or buffer-display-table
             (setq buffer-display-table (make-display-table)))
         ?\n [?\n?\n])
-  (add-hook 'kill-buffer-hook 'sensetion--create-log-diff nil t)
+  (mapc (lambda (f) (add-hook 'kill-buffer-hook f nil t)) sensetion-end-session-hook)
   ;; customize mode line
   (setq-local mode-name sensetion-mode-line))
 
@@ -651,6 +659,7 @@ synset and they have different pos1, return nil."
    #s(hash-table size 5 test equal rehash-size 1.5 rehash-threshold 0.8125
                  purecopy t data
                  ("n" "1" "v" "2" "a" "3" "r" "4"))))
+
 
 (defun sensetion--synset-type->pos (st)
   (gethash
