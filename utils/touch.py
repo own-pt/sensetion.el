@@ -77,8 +77,8 @@ def to_json(obj):
 
 def go_doc(fp,tkz):
     fname = os.path.basename(os.path.splitext(fp)[0])
-    if '-' in fname:
-        raise Error("Filename shouldn't contain '-' character.")
+    # if '-' in fname:
+    #     raise Error("Filename shouldn't contain '-' character.")
     with open(fp, 'r') as infile:
         for ix, line in enumerate(infile):
             sent_id = '{}-{}'.format(fname, ix)
