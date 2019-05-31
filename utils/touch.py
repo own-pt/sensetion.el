@@ -10,6 +10,7 @@
 ### TODO: way of specifying sentence ids
 from delphin.repp import REPP
 from nltk.corpus import wordnet as wn
+import string
 import json
 import click
 import os
@@ -19,17 +20,17 @@ WN_POS=[wn.NOUN,wn.VERB,wn.ADJ,wn.ADV,wn.ADJ_SAT]
 def go_sent(sent, sent_id, tkz):
     def go(form):
         # get lemma candidates
-        lemmas = []
-        for p in WN_POS:
-            l = wn.morphy(form, pos=p)
-            if l:
-                lemmas.append((l, p))
-        # assign sense automatically if desirable
+        lemmas  = set()
         synsets = set()
-        for l_p in lemmas:
-            for s in wn.lemmas(l_p[0], pos=l_p[1]):
-                sense = s
-                synsets.add(s.synset())
+        for p in WN_POS:
+            l = wn.morphy(form.lower(), pos=p)
+            if l:
+                lemmas.add((l, p))
+                for l in wn.lemmas(l, pos=p):
+                    lemmas.add((l.name(), p))
+                    sense = l
+                    synsets.add(sense.synset())
+        lemmas = list(lemmas)
         senses = []
         ignore = False
         ns = len(synsets)
