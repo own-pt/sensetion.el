@@ -12,12 +12,13 @@
 (require 'sensetion-utils)
 
 
-(defvar sensetion--es-headers '(("Content-Type" . "application/json")))
+(defvar sensetion--es-headers '(("Content-Type" . "application/json ; charset=UTF-8")))
 
 (defvar sensetion--es-size-params '(("size" . "10000")))
 
 
 (defsubst sensetion--json-read ()
+  (decode-coding-region (point-min) (point-max) 'utf-8)
   (let ((json-array-type 'list))
     (json-read)))
 
