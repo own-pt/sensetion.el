@@ -361,7 +361,7 @@ collocation."
                           (cond
                            ((equal (list ck) tk-keys)
                             ;; this token only part of one colloc
-                            (setf (sensetion--tk-kind tk) "wf"))
+                            (setf (sensetion--tk-kind tk) (list "wf")))
                            ((member ck tk-keys)
                             ;; this token part of more than one colloc
                             (setf (sensetion--tk-kind tk)
