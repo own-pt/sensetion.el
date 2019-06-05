@@ -33,4 +33,18 @@
 
 
 
+(defun stat-gloss (db gloss)
+  (let ((tks (getf gloss :TOKENS)))
+    ))
+
+
+(defun stat-corpus (corpus-directory)
+  (let ((db (make-hash-table :test '#equal)))
+    (mapcar (lambda (file) 
+	      (with-open-file (in file) 
+	       (loop for line = (read in)
+		     while line
+		     do (stat-gloss db line))))
+	    (directory corpus-directory))))
+
 
