@@ -9,9 +9,17 @@ search. provide one or more files with one sentence per line.
 python3 touch.py --help
 #+END_SRC
 
-you'll need to [[https://www.nltk.org/data.html][download wordnet data from NLTK]] and have configuration
-file for the REPP tokenizer; there is one at =pet/repp.set= at
-http://svn.delph-in.net/erg/trunk.
+you'll need to have a configuration file for the REPP tokenizer; there
+is one at =pet/repp.set= at http://svn.delph-in.net/erg/trunk.
+
+* enrich.py
+
+the corpus prepared by =touch.py= is not sufficient by itself. this
+script adds lemmatization and automatic sense-tagging (for unambiguous
+words), and may do more in the future.
+
+you'll need to [[https://www.nltk.org/data.html][download wordnet data from NLTK]] in order to run this
+script.
 
 * es-dump.py
 dump all documents in a given elasticsearch server to a chosen directory.

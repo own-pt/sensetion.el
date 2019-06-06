@@ -505,7 +505,7 @@ number of selected tokens."
                                                  sensetion-previously-annotated-colour
                                                sensetion-previously-annotated-unsure-colour))
                                             (_ (error "%s" tk))))
-                                 (when-let ((key (sensetion--tk-glob? tk)))
+                                 (when-let ((_ (sensetion--tk-glob? tk)))
                                    (list 'sensetion--glob-ix
                                          ix))))
 

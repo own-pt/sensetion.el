@@ -24,31 +24,34 @@ Content-Type: application/json
 {
     "mappings": {
         "properties": {
+            "doc_id": {
+                "type": "keyword"
+            },
+            "sent_id": {
+                "type": "keyword"
+            },
+            "text": {
+                "enabled": false
+            },
             "tokens": {
+                "type": "nested",
                 "properties": {
-                    "form": {
-                        "enabled": false
+                    "lemmas": {
+                        "type": "keyword"
                     },
-                    "tag": {
+                    "meta": {
                         "enabled": false
                     },
                     "kind": {
                         "enabled": false
                     },
-                    "meta": {
+                    "tag": {
                         "enabled": false
                     },
-                    "lemmas": {
-                        "type": "keyword"
+                    "form": {
+                        "enabled": false
                     }
-                },
-                "type": "nested"
-            },
-            "text": {
-                "enabled": false
-            },
-            "id": {
-                "type": "keyword"
+                }
             }
         }
     }
@@ -181,3 +184,15 @@ Content-Type: application/json
 #
 GET http://localhost:9200/sensetion-docs/_doc/447909-a
 Content-Type: application/json
+
+#
+GET http://localhost:9200/sensetion-docs/_search
+Content-Type: application/json
+
+{
+    "query": {
+        "term": {
+            "doc_id": "0f09c2fd-69e6-420d-bae3-823b2200be59-0"
+        }
+    }
+}

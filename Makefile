@@ -19,31 +19,34 @@ PUT_SYNSETS="{\
 PUT_DOCS="{\
     \"mappings\": {\
         \"properties\": {\
+            \"doc_id\": {\
+                \"type\": \"keyword\"\
+            },\
+            \"sent_id\": {\
+                \"type\": \"keyword\"\
+            },\
+            \"text\": {\
+                \"enabled\": false\
+            },\
             \"tokens\": {\
+                \"type\": \"nested\",\
                 \"properties\": {\
-                    \"form\": {\
-                        \"enabled\": false\
+                    \"lemmas\": {\
+                        \"type\": \"keyword\"\
                     },\
-                    \"tag\": {\
+                    \"meta\": {\
                         \"enabled\": false\
                     },\
                     \"kind\": {\
                         \"enabled\": false\
                     },\
-                    \"meta\": {\
+                    \"tag\": {\
                         \"enabled\": false\
                     },\
-                    \"lemmas\": {\
-                        \"type\": \"keyword\"\
+                    \"form\": {\
+                        \"enabled\": false\
                     }\
-                },\
-                \"type\": \"nested\"\
-            },\
-            \"text\": {\
-                \"enabled\": false\
-            },\
-            \"id\": {\
-                \"type\": \"keyword\"\
+                }\
             }\
         }\
     }\

@@ -119,6 +119,17 @@
     hits))
 
 
+(defun sensetion--es-get-doc-sents (doc-id)
+  (let* ((query `((query
+		   (term
+		    (doc_id . ,doc_id)))))
+	 (query (json-encode-alist query))
+	 (hits (sensetion--es-query "sensetion-docs/_search"
+			   query
+			   :params sensetion--es-size-params)))
+    hits))
+
+
 (defun sensetion--remove-man-now (sent)
   (cl-labels
       ((remove-man-now (tk)
