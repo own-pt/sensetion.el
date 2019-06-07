@@ -23,10 +23,9 @@ def go_sent(sent, sent_id, tkz):
         lemmas  = set()
         synsets = set()
         for p in WN_POS:
-            l = wn.morphy(form.lower(), pos=p)
-            if l:
-                lemmas.add((l, p))
-                for l in wn.lemmas(l, pos=p):
+            lstr = wn.morphy(form.lower(), pos=p)
+            if lstr:
+                for l in wn.lemmas(lstr, pos=p):
                     lemmas.add((l.name(), p))
                     sense = l
                     synsets.add(sense.synset())

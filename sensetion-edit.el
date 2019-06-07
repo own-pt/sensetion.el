@@ -34,6 +34,26 @@
    (eval (sensetion--edit-hydra-maker lemma tk-ix sent options))))
 
 
+(defun sensetion--sense-edit-help-text (chosen? sid terms gloss)
+  (sensetion-is
+   (format "%s%s %s"
+	   chosen-mark
+	   synset?
+	   (s-replace "\n" "\n   "
+		      (s-word-wrap (- (frame-width) 5)
+				   (concat terms-txt
+					   " • "
+					   gloss))))
+   :where
+   (terms-txt (mapconcat #'bold terms ","))
+   (synset? (if sensetion-sense-menu-show-synset-id (concat "(" (prop sid 'italic) ")") ""))
+   (chosen-mark (if chosen? "+ " ""))
+   (bold (txt)
+	 (prop txt 'bold))
+   (prop (txt prop)
+	 (propertize txt 'face prop))))
+
+
 (defun sensetion--edit-hydra-maker (lemma tk-ix sent options)
   "Creates interactive editing hydra on-the-fly."
   (sensetion-is
@@ -54,18 +74,12 @@
                                       ,sk)
                       (sensetion--edit-reinsert-state-call
                        ,tk-ix ,sent ,lemma ',options))
-                   (sense-help-text sk sid terms gloss)
+		   (sensetion--sense-edit-help-text (sense-chosen-ind? sk) sid terms gloss)
                    :column "Pick sense:")))
          options))
    :where
-   (sense-help-text (sk sid terms gloss)
-                    (concat (sense-chosen-ind sk)
-                            (if sensetion-sense-menu-show-synset-id (concat "(" sid ") ") "")
-                            (s-replace "\n" "\n   "
-                                       (s-word-wrap (- (frame-width) 5)
-                                                    (concat (s-join "," terms) " | " gloss)))))
-   (sense-chosen-ind (sk)
-                     (if (member sk pres-skeys) "+ " ""))
+   (sense-chosen-ind? (sk)
+		      (member sk pres-skeys))
    (no-sense-function
     `(,(sensetion--edit-function
         (lambda (tk _)
@@ -197,7 +211,7 @@ returns non-nil. None of the arguments may move point."
 (defun sensetion--completing-read-lemma (&optional initial-input)
   (completing-read "Lemma to annotate: "
 		   sensetion--completion-function
-		   nil t initial-input))
+		   nil 'yes initial-input))
 
 
 (defalias 'sensetion-edit-lemma
@@ -208,7 +222,7 @@ returns non-nil. None of the arguments may move point."
 	    (new-lemmas
 	     (completing-read-multiple
 	      "Edit lemma: "
-	      sensetion--completion-function nil nil
+	      sensetion--completion-function nil 'yes
 	      (cons lemmas-str (1+ (length lemmas-str))))))
        (setf (sensetion--tk-lemmas tk) new-lemmas))
      t))

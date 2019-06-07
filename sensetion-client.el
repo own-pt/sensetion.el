@@ -135,7 +135,7 @@
 
 (defun sensetion--es-update-modified-sent (sent)
   (let* ((sent (sensetion--remove-man-now sent))
-	 (data (json-encode-alist (sensetion--sent->alist sent))))
+	 (data (encode-coding-string (json-encode-alist (sensetion--sent->alist sent)) 'utf-8 t)))
     (sensetion--es-request (format "sensetion-docs/_doc/%s" (sensetion--sent-id sent))
 		  ;; DISCUSS: could be made async, but then might have
 		  ;; race condition?
