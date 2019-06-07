@@ -1,5 +1,6 @@
 # -*- restclient -*-
 
+
 ## index synsets
 PUT http://localhost:9200/sensetion-synsets
 Content-Type: application/json
@@ -159,7 +160,7 @@ Content-Type: application/json
             "path": "tokens",
             "query": {
                 "regexp": {
-                    "tokens.lemmas": "rock(%[1-4])?"
+                    "tokens.lemmas": "basin(%[1-4])?"
                 }
             }
         }
