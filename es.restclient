@@ -182,7 +182,7 @@ GET http://localhost:9200/sensetion-docs/_stats
 Content-Type: application/json
 
 #
-GET http://localhost:9200/sensetion-docs/_doc/447909-a
+GET http://localhost:9200/sensetion-docs/_doc/0-64345bce-76b0-447a-bfa1-800dc82007a6-3
 Content-Type: application/json
 
 #

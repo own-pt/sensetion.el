@@ -53,6 +53,8 @@ def go_sent(sent):
             elif ns == 0:
                 # ignore words that have no sense in wordnet
                 tk[TAG_KEY] = "ignore"
+            else:
+                tk[TAG_KEY] = tk.get(TAG_KEY, "un")
         return tk
 
     sent[TOKENS_KEY] = list(map(lambda tk: go_tk(tk), sent[TOKENS_KEY]))

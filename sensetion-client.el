@@ -96,7 +96,7 @@
 		    (query
 		     (regexp
 		      (tokens\.lemmas . ,(format "%s(%%%s)?" lemma (sensetion--pos->synset-type pos)))))))
-		  (sort . ("id"))))
+		  (sort . ("doc_id" "sent_id"))))
 	 (query (json-encode-alist query))
 	 (hits  (sensetion--es-query "sensetion-docs/_search"
 			    query
@@ -111,7 +111,7 @@
 		    (query
 		     (regexp
 		      (tokens\.lemmas . ,(format "%s(%%[1-4])?" lemma))))))
-		  (sort . ("id"))))
+		  (sort . ("doc_id" "sent_id"))))
 	 (query (json-encode-alist query))
 	 (hits (sensetion--es-query "sensetion-docs/_search"
 			   query

@@ -19,7 +19,7 @@
 		      (:constructor sensetion--make-sent)
 		      (:copier nil)
 		      (:copier sensetion--copy-sent))
-  id meta tokens text)
+  doc-id sent-id meta tokens text)
 
 
 (defun sensetion--alist->synset (alist)
@@ -30,8 +30,9 @@
 
 (defun sensetion--alist->sent (alist)
   (pcase alist
-    ((map id meta tokens text)
-     (sensetion--make-sent :id id :meta meta :tokens (mapcar #'sensetion--alist->tk tokens) :text text))))
+    ((map doc_id sent_id meta tokens text)
+     (sensetion--make-sent :doc-id doc_id :sent-id sent_id :meta meta
+		  :tokens (mapcar #'sensetion--alist->tk tokens) :text text))))
 
 
 (defun sensetion--alist->tk (alist)
@@ -43,11 +44,12 @@
 
 (defun sensetion--sent->alist (sent)
   (pcase sent
-    ((cl-struct sensetion--sent id meta tokens text)
+    ((cl-struct sensetion--sent doc-id sent-id meta tokens text)
      (cl-mapcan
       (lambda (k v) (when v (list (cons k v))))
-      '(id meta tokens text)
-      (list id
+      '(doc_id sent_id meta tokens text)
+      (list doc-id
+	    sent-id
 	    meta
 	    (mapcar #'sensetion--tk->alist tokens)
 	    text)))))
@@ -90,6 +92,12 @@
   (concat (number-to-string (sensetion--synset-ofs synset))
           "-"
           (sensetion--synset-pos synset)))
+
+
+(defun sensetion--sent-id (sent)
+  (format "%s-%s"
+	  (sensetion--sent-doc-id  sent)
+	  (sensetion--sent-sent-id sent)))
 
 
 (defun sensetion--make-lemma* (lemma &optional synset-type)

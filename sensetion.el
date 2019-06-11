@@ -341,9 +341,10 @@ collocation."
 
    (unglob (ck sent)
            (pcase sent
-             ((cl-struct sensetion--sent id meta tokens text)
+             ((cl-struct sensetion--sent doc-id sent-id meta tokens text)
               (sensetion--make-sent
-               :id id
+	       :doc-id doc-id
+               :sent-id sent-id
                :meta meta
                :text text
                :tokens
