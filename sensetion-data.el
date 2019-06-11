@@ -37,7 +37,7 @@
 (defun sensetion--alist->tk (alist)
   (pcase alist
     ((map kind form lemmas tag senses glob unsure meta)
-     (sensetion--make-tk :kind (s-split ":" kind t) :form form :lemmas lemmas
+     (sensetion--make-tk :kind kind :form form :lemmas lemmas
 		:tag tag :senses senses :glob glob :unsure unsure :meta meta))))
 
 
@@ -59,7 +59,7 @@
      (cl-mapcan
       (lambda (k v) (when v (list (cons k v))))
       '(kind form lemmas tag senses glob unsure meta)
-      (list (s-join ":" kind)
+      (list kind
 	    form
             lemmas
 	    tag
