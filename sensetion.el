@@ -315,7 +315,7 @@ annotation."
 
 (defun sensetion--tk-glob? (tk)
   (pcase (sensetion--tk-kind tk)
-    (`(:glob ,k)
+    (`("glob" ,k)
      k)))
 
 
@@ -336,9 +336,7 @@ collocation."
    (when (cdr ckeys)
      (user-error "Please select token which is part of only one collocation"))
    (sensetion--reinsert-sent-at-point (unglob ck sent))
-  
    :where
-
    (unglob (ck sent)
            (pcase sent
              ((cl-struct sensetion--sent doc-id sent-id meta tokens text)

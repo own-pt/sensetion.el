@@ -12,6 +12,9 @@ python3 touch.py --help
 you'll need to have a configuration file for the REPP tokenizer; there
 is one at =pet/repp.set= at http://svn.delph-in.net/erg/trunk.
 
+this step only performs tokenization; you should run the =enrich.py=
+script on its output too.
+
 * enrich.py
 
 the corpus prepared by =touch.py= is not sufficient by itself. this
