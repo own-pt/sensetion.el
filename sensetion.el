@@ -335,41 +335,43 @@ collocation."
      (user-error "Token is not part of a collocation"))
    (when (cdr ckeys)
      (user-error "Please select token which is part of only one collocation"))
-   (sensetion--reinsert-sent-at-point (unglob ck sent))
+   (sensetion--reinsert-sent-at-point (sensetion--unglob ck sent))
    :where
-   (unglob (ck sent)
-           (pcase sent
-             ((cl-struct sensetion--sent doc-id sent-id meta tokens text)
-              (sensetion--make-sent
-	       :doc-id doc-id
-               :sent-id sent-id
-               :meta meta
-               :text text
-               :tokens
-               (cl-loop
-                for tk in tokens
-                ;; don't collect glob to be removed
-                unless (when (equal ck (sensetion--tk-glob? tk))
-                         ;; handle status update when glob was tagged
-			 (when (sensetion--to-annotate? tk)
-                           (cl-incf (cdr sensetion--local-status) -1))
-                         (when (sensetion--tk-annotated? tk)
-			   (cl-incf (car sensetion--local-status) -1))
-                         t)
-                collect (let ((tk-keys (sensetion--tk-coll-keys tk)))
-                          (cond
-                           ((equal (list ck) tk-keys)
-                            ;; this token only part of one colloc
-                            (setf (sensetion--tk-kind tk) (list "wf")))
-                           ((member ck tk-keys)
-                            ;; this token part of more than one colloc
-                            (setf (sensetion--tk-kind tk)
-                                  (cons "cf" (remove ck tk-keys)))))
-                          tk))))))
    ;; TODO: select which colloc to undo?
    (ck (cl-first ckeys))
    (ckeys (sensetion--tk-coll-keys tk))
    (tk (elt (sensetion--sent-tokens sent) ix))))
+
+
+(defun sensetion--unglob (coll-key sent)
+  (pcase sent
+    ((cl-struct sensetion--sent doc-id sent-id meta tokens text)
+     (sensetion--make-sent
+      :doc-id doc-id
+      :sent-id sent-id
+      :meta meta
+      :text text
+      :tokens
+      (cl-loop
+       for tk in tokens
+       ;; don't collect glob to be removed
+       unless (when (equal coll-key (sensetion--tk-glob? tk))
+                ;; handle status update when glob was tagged
+		(when (sensetion--to-annotate? tk)
+                  (cl-incf (cdr sensetion--local-status) -1))
+                (when (sensetion--tk-annotated? tk)
+		  (cl-incf (car sensetion--local-status) -1))
+                t)
+       collect (let ((tk-keys (sensetion--tk-coll-keys tk)))
+                 (cond
+                  ((equal (list coll-key) tk-keys)
+                   ;; this token only part of one colloc
+                   (setf (sensetion--tk-kind tk) (list "wf")))
+                  ((member coll-key tk-keys)
+                   ;; this token part of more than one colloc
+                   (setf (sensetion--tk-kind tk)
+                         (cons "cf" (remove coll-key tk-keys)))))
+                 tk))))))
 
 
 (defun sensetion--tk-coll-keys (tk)
@@ -416,34 +418,38 @@ You can mark/unmark tokens with `sensetion-toggle-glob-mark'."
 		(sensetion--completing-read-pos)
 		(reverse (sensetion--get-text-property-eol 'sensetion--to-glob))
 		(sensetion--get-sent-at-point)))
-  (sensetion-is
-   (sensetion--reinsert-sent-at-point globbed-sent)
-   (with-inhibiting-read-only
-    (sensetion--put-text-property-eol 'sensetion--to-glob nil))
+  (let ((globbed-sent (sensetion--glob lemma pos ixs-to-glob sent)))
+    (sensetion--reinsert-sent-at-point globbed-sent)
+    (with-inhibiting-read-only
+     (sensetion--put-text-property-eol 'sensetion--to-glob nil))))
 
+(defun sensetion--glob (lemma pos ixs-to-glob sent)
+  (sensetion-is
+   globbed-sent
    :where
-  
-   (globbed-sent (progn
-		   (setf (sensetion--sent-tokens sent) globbed-tks)
-		   sent))
-   (globbed-tks (cl-loop
-                 for tk in (sensetion--sent-tokens sent)
-                 for i from 0
-                 append (cond
-                         ((equal i (cl-first ixs-to-glob))
-                          ;; insert glob before first token in the
-                          ;; collocation
-                          (list new-glob (glob-tk tk new-k)))
-                         ((cl-member i ixs-to-glob)
-                          (list (glob-tk tk new-k)))
-                         (t
-                          (list tk)))))
+   (globbed-sent
+    (pcase sent
+      ((cl-struct sensetion--sent doc-id sent-id meta tokens text)
+       (sensetion--make-sent :doc-id doc-id :sent-id sent-id :meta meta :text text
+		    :tokens (cl-loop
+			     for tk in tokens
+			     for i from 0
+			     append (cond
+				     ((equal i (cl-first ixs-to-glob))
+				      ;; insert glob before first token in the
+				      ;; collocation
+				      (list new-glob (glob-tk tk new-k)))
+				     ((cl-member i ixs-to-glob)
+				      (list (glob-tk tk new-k)))
+				     (t
+				      (list tk))))))))
    (glob-tk (tk key)
             (let ((cks (sensetion--tk-coll-keys tk)))
-              (setf (sensetion--tk-kind tk)
-                    (cl-list* "cf" key cks))
-              ;; TODO: delete senses and make status "un"
-              tk))
+	      (pcase tk
+		((cl-struct sensetion--tk kind form lemmas tag senses glob unsure meta)
+		 ;; TODO: delete senses and make status "un"
+		 (sensetion--make-tk :kind (cl-list* "cf" key cks)
+			    :form form :lemmas lemmas :tag tag :senses senses :glob glob :unsure unsure :meta meta)))))
    (new-glob (sensetion--make-tk :lemmas (list (sensetion--make-lemma* lemma st)) :tag "un"
                         :kind `("glob" ,new-k) :glob "man"))
    (st (sensetion--pos->synset-type pos))
