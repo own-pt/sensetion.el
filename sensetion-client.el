@@ -122,12 +122,12 @@
 (defun sensetion--es-get-doc-sents (doc-id)
   (let* ((query `((query
 		   (term
-		    (doc_id . ,doc_id)))))
+		    (doc_id . ,doc-id)))))
 	 (query (json-encode-alist query))
 	 (hits (sensetion--es-query "sensetion-docs/_search"
 			   query
 			   :params sensetion--es-size-params)))
-    hits))
+    (mapcar #'sensetion--alist->sent hits)))
 
 
 (defun sensetion--remove-man-now (sent)
