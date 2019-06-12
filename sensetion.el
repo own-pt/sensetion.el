@@ -138,14 +138,8 @@ far, and the cdr is the number of annotatable tokens.")
   nil)
 
 
- (defvar-local sensetion--buffer-modified-sents
-  (make-hash-table :size 1000 :test 'equal)
-  "Map from sent-ids to booleans.")
 
 
-(defvar-local sensetion--buffer-logfile
-  nil
-  "Filepath to log of current annotation session.")
 
 
 (defvar sensetion-mode-map
@@ -222,7 +216,6 @@ annotation."
      (with-inhibiting-read-only
       (setq sensetion--lemma lemma)
       (setq sensetion--synset-cache (sensetion--wordnet-lookup-lemma lemma))
-      (setq sensetion--buffer-logfile (sensetion--buffer-logfile lemma))
       (setq sensetion--local-status (sensetion--make-collocations matches)))
      (sensetion--beginning-of-buffer))
    (pop-to-buffer result-buffer)
@@ -233,12 +226,6 @@ annotation."
    (pos (unless (equal pos "any") pos))))
 
 
-(defun sensetion--buffer-logfile (lemma)
-  (let ((fp (f-join user-emacs-directory
-		    "sensetion"
-		    (format "%s-%s.curr" lemma (float-time)))))
-    (f-mkdir (f-dirname fp))
-    fp))
 
 
 (defun sensetion--create-buffer-name (lemma pos)
@@ -271,46 +258,8 @@ annotation."
     (sensetion--alist->sent (sensetion--es-id->sent sent-id))))
 
 
-(cl-defun sensetion--update-sent (sent &optional (mod-sents sensetion--buffer-modified-sents)
-			                (logfile sensetion--buffer-logfile))
-  (let* ((sent-id   (sensetion--sent-id sent))
-	 (modified? (gethash sent-id mod-sents)))
-    (unless modified?
-      (let ((old-sent (sensetion--es-id->sent sent-id)))
-	(with-temp-buffer
-	  (prin1 old-sent (current-buffer))
-	  (terpri (current-buffer))
-	  (let ((save-silently t)) 	; no minibuffer logging
-	    (append-to-file (point-min) (point-max) logfile))))
-      (setf (gethash sent-id mod-sents) t)))
+(defun sensetion--update-sent (sent)
   (sensetion--es-update-modified-sent sent))
-
-
-(cl-defun sensetion--create-log-diff (&optional (logfile sensetion--buffer-logfile))
-  (when (f-exists? logfile)
-    (sensetion-is
-     (sensetion--map-file-lines logfile #'go)
-     (with-current-buffer new-b
-       (write-region (point-min) (point-max) new-f))
-     (if (executable-find "git")
-	 (prog1
-	     (call-process "git" nil diff-b t
-			   "diff" "--no-index" "--color-words=\\w+" "-U0" logfile new-f)
-	   (with-current-buffer diff-b
-	     (diff-mode)
-	     (ansi-color-apply-on-region (point-min) (point-max))) ; or else unreadable with word-diff
-	   (display-buffer diff-b))
-       (user-error "Please make sure you have `git' in your PATH"))
-     :where
-     (new-f (f-swap-ext logfile "new"))
-     (go (_ line)
-	 (let* ((sent-id  (cdr (read (substring line 1)))) ; substring -> doesn't reade whole sentence
-		(new-sent (sensetion--es-id->sent sent-id)))
-	   (prin1 new-sent new-b)
-	   (terpri new-b)))
-     (diff-b (generate-new-buffer (format "*diff:%s*" fname)))
-     (new-b  (generate-new-buffer fname))
-     (fname  (f-filename logfile)))))
 
 
 (defun sensetion--tk-glob? (tk)
