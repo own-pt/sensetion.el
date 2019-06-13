@@ -122,7 +122,8 @@
 (defun sensetion--es-get-doc-sents (doc-id)
   (let* ((query `((query
 		   (term
-		    (doc_id . ,doc-id)))))
+		    (doc_id . ,doc-id)))
+		  (sort . ("sent_id"))))
 	 (query (json-encode-alist query))
 	 (hits (sensetion--es-query "sensetion-docs/_search"
 			   query
