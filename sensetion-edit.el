@@ -9,21 +9,40 @@
                        nil t nil nil))
 
 
-(defun sensetion-edit-sense (lemma ix pos sent)
-  (interactive (list (buffer-local-value 'sensetion--lemma (current-buffer))
-                     (or (get-char-property (point) 'sensetion--glob-ix)
+(defun sensetion-edit-sense (ix sent)
+  (interactive (list (or (get-char-property (point) 'sensetion--glob-ix)
                          (sensetion--tk-ix-prop-at-point))
-                     (sensetion--completing-read-pos)
                      (sensetion--get-sent-at-point)))
   (unless (sensetion--selected? (point))
     (user-error "Token at point not selected for annotation"))
-  (unless lemma
-    (error "No local sensetion--lemma; please report bug"))
-  (sensetion--edit-sense lemma pos ix sent))
+  (let* ((lemma? (buffer-local-value 'sensetion--lemma (current-buffer)))
+	 (lemma (sensetion--lemma-to-edit lemma? ix sent))
+	 (pos (sensetion--completing-read-pos)))
+    (sensetion--edit-sense lemma
+		  pos
+		  ix sent)))
+
+
+(defun sensetion--lemma-to-edit (lemma? ix sent)
+  (sensetion-is
+   (or lemma?
+       (if (cdr lemmas)
+	   (choose-lemma)
+	 (car lemmas)))
+   :where
+   (choose-lemma ()
+		 (second
+		  (read-multiple-choice "Pick lemma: "
+					(seq-map-indexed (lambda (l ix)
+							   (list (+ 49 ix) l))
+							 lemmas))))
+   (lemmas (cl-remove-duplicates
+	    (cl-map 'list #'sensetion--lemma*->lemma (sensetion--tk-lemmas (elt (sensetion--sent-tokens sent) ix)))
+	    :test #'equal))))
 
 
 (defun sensetion--edit-sense (lemma pos1 ix sent)
-  (let ((senses (sensetion--cache-lemma->senses lemma pos1)))
+  (let ((senses (sensetion--cache-lemma->senses lemma pos1 sensetion--synset-cache)))
     (unless senses
       (user-error "No senses for lemma %s with pos %s" lemma pos1))
     (sensetion--call-hydra lemma ix sent senses)))
