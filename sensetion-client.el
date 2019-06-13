@@ -82,7 +82,7 @@
 
 
 (defun sensetion--es-get-sents (lemma &optional pos)
-  (let* ((lemma (cl-substitute ?_ ?  lemma :test #'eq))
+  (let* ((lemma (cl-substitute ?_ (string-to-char " ") lemma :test #'eq))
 	 (docs (if pos
 		   (sensetion--es-lemma-pos->docs lemma pos)
 		 (sensetion--es-lemma->docs lemma))))

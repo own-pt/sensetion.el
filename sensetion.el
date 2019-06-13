@@ -3,14 +3,12 @@
 (require 'subr-x)
 (require 'ido)
 (require 'f)
-(require 'ansi-color)
-(require 'diff-mode)
 (require 'map)
 (require 'async)
 (require 'hydra)
 (require 'sensetion-utils)
 (require 'sensetion-data)
-(require 'sensetion--colloc)
+(require 'sensetion-colloc)
 (require 'sensetion-client)
 (require 'sensetion-edit)
 
@@ -457,11 +455,11 @@ was linearized), and reinsert SENT."
   "Get pos1 of synsets assigned to TK. If there is more than one
 synset and they have different pos1, return nil."
   (when-let* ((sks   (sensetion--tk-skeys tk))
-              (st    (sensetion--sk-st (cl-first sks)))
+              (st    (sensetion--sensekey-pos (cl-first sks)))
               (sts    (if (member st '("3" "5"))
                           '("3" "5")
                         (list st)))
-              (same? (seq-every-p (lambda (sk) (member (sensetion--sk-st sk) sts))
+              (same? (seq-every-p (lambda (sk) (member (sensetion--sensekey-pos sk) sts))
                                   (cl-rest sks))))
     (sensetion--synset-type->pos st)))
 

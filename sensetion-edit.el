@@ -15,30 +15,34 @@
                      (sensetion--get-sent-at-point)))
   (unless (sensetion--selected? (point))
     (user-error "Token at point not selected for annotation"))
-  (let* ((lemma? (buffer-local-value 'sensetion--lemma (current-buffer)))
-	 (lemma (sensetion--lemma-to-edit lemma? ix sent))
-	 (pos (sensetion--completing-read-pos)))
-    (sensetion--edit-sense lemma
-		  pos
-		  ix sent)))
+  (cl-destructuring-bind (lemma . pos) (sensetion--split-lemma+synset-type
+					(sensetion--pick-candidate ix sent))
+    (sensetion--edit-sense lemma (or pos (sensetion--completing-read-pos)) ix sent)))
 
 
-(defun sensetion--lemma-to-edit (lemma? ix sent)
+(defun sensetion--pick-candidate (ix sent)
+  "Choose candidate (lemma + synset type) to annotate among the
+options in the token corresponding to index IX in SENT."
   (sensetion-is
-   (or lemma?
-       (if (cdr lemmas)
-	   (choose-lemma)
-	 (car lemmas)))
+   (if (cdr lemmas)
+       (choose-lemma)
+     (let ((lemma (car lemmas)))
+       (message "Annotating lemma %s" lemma)
+       (sleep-for 0.5)
+       lemma))
    :where
    (choose-lemma ()
-		 (second
-		  (read-multiple-choice "Pick lemma: "
-					(seq-map-indexed (lambda (l ix)
-							   (list (+ 49 ix) l))
-							 lemmas))))
-   (lemmas (cl-remove-duplicates
-	    (cl-map 'list #'sensetion--lemma*->lemma (sensetion--tk-lemmas (elt (sensetion--sent-tokens sent) ix)))
-	    :test #'equal))))
+		 (cl-third
+		  (read-multiple-choice
+		   "Pick lemma+PoS candidate: "
+		   (seq-map-indexed #'make-option lemmas))))
+   (make-option (lemma+synset-type ix)
+		(destructuring-bind (lemma . pos)
+		    (sensetion--split-lemma+synset-type lemma+synset-type)
+		  (list (+ 49 ix)
+			(format "%s%%%s" lemma pos)
+			lemma+synset-type)))
+   (lemmas (sensetion--tk-lemmas (elt (sensetion--sent-tokens sent) ix)))))
 
 
 (defun sensetion--edit-sense (lemma pos1 ix sent)
@@ -88,9 +92,7 @@
                    ;; gets wrapped in (lambda () (interactive)
                    ;; automatically by hydra
                    `(atomic-change-group
-                      (sensetion--toggle-sense ,lemma
-                                      ,tk
-                                      ,sk)
+                      (sensetion--toggle-sense ,tk ,sk)
                       (sensetion--edit-reinsert-state-call
                        ,tk-ix ,sent ,lemma ',options))
 		   (sensetion--sense-edit-help-text (sense-chosen-ind? sk) sid terms gloss)
@@ -110,7 +112,7 @@
    (tk (elt (sensetion--sent-tokens sent) tk-ix))))
 
 
-(defun sensetion--toggle-sense (lemma tk sk)
+(defun sensetion--toggle-sense (tk sk)
   "Called by `sensetion--edit-hydra-maker'. Only used for side-effects."
   (let* ((orig (sensetion--tk-senses tk))
          (present? (member sk orig))
@@ -168,7 +170,7 @@
 (defun sensetion--refresh-sent (sent &optional buffer)
   (catch 'sensetion--exit
     (sensetion--map-buffer-lines
-     (lambda (lno line)
+     (lambda (_ _)
        (when-let* ((line-sent (sensetion--get-sent-at-point))
                    (_ (equal (sensetion--sent-id sent) (sensetion--sent-id line-sent))))
          (sensetion--reinsert-sent-at-point sent)
@@ -245,7 +247,7 @@ returns non-nil. None of the arguments may move point."
 	      (cons lemmas-str (1+ (length lemmas-str))))))
        (setf (sensetion--tk-lemmas tk) new-lemmas))
      t))
-  "Edit lemma of token of index TK-IX at point and save modified SENT.")
+  "Edit lemma of TK at point and save modified SENT.")
 
 
 (defalias 'sensetion-edit-unsure
