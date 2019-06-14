@@ -142,6 +142,7 @@ far, and the cdr is the number of annotatable tokens.")
     (define-key map "<" #'sensetion-previous-selected)
     (define-key map ">" #'sensetion-next-selected)
     (define-key map "/" #'sensetion-edit-sense)
+    (define-key map "c" #'sensetion-sequential-annotate-sentence-document)
     (define-key map "u" #'sensetion-unglob)
     (define-key map "l" #'sensetion-edit-lemma)
     (define-key map "m" #'sensetion-toggle-glob-mark)
@@ -211,6 +212,13 @@ far, and the cdr is the number of annotatable tokens.")
   (let ((matches (sensetion--es-get-doc-sents document-id)))
     (sensetion--annotate matches document-id)))
 
+
+(defun sensetion-sequential-annotate-text (text)
+  (interactive "sDocuments matching: ")
+  (let ((matches (sensetion--es-text->sents text)))
+    (sensetion--annotate matches text)))
+
+
 (defun sensetion-annotate-target (lemma &optional pos)
   "Create targeted annotation buffer, where several sentences
 containing tokens with LEMMA and optionally POS are displayed for
@@ -270,8 +278,24 @@ annotation."
    (done    0)))
 
 
+(defun sensetion-sequential-annotate-sentence-document ()
+  (interactive)
+  (when sensetion--lemma
+    ;; if in sequential mode already this doesn't make sense
+    (let* ((sentence (sensetion--get-sent-at-point))
+	   (document-id (sensetion--sent-doc-id sentence))
+	   (sentence-index (sensetion--sent-sent-id sentence)))
+      ;; this implementation feels like an abstraction leak...
+      (sensetion-sequential-annotate-doc document-id)
+      (forward-line sentence-index)
+      (recenter)
+      (momentary-string-display (propertize "----> " 'face '(bold (:foreground "black")))
+				(point)))))
+
+
 (defun sensetion--get-sent-at-point ()
   (let ((sent-id (sensetion--get-text-property-eol 'sensetion--sent-id)))
+    (unless sent-id (user-error "No sentence at point"))
     (sensetion--alist->sent (sensetion--es-id->sent sent-id))))
 
 
@@ -641,6 +665,7 @@ gloss."
   ("q" nil nil)
   ("s" nil nil)
   ("RET" nil nil)
+  ("c" sensetion-sequential-annotate-sentence-document "Show context of sentence at point" :column "Navigation")
   ("l" sensetion-edit-lemma "Edit token lemma" :column "Edit")
   ("/" sensetion-edit-sense "Edit token senses" :column "Edit")
   ("i" sensetion-edit-ignore "Ignore token" :column "Edit")
