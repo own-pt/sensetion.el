@@ -60,6 +60,18 @@
     (seq-filter (lambda (lemma) (string-prefix-p prefix lemma t)) terms)))
 
 
+(defun sensetion-es-prefix-document-id (prefix)
+  (let* ((query `((query
+		   (prefix
+		    (doc_id . ,prefix)))))
+	 (query (json-encode-alist query))
+	 (hits  (sensetion--es-query "sensetion-docs/_search"
+			    query
+			    :params sensetion--es-size-params))
+	 (document-ids (cl-map 'list (lambda (doc) (map-elt doc 'doc_id)) hits)))
+    (seq-filter (lambda (document-id) (string-prefix-p prefix document-id)) document-ids)))
+
+
 (defun sensetion--es-lemma->synsets (lemma pos)
   (let* ((query `((query
 		   (bool

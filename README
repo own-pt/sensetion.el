@@ -66,7 +66,6 @@ invokes a menu which includes all other commands.
 | command name                | key binding | description                                                       |
 |-----------------------------+-------------+-------------------------------------------------------------------|
 | sensetion                   | -           | Start sensetion annotation process.                               |
-| sensetion-annotate          | -           | Start annotating a new lemma/PoS tag.                             |
 | sensetion-edit-synset       | =.=         | Edit sentence source data (be careful!)                           |
 | sensetion-edit-sense        | =/=         | Annotate sense of selected token at point                         |
 | sensetion-edit-lemma        | =l=         | Annotate lemma of token at point                                  |

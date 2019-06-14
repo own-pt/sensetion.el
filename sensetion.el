@@ -183,22 +183,35 @@ far, and the cdr is the number of annotatable tokens.")
             "")))
 
 
-(defvar sensetion--completion-function
-  (completion-table-dynamic
-   (lambda (prefix)
-     (sensetion-es-prefix-lemma prefix))))
+(defvar sensetion--lemma-completion-function
+  (completion-table-dynamic #'sensetion-es-prefix-lemma))
 
+(defvar sensetion--document-id-completion-function
+  (completion-table-dynamic #'sensetion-es-prefix-document-id))
 
 ;;;###autoload
 (defalias 'sensetion #'sensetion-annotate)
 
+(defun sensetion-annotate (annotation-function)
+  (interactive (list (sensetion--pick-annotation-function)))
+  (call-interactively annotation-function))
 
-(defun sensetion-sequential-annotate (doc-id)
-  (let ((matches (sensetion--es-get-doc-sents doc-id)))
-    (sensetion--annotate matches doc-id)))
+(defun sensetion--pick-annotation-function ()
+  (cl-fourth
+   (read-multiple-choice
+    "Annotation mode: "
+    `((?t "targeted mode" "Annotate sentences containing a given target lemma/PoS." ,#'sensetion-annotate-target)
+      (?s "sequential mode" "Annotate sentences from a given document." ,#'sensetion-sequential-annotate-doc)))))
 
 
-(defun sensetion-annotate (lemma &optional pos)
+(defun sensetion-sequential-annotate-doc (document-id)
+  (interactive (list (completing-read "Document to annotate: "
+				      sensetion--document-id-completion-function
+				      nil 'yes)))
+  (let ((matches (sensetion--es-get-doc-sents document-id)))
+    (sensetion--annotate matches document-id)))
+
+(defun sensetion-annotate-target (lemma &optional pos)
   "Create targeted annotation buffer, where several sentences
 containing tokens with LEMMA and optionally POS are displayed for
 annotation."

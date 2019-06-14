@@ -231,7 +231,7 @@ returns non-nil. None of the arguments may move point."
 
 (defun sensetion--completing-read-lemma (&optional initial-input)
   (completing-read "Lemma to annotate: "
-		   sensetion--completion-function
+		   sensetion--lemma-completion-function
 		   nil 'yes initial-input))
 
 
@@ -243,7 +243,7 @@ returns non-nil. None of the arguments may move point."
 	    (new-lemmas
 	     (completing-read-multiple
 	      "Edit lemma: "
-	      sensetion--completion-function nil 'yes
+	      sensetion--lemma-completion-function nil 'yes
 	      (cons lemmas-str (1+ (length lemmas-str))))))
        (setf (sensetion--tk-lemmas tk) new-lemmas))
      t))
