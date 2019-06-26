@@ -30,9 +30,6 @@ Content-Type: application/json
             "sent_id": {
                 "type": "keyword"
             },
-            "text": {
-                "enabled": false
-            },
             "tokens": {
                 "type": "nested",
                 "properties": {
@@ -193,6 +190,28 @@ Content-Type: application/json
     "query": {
         "term": {
             "doc_id": "0f09c2fd-69e6-420d-bae3-823b2200be59-0"
+        }
+    }
+}
+
+#
+GET http://localhost:9200/sensetion-docs/_search
+Content-Type: application/json
+{
+    "query": {
+        "match" : {
+            "text" : "lewis shale"
+        }
+    }
+}
+
+#
+GET http://localhost:9200/sensetion-docs/_search
+Content-Type: application/json
+{
+    "query": {
+        "prefix": {
+            "doc_id": "0"
         }
     }
 }

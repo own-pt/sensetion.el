@@ -25,9 +25,6 @@ PUT_DOCS="{\
             \"sent_id\": {\
                 \"type\": \"keyword\"\
             },\
-            \"text\": {\
-                \"enabled\": false\
-            },\
             \"tokens\": {\
                 \"type\": \"nested\",\
                 \"properties\": {\

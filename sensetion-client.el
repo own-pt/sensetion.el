@@ -143,6 +143,18 @@
     (mapcar #'sensetion--alist->sent hits)))
 
 
+(defun sensetion--es-text->sents (text)
+  (let* ((query `((query
+		   (match
+		    (text . ,text)))
+		  (sort . ("doc_id" "sent_id"))))
+	 (query (json-encode-alist query))
+	 (hits (sensetion--es-query "sensetion-docs/_search"
+			   query
+			   :params '(("size" . "250")))))
+    (mapcar #'sensetion--alist->sent hits)))
+
+
 (defun sensetion--remove-man-now (sent)
   (cl-labels
       ((remove-man-now (tk)
