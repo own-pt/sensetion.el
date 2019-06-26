@@ -76,7 +76,7 @@
      (sensetion--check-index-nonnil)
      ;; TODO: randomize completion so that stuff like completing a to
      ;; a_ doesn't happen (as often)
-     (trie-complete sensetion--index prefix nil sensetion-number-completions nil nil
+     (trie-complete sensetion--lemma->synsets prefix nil sensetion-number-completions nil nil
                     (lambda (k _) (sensetion--lemma*->lemma k))))))
 
 
