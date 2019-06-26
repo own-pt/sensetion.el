@@ -3,6 +3,7 @@
 
 (defparameter *db* (make-hash-table :test #'equal))
 (defparameter *db-freq* (make-hash-table :test #'equal))
+(defparameter *glosstag-plists* "/Users/ar/work/wn/glosstag/data/*.plist")
 
 (defun index (&key (*db* *db*))
   (dolist (file (directory "/Users/ar/Temp/glosstag/*.plist"))
