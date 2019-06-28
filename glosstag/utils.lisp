@@ -1,50 +1,54 @@
 
 (in-package :glosstag)
 
-(defparameter *db* (make-hash-table :test #'equal))
-(defparameter *db-freq* (make-hash-table :test #'equal))
+(defstruct line id type form lemma pos tag senses globid globtag sep)
 
-(defun index (&key (*db* *db*))
-  (dolist (file (directory "/Users/ar/Temp/glosstag/*.plist"))
-    (with-open-file (in file)
-      (loop for plist = (read in nil nil)
-	    while plist
-	    do (let ((pairs (getf plist :keys)))
-		 (dolist (p pairs)
-		   (push (car p) (gethash (cdr p) *db*))))))))
+(defun token-to-line (tk)
+  (labels ((getc (key)
+	     (if (getf tk key) (getf tk key) "_")))
+    (let ((senses (if (getf tk :senses)
+		      (format nil "~{~a~^|~}" (mapcar #'car (getf tk :senses)))
+		      "_")))
+     (cond
+       ((equal :wf (getf tk :kind))
+	(make-line :id id :type (getc :kind)
+		   :form (getc :form) :lemma (getc :lemma) :pos (getc :pos) :tag (getc :tag) :senses senses))
 
+       ((equal :cf (car (getf tk :kind)))
+	(make-line :id id :type (car (getc :kind))
+		   :form (getc :form) :lemma (getc :lemma) :pos (getc :pos) :tag (getc :tag) :senses senses
+		   :sep (getc :sep) :globid (cdr (getf tk :kind))))
 
-(defun index-freq (&key (*db-freq* *db-freq*))
-  (dolist (file (directory "/Users/ar/Temp/glosstag/*.plist"))
-    (with-open-file (in file)
-      (loop for plist = (read in nil nil)
-	    while plist
-	    do (dolist (tk (getf plist :tokens))
-		 (if (getf tk :lemma)
-		     (let ((lms (cl-ppcre:split "\\|" (getf tk :lemma))))
-		       (mapcar (lambda (l)
-				 (push (getf plist :id)
-				       (gethash l *db-freq*)))
-			       lms))))))))
-  
-
-(defun get-lemma (lemma &key (db *db*))
-  (gethash lemma db))
+       ((equal :glob (car (getf tk :kind)))
+	(make-line :id id :type (car (getc :kind))
+		   :form (getc :form) :lemma (getc :lemma) :tag (getc :tag) :senses senses
+		   :globid (cdr (getc :kind)) :globtag (getc :glob)))
+       
+       ((member (getf tk :kind) (list :def :qf :ex)) nil)
+       (t (error "invalid object ~a" tk))))))
 
 
+(defun process-token (id tk stream)
+  (let ((sep #\Tab)
+	(line (token-to-line tk)))
+    (format stream "~a~C~a~C~a~C~a~C~a~C~a~C~a~%"
+	    (reduce (lambda (a b) (append a (list (line-?? ) sep)))
+		    '(id type form lemma pos tag senses globid globtag sep) :initial-value nil))))
 
-(defun stat-gloss (db gloss)
-  (let ((tks (getf gloss :TOKENS)))
-    ))
 
+(defun process-entry (data stream)
+  (format stream "~%# txt = ~a~%# id = ~a-~a~%" (getf data :gloss) (getf data :ofs) (getf data :pos))
+  (loop for token in (getf data :tokens)
+	for id = 1 then (incf id)
+	do (process-token id token stream)))
 
-(defun stat-corpus (corpus-directory)
-  (let ((db (make-hash-table :test '#equal)))
-    (mapcar (lambda (file) 
-	      (with-open-file (in file) 
-	       (loop for line = (read in)
-		     while line
-		     do (stat-gloss db line))))
-	    (directory corpus-directory))))
+(defun process-corpus (corpus-directory output)
+  (with-open-file (out output :direction :output :if-exists :supersede)
+    (mapc (lambda (file) 
+	    (with-open-file (in file) 
+	      (loop for line = (read in nil nil)
+		    while line
+		    do (process-entry line out))))
+	  (directory corpus-directory))))
 
 
