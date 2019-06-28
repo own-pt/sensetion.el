@@ -70,16 +70,6 @@
   :type  'boolean)
 
 
-(defvar sensetion--completion-function
-  (completion-table-dynamic
-   (lambda (prefix)
-     (sensetion--check-index-nonnil)
-     ;; TODO: randomize completion so that stuff like completing a to
-     ;; a_ doesn't happen (as often)
-     (trie-complete sensetion--lemma->synsets prefix nil sensetion-number-completions nil nil
-                    (lambda (k _) (sensetion--lemma*->lemma k))))))
-
-
 (defvar sensetion--index
   nil
   "Index.
@@ -205,6 +195,16 @@ with low confidence."
         ?\n [?\n?\n])
   (setq-local mode-name '(:eval (sensetion--mode-line-status-text)))
   (setq-local write-contents-functions (list (lambda () t))))
+
+
+(defvar sensetion--completion-function
+  (completion-table-dynamic
+   (lambda (prefix)
+     (sensetion--check-index-nonnil)
+     ;; TODO: randomize completion so that stuff like completing a to
+     ;; a_ doesn't happen (as often)
+     (trie-complete sensetion--lemma->synsets prefix nil sensetion-number-completions nil nil
+                    (lambda (k _) (sensetion--lemma*->lemma k))))))
 
 
 (defun sensetion--mode-line-status-text ()
@@ -579,9 +579,7 @@ number of selected tokens."
                               (glob-selected?
                                (unless (cdr ckeys)
                                  ;; don't highlight token part of more than one colloc
-                                 (gethash (cl-first ckeys) sel-keys)))
-                              (punct-before? (and form-str
-                                                  (sensetion--punctuation-no-space-before? form-str))))
+                                 (gethash (cl-first ckeys) sel-keys))))
                          (when selected?
                            (cl-incf total)
                            (when (sensetion--tk-annotated? tk)
@@ -589,8 +587,6 @@ number of selected tokens."
                          (pcase kind
                            ((or :wf `(:cf . ,_))
                             (concat
-                             ;; spacing
-                             (if punct-before? "" " ")
                              ;; collocation index
                              (if ckeys
                                  (propertize (s-join "," ckeys)
@@ -630,7 +626,8 @@ number of selected tokens."
                                              'display '(raise 0.4)
                                              'invisible 'sensetion--scripts
                                              'face '(:height 0.6))
-                               "")))
+                               "")
+			     " "))
                            (`(:glob . ,glob-key)
                             (prog1 ""
                               (when selected?
@@ -649,7 +646,7 @@ number of selected tokens."
              (terms      (sensetion--synset-terms synset))
              (pos        (sensetion--synset-pos synset)))
         (list
-         (apply #'concat "(" pos ") " (s-join "," terms) " |" tks-colloc)
+         (format "(%s) %s | %s" pos (s-join "," terms) (apply #'concat tks-colloc))
          (cons done total))))))
 
 
