@@ -882,7 +882,7 @@ set `sensetion--global-status'. "
    st
    #s(hash-table size 5 test equal rehash-size 1.5 rehash-threshold 0.8125
                  purecopy t data
-                 ("1" "n" "2" "v" "3" "a" "4" "r"))))
+                 ("1" "n" "2" "v" "3" "a" "4" "r" "5" "s"))))
 
 
 (defun sensetion--wordnet-lookup (lemma)
