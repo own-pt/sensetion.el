@@ -261,7 +261,7 @@ with low confidence."
    (with-current-buffer result-buffer
      (sensetion-mode)
      (with-inhibiting-read-only
-      (setq sensetion--lemma lemma)
+      (setq sensetion--lemma escaped-lemma)
       (setq sensetion--synset-cache (sensetion--wordnet-lookup lemma))
       (setq sensetion--local-status (sensetion--make-collocations matches)))
      (sensetion--beginning-of-buffer))
@@ -274,8 +274,11 @@ with low confidence."
    (result-buffer (generate-new-buffer
                    (sensetion--create-buffer-name lemma pos)))
    (regexp (if (equal pos "any")
-               (concat lemma "%?[1234]?")
-             (concat lemma "%?" (sensetion--pos->synset-type pos) "?")))))
+               (concat escaped-lemma "%?[1234]?")
+             (concat escaped-lemma "%?" (sensetion--pos->synset-type pos) "?")))
+   (escaped-lemma (cl-substitute (string-to-char "_")
+                         (string-to-char " ")
+                         lemma))))
 
 
 (defun sensetion--regexp-search-filter-fn ()
@@ -919,10 +922,7 @@ terms defined by that synset, and the fourth is the gloss."
                      lemma (sensetion--synset-ofs synset) (sensetion--synset-pos synset))))
    (synsets  (sensetion--get-synsets coords))
    (coords   (trie-lookup sensetion--lemma->synsets lemma))
-   (options  (make-hash-table :test 'equal :size 30))
-   (lemma (cl-substitute (string-to-char " ")
-                         (string-to-char "_")
-                         lemma))))
+   (options  (make-hash-table :test 'equal :size 30))))
 
 
 (defun sensetion--tk-annotated? (tk)
