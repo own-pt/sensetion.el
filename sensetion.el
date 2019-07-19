@@ -261,7 +261,7 @@ with low confidence."
    (with-current-buffer result-buffer
      (sensetion-mode)
      (with-inhibiting-read-only
-      (setq sensetion--lemma lemma)
+      (setq sensetion--lemma escaped-lemma)
       (setq sensetion--synset-cache (sensetion--wordnet-lookup lemma))
       (setq sensetion--local-status (sensetion--make-collocations matches)))
      (sensetion--beginning-of-buffer))
@@ -274,8 +274,11 @@ with low confidence."
    (result-buffer (generate-new-buffer
                    (sensetion--create-buffer-name lemma pos)))
    (regexp (if (equal pos "any")
-               (concat lemma "%?[1234]?")
-             (concat lemma "%?" (sensetion--pos->synset-type pos) "?")))))
+               (concat escaped-lemma "%?[1234]?")
+             (concat escaped-lemma "%?" (sensetion--pos->synset-type pos) "?")))
+   (escaped-lemma (cl-substitute (string-to-char "_")
+                         (string-to-char " ")
+                         lemma))))
 
 
 (defun sensetion--regexp-search-filter-fn ()
@@ -687,20 +690,54 @@ synset and they have different pos1, return nil."
     (sensetion--synset-type->pos st)))
 
 
-(defun sensetion-previous-selected (point)
-  (interactive (list (point)))
-  (let ((selected? (sensetion--selected? point)))
-    (goto-char
-     (previous-single-property-change point 'sensetion--selected nil (point-min)))
-    (when selected? (sensetion-previous-selected (point)))))
+(defun sensetion--in-line-previous-glob (pos glob limit)
+  (when (not (equal pos limit))
+    (let* ((result (previous-single-property-change pos 'sensetion--selected nil limit))
+	   (glob?  (get-text-property result 'sensetion--glob-ix)))
+      (cond ((equal limit result) nil)
+	    ((and glob? (not (equal glob? glob))) result)
+	    (t (sensetion--in-line-previous-glob (- result 1) glob limit))))))
 
 
-(defun sensetion-next-selected (point)
-  (interactive (list (point)))
+(defun sensetion-previous-selected (point glob-ix)
+  (interactive (list (point) (get-text-property (point) 'sensetion--glob-ix)))
   (let ((selected? (sensetion--selected? point)))
-    (goto-char
-     (next-single-property-change point 'sensetion--selected nil (point-max)))
-    (when selected? (sensetion-next-selected (point)))))
+    (if glob-ix
+	(let ((previous-glob (sensetion--in-line-previous-glob point glob-ix (line-beginning-position))))
+	  (if previous-glob
+	      (goto-char previous-glob)
+	    (progn
+	      (sensetion-previous-selected (line-beginning-position) nil)
+	      (goto-char (- (point) 1)))))
+      (progn
+	(goto-char
+	 (previous-single-property-change point 'sensetion--selected nil (point-min)))
+	(if selected?
+	    (sensetion-previous-selected (point) nil))))))
+
+
+(defun sensetion--in-line-next-glob (pos glob limit)
+  (when (not (equal pos limit))
+    (let* ((result (next-single-property-change pos 'sensetion--selected nil limit))
+	   (glob?  (get-text-property result 'sensetion--glob-ix)))
+      (cond ((equal limit result) nil)
+	    ((and glob? (not (equal glob? glob))) result)
+	    (t (sensetion--in-line-next-glob (+ 1 result) glob limit))))))
+
+
+(defun sensetion-next-selected (point glob-ix)
+  (interactive (list (point) (get-text-property (point) 'sensetion--glob-ix)))
+  (let ((selected? (sensetion--selected? point)))
+    (if glob-ix
+	(let ((next-glob (sensetion--in-line-next-glob point glob-ix (line-end-position))))
+	  (if next-glob
+	      (goto-char next-glob)
+	    (sensetion-next-selected (line-end-position) nil)))
+      (progn
+	(goto-char
+	 (next-single-property-change point 'sensetion--selected nil (point-max)))
+	(when selected?
+	  (sensetion-next-selected (point) nil))))))
 
 
 (defun sensetion--selected? (point)
@@ -882,7 +919,7 @@ set `sensetion--global-status'. "
    st
    #s(hash-table size 5 test equal rehash-size 1.5 rehash-threshold 0.8125
                  purecopy t data
-                 ("1" "n" "2" "v" "3" "a" "4" "r"))))
+                 ("1" "n" "2" "v" "3" "a" "4" "r" "5" "s"))))
 
 
 (defun sensetion--wordnet-lookup (lemma)
@@ -919,10 +956,7 @@ terms defined by that synset, and the fourth is the gloss."
                      lemma (sensetion--synset-ofs synset) (sensetion--synset-pos synset))))
    (synsets  (sensetion--get-synsets coords))
    (coords   (trie-lookup sensetion--lemma->synsets lemma))
-   (options  (make-hash-table :test 'equal :size 30))
-   (lemma (cl-substitute (string-to-char " ")
-                         (string-to-char "_")
-                         lemma))))
+   (options  (make-hash-table :test 'equal :size 30))))
 
 
 (defun sensetion--tk-annotated? (tk)
