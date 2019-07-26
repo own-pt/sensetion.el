@@ -553,7 +553,8 @@ number of selected tokens."
         ;; this is used to highlight their constituent tokens and edit
         ;; them properly
         (sel-keys (make-hash-table :test 'equal))
-        (ignoring?   nil))
+        (ignoring?  nil)
+	(last-quote nil))
     (cl-labels
         ((sel-tk-props (tk &optional ix)
                        (cl-list* 'sensetion--selected t
@@ -641,8 +642,16 @@ number of selected tokens."
                               (when (eq (sensetion--tk-tag tk) :ignore)
                                 (setf ignoring? t)))
                             "")
-                           ((or :qf :ex :mwf :def :classif) "")
-                           (_ (error "Token of kind %s does not exist" kind))))))
+			   (:qf
+			    (when-let ((quote-rend (sensetion--tk-rend tk)))
+			      (setf last-quote quote-rend))
+			    (pcase last-quote
+			      (:dq "\" ")
+			      (:sq "' ")))
+                           ((or :ex :mwf :def :classif)
+			    "")
+                           (_
+			    (error "Token of kind %s does not exist" kind))))))
       ;;
       (let* ((tks        (sensetion--synset-tokens synset))
              (tks-colloc (seq-map-indexed #'token-colloc tks))
