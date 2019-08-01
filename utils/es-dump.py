@@ -19,8 +19,7 @@ def main(address,port,index,output_dir,file_size):
         fp = os.path.join(output_dir, '{}.json'.format(ix))
         with open(fp, 'w') as out:
             for doc in docs:
-                print(json.dumps(doc['_source'], sort_keys=True, ensure_ascii=False),
-                      file=out)
+                print(json.dumps(doc['_source'], sort_keys=True, ensure_ascii=False), file=out)
 
     
     url = '{}:{}/'.format(address, port)

@@ -60,6 +60,18 @@
     (seq-filter (lambda (lemma) (string-prefix-p prefix lemma t)) terms)))
 
 
+(defun sensetion-es-prefix-document-id (prefix)
+  (let* ((query `((query
+		   (prefix
+		    (doc_id . ,prefix)))))
+	 (query (json-encode-alist query))
+	 (hits  (sensetion--es-query "sensetion-docs/_search"
+			    query
+			    :params sensetion--es-size-params))
+	 (document-ids (cl-map 'list (lambda (doc) (map-elt doc 'doc_id)) hits)))
+    (seq-filter (lambda (document-id) (string-prefix-p prefix document-id)) document-ids)))
+
+
 (defun sensetion--es-lemma->synsets (lemma pos)
   (let* ((query `((query
 		   (bool
@@ -82,7 +94,7 @@
 
 
 (defun sensetion--es-get-sents (lemma &optional pos)
-  (let* ((lemma (cl-substitute ?_ ?  lemma :test #'eq))
+  (let* ((lemma (cl-substitute ?_ (string-to-char " ") lemma :test #'eq))
 	 (docs (if pos
 		   (sensetion--es-lemma-pos->docs lemma pos)
 		 (sensetion--es-lemma->docs lemma))))
@@ -122,12 +134,13 @@
 (defun sensetion--es-get-doc-sents (doc-id)
   (let* ((query `((query
 		   (term
-		    (doc_id . ,doc_id)))))
+		    (doc_id . ,doc-id)))
+		  (sort . ("sent_id"))))
 	 (query (json-encode-alist query))
 	 (hits (sensetion--es-query "sensetion-docs/_search"
 			   query
 			   :params sensetion--es-size-params)))
-    hits))
+    (mapcar #'sensetion--alist->sent hits)))
 
 
 (defun sensetion--remove-man-now (sent)

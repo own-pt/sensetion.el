@@ -81,10 +81,10 @@
 (defalias 'sensetion--tk-skeys #'sensetion--tk-senses)
 
 
-(defun sensetion--sk-st (sk)
+(defun sensetion--sensekey-pos (sk)
   (pcase (s-split ":" sk)
     (`(,lemma* ,_ ,_ ,_ ,_)
-     (sensetion--lemma*->st lemma*))
+     (sensetion--lemma*->pos lemma*))
     (_ (error "Malformed sense key %s" sk))))
 
 
@@ -107,15 +107,23 @@
 
 
 (defun sensetion--lemma*->lemma (lemma*)
-  (let ((st (sensetion--lemma*->st lemma*)))
-    (if st
-        (substring lemma* 0 (- (length lemma*) 2))
-      lemma*)))
+  (cl-destructuring-bind (lemma . _)
+      (sensetion--split-lemma+synset-type lemma*)
+    lemma))
 
-(defun sensetion--lemma*->st (lemma*)
-  (let ((len (length lemma*)))
-    (when (and (> len 1) (= (elt lemma* (- len 2)) (string-to-char "%")))
-      (substring lemma* (1- len)))))
+(defun sensetion--lemma*->pos (lemma+synset-type)
+  (cl-destructuring-bind (_ . pos)
+      (sensetion--split-lemma+synset-type lemma+synset-type)
+    pos))
+
+
+(defun sensetion--split-lemma+synset-type (lemma+synset-type)
+  "Return (cons lemma (synset-type->pos synset-type))."
+  (let ((len (length lemma+synset-type)))
+    (if (and (> len 1) (= (elt lemma+synset-type (- len 2)) ?%))
+	(cons (substring lemma+synset-type 0 (- len 2))
+	      (sensetion--synset-type->pos (substring lemma+synset-type (1- len))))
+      (list lemma+synset-type))))
 
 
 (provide 'sensetion-data)
