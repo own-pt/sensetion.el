@@ -209,7 +209,8 @@ far, and the cdr is the number of annotatable tokens.")
   (interactive (list (completing-read "Document to annotate: "
 				      sensetion--document-id-completion-function
 				      nil 'yes)))
-  (let ((matches (sensetion--es-get-doc-sents document-id)))
+  (let ((matches (cl-sort (sensetion--es-get-doc-sents document-id)
+			  '< :key 'sensetion--sent-sent-id)))
     (sensetion--annotate matches document-id)))
 
 
