@@ -52,14 +52,16 @@ PUT_DOCS="{\
     }\
 }"
 
-synsets:
+clean:
 	curl -i -H Content-Type\:\ application/json -XDELETE http://localhost:${PORT}/${SYNSETS_URL} ; echo -e '\n\n---\n'
+	curl -i -H Content-Type\:\ application/json -XDELETE http://localhost:${PORT}/${DOCS_URL} ; echo -e '\n\n---\n'
+
+synsets: clean
 	curl -i -H Content-Type\:\ application/json -XPUT http://localhost:${PORT}/${SYNSETS_URL} -d ${PUT_SYNSETS} ; echo -e '\n\n---\n'
 	curl -s -H "Content-Type: application/x-ndjson" -XPOST localhost:${PORT}/${SYNSETS_URL}/_bulk --data-binary "@${SYNSETS_PATH}" &> /dev/null ; echo
 
-docs:
-	curl -i -H Content-Type\:\ application/json -XDELETE http://localhost:${PORT}/${DOCS_URL} ; echo -e '\n\n---\n'
+docs: synsets
 	curl -i -H Content-Type\:\ application/json -XPUT http://localhost:${PORT}/${DOCS_URL} -d ${PUT_DOCS} ; echo -e '\n\n---\n'
 	for i in ${DOCS_DIR}*.json ; do curl -s -H "Content-Type: application/x-ndjson" -XPOST localhost:${PORT}/${DOCS_URL}/_bulk --data-binary "@$$i" &> /dev/null ; done ; echo
 
-all: synsets docs
+all: clean synsets docs

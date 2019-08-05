@@ -5,12 +5,13 @@ You can install it yourself, or use the docker image. If installing
 manually, note that you might need Emacs version 26 or higher.
 
 * Dependencies
+
 - [[https://curl.haxx.se/download.html][curl]] -- you probably already have it installed
 - [[https://www.elastic.co/downloads/elasticsearch][elastic search]]
 - (optional) python 3 and some libraries (see =utils/requirements.txt=)
 
-
 * Data
+
 You use the Makefile in the root directory to add data to
 elasticsearch. wordnet data should be in a directory called =data/=,
 in a file named =synset.json= (this can be customized in the
@@ -21,8 +22,8 @@ input files over there.
 You can produce data to be used by this annotation interface using a
 Python script; see =utils/README=.
 
-
 * Emacs beginner installation
+
 - Download and install emacs -- instructions [[https://www.gnu.org/software/emacs/][here]].
 - Clone this repository ([[https://help.github.com/en/articles/cloning-a-repository][how-to]]) to your home directory ; If you don't
   know what your home directory is, you can run

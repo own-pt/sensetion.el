@@ -1,10 +1,16 @@
 # -*- mode:org -*-
+
 please create a virtual environment and run
+
 : pip install -r requirements.txt
 
+See https://uoa-eresearch.github.io/eresearch-cookbook/recipe/2014/11/26/python-virtual-env/
+
 * touch.py
+
 prepare sentences for input to =sensetion.el= and elastic
 search. provide one or more files with one sentence per line.
+
 #+BEGIN_SRC sh
 python3 touch.py --help
 #+END_SRC
@@ -24,8 +30,15 @@ words), and may do more in the future.
 you'll need to [[https://www.nltk.org/data.html][download wordnet data from NLTK]] in order to run this
 script.
 
+#+begin_src python
+import nltk
+nltk.download('wordnet')
+#+end_src
+
 * es-dump.py
+
 dump all documents in a given elasticsearch server to a chosen directory.
+
 #+BEGIN_SRC sh
 python3 es-dump.py --help
 #+END_SRC
