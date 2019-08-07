@@ -19,6 +19,9 @@ Makefile). The corpus data to be inserted in elasticsearch by default
 are all the =*.json= files in the directory =data/docs=, so place your
 input files over there.
 
+To produce the =synsets.json= you can use =json-convert.lisp= located
+in the root directory.
+
 You can produce data to be used by this annotation interface using a
 Python script; see =utils/README=.
 
