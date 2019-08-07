@@ -235,19 +235,47 @@ returns non-nil. None of the arguments may move point."
 		   nil 'yes initial-input))
 
 
+(defun sensetion--hydra-edit-lemma (tk sent &optional lemmas)
+  (call-interactively
+   (eval
+    (let ((lemmas (or lemmas (sensetion--tk-lemmas tk)))
+	  (num -1))
+      `(defhydra hydra-lemmas () ""
+	 ("q" nil "quit")
+	 ("a" ,(lambda (lemma pos)
+		 (interactive
+		  (list (sensetion--completing-read-lemma)
+			(ido-completing-read "PoS tag? " '("a" "r" "v" "n") nil t nil nil)))
+		 (let ((new-lemmas (cons (format "%s\%%%s" lemma (sensetion--pos->synset-type pos))
+					 lemmas)))
+		   (sensetion--hydra-edit-lemma tk sent new-lemmas)))
+	  "add")
+	 ("s" ,(lambda ()
+		 (interactive)
+		 (setf (sensetion--tk-lemmas tk)
+		       lemmas)
+		 (sensetion--update-sent sent))
+	  "save"
+	  :exit t)
+	 ,@(mapcar
+	    (lambda (l)
+	      (cl-destructuring-bind (lemma pos) (split-string l "%")
+		(list
+		 (number-to-string (cl-incf num))
+		 (lambda ()
+		   (interactive)
+		   (sensetion--hydra-edit-lemma
+		    tk sent (sensetion--remove-nth num lemmas)))
+		 (format "%s s" lemma (sensetion--synset-type->pos pos))
+		 :column "Remove lemma pos:")))
+	    lemmas))))))
+
+
 (defalias 'sensetion-edit-lemma
   (sensetion--edit-function
    (lambda (tk sent)
-     (let* ((lemmas (sensetion--tk-lemmas tk))
-	    (lemmas-str (s-join "," lemmas))
-	    (new-lemmas
-	     (completing-read-multiple
-	      "Edit lemma: "
-	      sensetion--lemma-completion-function nil 'yes
-	      (cons lemmas-str (1+ (length lemmas-str))))))
-       (setf (sensetion--tk-lemmas tk) new-lemmas))
-     t))
-  "Edit lemma of TK at point and save modified SENT.")
+     (sensetion--hydra-edit-lemma tk sent)))
+ "Edit lemma of TK at point.")
 
 
 (defalias 'sensetion-edit-unsure
