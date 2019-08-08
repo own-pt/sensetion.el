@@ -31,8 +31,9 @@ keyboard key. Senses which are already selected are prefixed by a plus
 sign (=+=); when satisfied, press enter/return. If you'd like to quit,
 press =q=; note that quitting does not undo anything (if you selected
 an option and then quit, its effects were already carried out). You
-can see how many tokens still need to be annotated in the mode-line,
-next to the =sensetion= indicator.
+can see the number of tokens annotated so far and how many tokens
+still need to be annotated in the mode-line, next to the =sensetion=
+indicator.
 
 Any editing action is saved in the buffer, but these are only
 propagated to the backend when you close the buffer and select confirm
