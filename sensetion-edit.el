@@ -297,13 +297,16 @@ returns non-nil. None of the arguments may move point."
   ;; TODO: allow this anywhere?
   (sensetion--edit-function
    (lambda (tk _)
-     (unless (sensetion--tk-annotatable? tk)
-       (user-error "Token already ignored"))
-     (when (sensetion--tk-annotated? tk)
-       (cl-incf (car sensetion--local-status) -1))
-     (cl-incf (cdr sensetion--local-status) -1)
-     (setf (sensetion--tk-tag tk) "ignore")
-     (setf (sensetion--tk-senses tk) nil)
+     (if (sensetion--tk-annotatable? tk)
+	 (progn
+	   (when (sensetion--tk-annotated? tk)
+	     (cl-incf (car sensetion--local-status) -1))
+	   (cl-incf (cdr sensetion--local-status) -1)
+	   (setf (sensetion--tk-tag tk) "ignore")
+	   (setf (sensetion--tk-senses tk) nil))
+       (progn
+	 (setf (sensetion--tk-tag tk) "un")
+	 (cl-incf (cdr sensetion--local-status))))
      t))
   "Annotate that token is to be ignored in annotation.")
 
