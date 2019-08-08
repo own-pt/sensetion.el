@@ -229,23 +229,23 @@ returns non-nil. None of the arguments may move point."
         (goto-char point)))))
 
 
-(defun sensetion--completing-read-lemma (&optional initial-input)
-  (completing-read "Lemma to annotate: "
-		   sensetion--lemma-completion-function
-		   nil 'yes initial-input))
+(defun sensetion--completing-read-lemma (prompt &optional initial-input)
+  (let ((input-lemma (completing-read prompt
+				  sensetion--lemma-completion-function
+				  nil sensetion-restrict-lemmas initial-input)))
+    (sensetion--spaces->underlines input-lemma)))
 
 
 (defun sensetion--hydra-edit-lemma (tk sent &optional lemmas)
   (call-interactively
    (eval
-    (let ((lemmas (or lemmas (sensetion--tk-lemmas tk)))
-	  (num -1))
+    (let ((lemmas (or lemmas (sensetion--tk-lemmas tk))))
       `(defhydra hydra-lemmas () ""
 	 ("q" nil "quit")
 	 ("a" ,(lambda (lemma pos)
 		 (interactive
-		  (list (sensetion--completing-read-lemma)
-			(ido-completing-read "PoS tag? " '("a" "r" "v" "n") nil t nil nil)))
+		  (list (sensetion--completing-read-lemma "New lemma: ")
+			(sensetion--completing-read-pos)))
 		 (let ((new-lemmas (cons (format "%s\%%%s" lemma (sensetion--pos->synset-type pos))
 					 lemmas)))
 		   (sensetion--hydra-edit-lemma tk sent new-lemmas)))
@@ -257,19 +257,22 @@ returns non-nil. None of the arguments may move point."
 		 (sensetion--update-sent sent))
 	  "save"
 	  :exit t)
-	 ,@(mapcar
-	    (lambda (l)
-	      (cl-destructuring-bind (lemma pos) (split-string l "%")
-		(list
-		 (number-to-string (cl-incf num))
-		 (lambda ()
-		   (interactive)
-		   (sensetion--hydra-edit-lemma
-		    tk sent (sensetion--remove-nth num lemmas)))
-		 (format "%s s" lemma (sensetion--synset-type->pos pos))
-		 :column "Remove lemma pos:")))
-	    lemmas))))))
+	 ,@(sensetion--create-hydra-read-lemma lemmas lemmas tk sent 0))))))
 
+
+(defun sensetion--create-hydra-read-lemma (all-lemmas lemmas tk sent num)
+  (when lemmas
+    (cons
+     (cl-destructuring-bind (lemma pos) (split-string (car lemmas) "%")
+       (list
+	(number-to-string num)
+	(lambda ()
+	  (interactive)
+	  (sensetion--hydra-edit-lemma
+	   tk sent (sensetion--remove-nth num all-lemmas)))
+	(format "%s %s" lemma (sensetion--synset-type->pos pos))
+	:column "Remove lemma pos:"))
+     (sensetion--create-hydra-read-lemma all-lemmas (cdr lemmas) tk sent (+ 1 num)))))
 
 (defalias 'sensetion-edit-lemma
   (sensetion--edit-function

@@ -117,6 +117,13 @@ with low confidence."
   :risky t)
 
 
+(defcustom sensetion-restrict-lemmas t
+  "When `t' restrict the user to add only lemmas that is part of
+wordnet to a token or a glob."
+  :group 'sensetion
+  :type 'boolean)
+
+
 ;;; Vars
 
 
@@ -225,7 +232,7 @@ far, and the cdr is the number of annotatable tokens.")
 containing tokens with LEMMA and optionally POS are displayed for
 annotation."
   (interactive
-   (list (sensetion--completing-read-lemma)
+   (list (sensetion--completing-read-lemma "Lemma to annotate: ")
          (ido-completing-read "PoS tag? " '("a" "r" "v" "n" "any") nil t nil nil "any")))
   (unless lemma (user-error "Must provide lemma"))
   (sensetion-is
@@ -405,7 +412,7 @@ assigning the resulting glob token LEMMA and POS.
 
 You can mark/unmark tokens with `sensetion-toggle-glob-mark'."
   (interactive (list
-                (sensetion--completing-read-lemma)
+                (sensetion--completing-read-lemma "Lemma: ")
 		(sensetion--completing-read-pos)
 		(reverse (sensetion--get-text-property-eol 'sensetion--to-glob))
 		(sensetion--get-sent-at-point)))
