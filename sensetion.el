@@ -586,10 +586,7 @@ synset and they have different pos1, return nil."
 
 (defun sensetion--wordnet-lookup-lemma (lemma &optional options)
   "(hash-table ,lemma ((,pos (,sense-key ,hydra-index ,synset-id ,terms ,gloss) ...) ...)"
-  (let ((lemma (cl-substitute (string-to-char " ")
-                              (string-to-char "_")
-                              lemma :test #'eq))
-	(poses '("n" "v" "r" "a"))
+  (let ((poses '("n" "v" "r" "a"))
 	(options (or options (make-hash-table :test 'equal :size 200))))
     (setf (gethash lemma options)
 	  (mapcar
