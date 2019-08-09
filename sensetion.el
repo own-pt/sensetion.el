@@ -124,6 +124,12 @@ wordnet to a token or a glob."
   :type 'boolean)
 
 
+(defcustom sensetion-identify-sentence t
+  "When t shows a tuple before each sentence in target mode with
+  the doc-id and sent-id."
+  :group 'sensetion
+  :type 'boolean)
+
 ;;; Vars
 
 
@@ -243,7 +249,15 @@ annotation."
 			     (sensetion--wordnet-lookup-lemma lemma sensetion--synset-cache))))
    :where
    (id (if pos (format "%s@%s" lemma pos) lemma))
-   (matches (sensetion--es-get-sents lemma pos))
+   (matches (cl-sort
+	     (sensetion--es-get-sents lemma pos)
+	     (lambda (x y)
+	       (if (equal (sensetion--sent-doc-id x)
+			  (sensetion--sent-doc-id y))
+		   (< (sensetion--sent-sent-id x)
+		      (sensetion--sent-sent-id y))
+		 (string-lessp (sensetion--sent-doc-id x)
+			       (sensetion--sent-doc-id y))))))
    (pos (unless (equal pos "any") pos))))
 
 
@@ -274,9 +288,16 @@ annotation."
    (go (sent)
        (seq-let (tokens-line status)
            (colloc sent)
-         (insert tokens-line
-                 ;; no need to add it all the time
-                 (propertize "\n" 'sensetion--sent-id (sensetion--sent-id sent)))
+         (insert
+	  (if (and target sensetion-identify-sentence)
+	      (propertize
+	       (format "(%s %s) "
+		       (sensetion--sent-doc-id sent) (sensetion--sent-sent-id sent))
+	       'face 'bold)
+	    "")
+	  tokens-line
+	  ;; no need to add it all the time
+          (propertize "\n" 'sensetion--sent-id (sensetion--sent-id sent)))
          (cl-incf done (car status))
          (cl-incf total (cdr status))))
    (colloc (sent)
@@ -288,8 +309,7 @@ annotation."
 
 (defun sensetion-sequential-annotate-sentence-document ()
   (interactive)
-  (when sensetion--lemma
-    ;; if in sequential mode already this doesn't make sense
+  (if sensetion--lemma
     (let* ((sentence (sensetion--get-sent-at-point))
 	   (document-id (sensetion--sent-doc-id sentence))
 	   (sentence-index (sensetion--sent-sent-id sentence)))
@@ -298,7 +318,8 @@ annotation."
       (forward-line sentence-index)
       (recenter)
       (momentary-string-display (propertize "----> " 'face '(bold (:foreground "black")))
-				(point)))))
+				(point)))
+    (message "You are already in the context!")))
 
 
 (defun sensetion--get-sent-at-point ()
@@ -420,6 +441,7 @@ You can mark/unmark tokens with `sensetion-toggle-glob-mark'."
     (sensetion--reinsert-sent-at-point globbed-sent)
     (with-inhibiting-read-only
      (sensetion--put-text-property-eol 'sensetion--to-glob nil))))
+
 
 (defun sensetion--glob (lemma pos ixs-to-glob sent)
   (sensetion-is
