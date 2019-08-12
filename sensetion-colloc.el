@@ -25,8 +25,8 @@
 	     (let ((kind  (car kind))
 		   (ckeys (cdr kind)))
 	       (pcase ckeys
-		 (`(k) 			;part of exactly one glob
-		  (seq-let (_ ix glob-tk) (map-elt globs k nil #'equal)
+		 (`(,k) 			;part of exactly one glob
+		  (seq-let (ix glob-tk) (map-elt globs k nil #'equal)
 		    (sensetion--tk-colloc ix form kind ckeys
 				 (select? glob-tk)
 				 (sensetion--tk-tag glob-tk)

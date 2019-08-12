@@ -43,7 +43,7 @@
       `(("ofs" . ,ofs)
 	("pos" . ,pos)
 	("keys" . ,(mapcar #'car keys-lemmas))
-	("terms" . ,(mapcar #'cdr keys-lemmas))
+	("terms" . ,(mapcar (alexandria:curry #'substitute #\_ #\space) (mapcar #'cdr keys-lemmas)))
 	("gloss" . ,gloss))
       :test 'equal)
      out)
