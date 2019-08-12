@@ -4,7 +4,14 @@
   "Return propertized string with SENT contents and its statistics."
   (sensetion-is
    (list
-    (s-join " " tks)
+    (s-concat
+     (if (and target sensetion-identify-sentence)
+	 (propertize
+	  (format "(%s %s) "
+		  (sensetion--sent-doc-id sent) (sensetion--sent-sent-id sent))
+	  'face 'bold)
+       "")
+     (s-join " " tks))
     (cons done total))
    :where
    (tks (cl-loop for tk in (sensetion--sent-tokens sent) for ix from 0 append (go-tk tk ix)))

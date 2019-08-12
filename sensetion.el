@@ -156,6 +156,7 @@ far, and the cdr is the number of annotatable tokens.")
     (define-key map ">" #'sensetion-next-selected)
     (define-key map "/" #'sensetion-edit-sense)
     (define-key map "c" #'sensetion-sequential-annotate-sentence-document)
+    (define-key map "r" #'sensetion-refresh)
     (define-key map "u" #'sensetion-unglob)
     (define-key map "l" #'sensetion-edit-lemma)
     (define-key map "m" #'sensetion-toggle-glob-mark)
@@ -289,12 +290,6 @@ annotation."
        (seq-let (tokens-line status)
            (colloc sent)
          (insert
-	  (if (and target sensetion-identify-sentence)
-	      (propertize
-	       (format "(%s %s) "
-		       (sensetion--sent-doc-id sent) (sensetion--sent-sent-id sent))
-	       'face 'bold)
-	    "")
 	  tokens-line
 	  ;; no need to add it all the time
           (propertize "\n" 'sensetion--sent-id (sensetion--sent-id sent)))
@@ -487,7 +482,7 @@ You can mark/unmark tokens with `sensetion-toggle-glob-mark'."
                                      (sensetion--sent-tokens sent)))))))
 
 
-(defun sensetion--reinsert-sent-at-point (sent)
+(cl-defun sensetion--reinsert-sent-at-point (sent &optional (update t))
   "Save SENT, delete current line (where previous version of sent
 was linearized), and reinsert SENT."
   (with-inhibiting-read-only
@@ -497,7 +492,8 @@ was linearized), and reinsert SENT."
 	 (sensetion--sent-colloc sent sensetion--lemma
 			(when sensetion--lemma (sensetion--cache-lemma->senses sensetion--lemma nil sensetion--synset-cache)))
        (insert line)))
-   (sensetion--update-sent sent)))
+   (when update
+    (sensetion--update-sent sent))))
 
 ;; TODO: when annotating glob, check if token is part of more than one
 ;; colloc
@@ -687,12 +683,18 @@ gloss."
       (remove-from-invisibility-spec 'sensetion--scripts)
     (add-to-invisibility-spec 'sensetion--scripts)))
 
+(defun sensetion-refresh ()
+  (interactive)
+  (sensetion--map-buffer-lines
+   (lambda (line-n line)
+     (sensetion--reinsert-sent-at-point (sensetion--get-sent-at-point) nil))))
 
 (defhydra sensetion-hydra (:color blue)
   ("q" nil nil)
   ("s" nil nil)
   ("RET" nil nil)
   ("c" sensetion-sequential-annotate-sentence-document "Show context of sentence at point" :column "Navigation")
+  ("r" sensetion-refresh "Refresh current buffer" :column "Navigation")
   ("l" sensetion-edit-lemma "Edit token lemma" :column "Edit")
   ("/" sensetion-edit-sense "Edit token senses" :column "Edit")
   ("i" sensetion-edit-ignore "Ignore token" :column "Edit")
