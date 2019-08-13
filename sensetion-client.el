@@ -34,7 +34,7 @@
 (cl-defun sensetion--es-request (path &key data type params (sync t) debug)
   (let* ((response (request (format "%s:%s/%s" sensetion-backend-url sensetion-backend-port path)
 			    :headers sensetion--es-headers :parser #'sensetion--json-read
-			    :params params
+			    :params params :type type
 			    :sync t :data data :complete (when debug #'sensetion--es-request-debug-fn)))
 	 (data (request-response-data response)))
     data))
