@@ -49,12 +49,12 @@ options in the token corresponding to index IX in SENT."
   (let ((senses (sensetion--cache-lemma->senses lemma pos1 sensetion--synset-cache)))
     (unless senses
       (user-error "No senses for lemma %s with pos %s" lemma pos1))
-    (sensetion--call-hydra lemma ix sent senses)))
+    (sensetion--call-hydra lemma pos1 ix sent senses)))
 
 
-(defun sensetion--call-hydra (lemma tk-ix sent options)
+(defun sensetion--call-hydra (lemma pos1 tk-ix sent options)
   (call-interactively
-   (eval (sensetion--edit-hydra-maker lemma tk-ix sent options))))
+   (eval (sensetion--edit-hydra-maker lemma pos1 tk-ix sent options))))
 
 
 (defun sensetion--sense-edit-help-text (chosen? sid terms gloss)
@@ -77,14 +77,14 @@ options in the token corresponding to index IX in SENT."
 	 (propertize txt 'face prop))))
 
 
-(defun sensetion--edit-hydra-maker (lemma tk-ix sent options)
+(defun sensetion--edit-hydra-maker (lemma pos1 tk-ix sent options)
   "Creates interactive editing hydra on-the-fly."
   (sensetion-is
    `(defhydra hydra-senses (:color blue)
       ""
       ("q" nil nil)
       ("RET" nil nil)
-      ("0" ,no-sense-function "No sense in Wordnet" :column "Pick sense:")
+      ("0" ,no-sense-function "No sense in Wordnet" :column ,column)
       ,@(mapcar
          (lambda (s)
            (cl-destructuring-bind (sk hkey sid terms gloss) s
@@ -96,9 +96,10 @@ options in the token corresponding to index IX in SENT."
                       (sensetion--edit-reinsert-state-call
                        ,tk-ix ,sent ,lemma ',options))
 		   (sensetion--sense-edit-help-text (sense-chosen-ind? sk) sid terms gloss)
-                   :column "Pick sense:")))
+                   :column column)))
          options))
    :where
+   (column (format "Pick sense for token %s with PoS %s:" lemma pos1))
    (sense-chosen-ind? (sk)
 		      (member sk pres-skeys))
    (no-sense-function
