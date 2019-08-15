@@ -45,8 +45,6 @@ There are two things you can do about this warning:
 (use-package request   :defer t :ensure t)
 (use-package async     :defer t :ensure t)
 
-(require 'cl)
-
 (use-package sensetion
   :commands sensetion
   ;; change path to repository here

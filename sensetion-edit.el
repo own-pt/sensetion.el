@@ -37,7 +37,7 @@ options in the token corresponding to index IX in SENT."
 		   "Pick lemma+PoS candidate: "
 		   (seq-map-indexed #'make-option lemmas))))
    (make-option (lemma+synset-type ix)
-		(destructuring-bind (lemma . pos)
+		(cl-destructuring-bind (lemma . pos)
 		    (sensetion--split-lemma+synset-type lemma+synset-type)
 		  (list (+ 49 ix)
 			(format "%s%%%s" lemma pos)
