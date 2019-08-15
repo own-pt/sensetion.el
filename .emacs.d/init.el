@@ -30,7 +30,7 @@ There are two things you can do about this warning:
 
 ;; --- If on Mac this might be necessary
 (use-package exec-path-from-shell :ensure t)
-(when (memq window-system '(mac ns x))
+(when (memq system-type '(darwin))
   (exec-path-from-shell-initialize))
 ;; ---
 
@@ -42,8 +42,15 @@ There are two things you can do about this warning:
 (use-package flycheck  :defer t :ensure t)
 (use-package s         :defer t :ensure t)
 (use-package f         :defer t :ensure t)
-(use-package request   :defer t :ensure t)
 (use-package async     :defer t :ensure t)
+(use-package request
+  :defer t
+  :ensure t
+  :config
+  (when (memq system-type '(ms-dos windows-nt cygwin))
+    (setq request-backend 'url-retrieve)))
+
+(use-package restclient   :defer t :ensure t)
 
 (use-package sensetion
   :commands sensetion
