@@ -119,10 +119,11 @@ with low confidence."
 
 
 (defcustom sensetion-restrict-lemmas t
-  "When `t' restrict the user to add only lemmas that is part of
+  "When yes restrict the user to add only lemmas that is part of
 wordnet to a token or a glob."
   :group 'sensetion
-  :type 'boolean)
+  :type '(choose (const :tag "yes" 'yes)
+		 (const :tag "no"  'confirm)))
 
 
 (defcustom sensetion-identify-sentence t
@@ -224,8 +225,7 @@ far, and the cdr is the number of annotatable tokens.")
   (interactive (list (completing-read "Document to annotate: "
 				      sensetion--document-id-completion-function
 				      nil 'yes)))
-  (let ((matches (cl-sort (sensetion--es-get-doc-sents document-id)
-			  '< :key 'sensetion--sent-sent-id)))
+  (let ((matches (sensetion--es-get-sorted-doc-sents document-id)))
     (sensetion--annotate matches document-id)))
 
 

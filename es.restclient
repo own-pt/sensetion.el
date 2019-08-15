@@ -1,7 +1,14 @@
 # -*- restclient -*-
+# Local Variables:
+# restclient-log-request: nil
+# End:
 
-## index synsets
-PUT http://localhost:9200/sensetion-synsets
+:SYNSETS_URL = sensetion-synsets
+:DOCS_URL = sensetion-docs
+
+#### SYNSETS
+# create index synsets
+PUT http://localhost:9200/:SYNSETS_URL
 Content-Type: application/json
 
 {
@@ -17,8 +24,15 @@ Content-Type: application/json
     }
 }
 
-# index docs
-PUT http://localhost:9200/sensetion-docs
+# index synsets.json
+POST http://localhost:9200/:SYNSETS_URL/_bulk
+Content-Type: application/x-ndjson
+
+< data/synsets.json
+
+#### DOCS
+# create index docs
+PUT http://localhost:9200/:DOCS_URL
 Content-Type: application/json
 
 {
@@ -28,7 +42,7 @@ Content-Type: application/json
                 "type": "keyword"
             },
             "sent_id": {
-                "type": "keyword"
+                "type": "integer"
             },
             "text": {
                 "enabled": false
@@ -57,23 +71,26 @@ Content-Type: application/json
     }
 }
 
+# index docs
+POST http://localhost:9200/:DOCS_URL/_bulk
+Content-Type: application/x-ndjson
+
+< data/docs/repsol.json
+
+
+#### CLEAN
 # delete synsets
-DELETE http://localhost:9200/sensetion-synsets/
+DELETE http://localhost:9200/:SYNSETS_URL/
 Content-Type: application/json
 
 
 # delete docs
-DELETE http://localhost:9200/sensetion-docs/
+DELETE http://localhost:9200/:DOCS_URL/
 Content-Type: application/json
 
-## index synsets
-# curl -s -H "Content-Type: application/x-ndjson" -XPOST localhost:9200/sensetion-synsets/_bulk --data-binary "@synsets.json" &> /dev/null ; echo
-## index documents
-## if only one file:
-# curl -s -H "Content-Type: application/x-ndjson" -XPOST localhost:9200/sensetion-docs/_bulk --data-binary "@repsol.json" &> /dev/null ; echo
-## if many, all in one directory with extension json:
-# for i in *.json ; do curl -s -H "Content-Type: application/x-ndjson" -XPOST localhost:9200/sensetion-docs/_bulk --data-binary "@$i" &> /dev/null ; done
 
+#### DEVELOPMENT
+#
 GET http://localhost:9200/sensetion-synsets/_search
 Content-Type: application/json
 
@@ -189,10 +206,11 @@ Content-Type: application/json
 GET http://localhost:9200/sensetion-docs/_search
 Content-Type: application/json
 
-{
+ {
+    "sort": "sent_id",
     "query": {
         "term": {
-            "doc_id": "0f09c2fd-69e6-420d-bae3-823b2200be59-0"
+            "doc_id": "64345bce-76b0-447a-bfa1-800dc82007a6-2"
         }
     }
 }

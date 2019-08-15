@@ -131,7 +131,7 @@
     hits))
 
 
-(defun sensetion--es-get-doc-sents (doc-id)
+(defun sensetion--es-get-sorted-doc-sents (doc-id)
   (let* ((query `((query
 		   (term
 		    (doc_id . ,doc-id)))
