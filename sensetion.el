@@ -304,18 +304,21 @@ annotation."
 
 
 (defun sensetion-sequential-annotate-sentence-document ()
+  "In targeted mode, open a buffer of sequential annotation with point at the same sentence as the one in point.
+
+Can be used to switch to sequential annotation or to see the context of a sentence."
   (interactive)
-  (if sensetion--lemma
-    (let* ((sentence (sensetion--get-sent-at-point))
-	   (document-id (sensetion--sent-doc-id sentence))
-	   (sentence-index (sensetion--sent-sent-id sentence)))
-      ;; this implementation feels like an abstraction leak...
-      (sensetion-sequential-annotate-doc document-id)
-      (forward-line sentence-index)
-      (recenter)
-      (momentary-string-display (propertize "----> " 'face '(bold (:foreground "black")))
-				(point)))
-    (message "You are already in the context!")))
+  (unless sensetion--lemma
+    (user-error "You are already in sequential mode"))
+  (let* ((sentence       (sensetion--get-sent-at-point))
+	 (document-id    (sensetion--sent-doc-id sentence))
+	 (sentence-index (sensetion--sent-sent-id sentence)))
+    ;; this implementation feels like an abstraction leak...
+    (sensetion-sequential-annotate-doc document-id)
+    (forward-line sentence-index)
+    (recenter)
+    (momentary-string-display (propertize "----> " 'face '(bold (:foreground "black")))
+			      (point))))
 
 
 (defun sensetion--get-sent-at-point ()

@@ -294,11 +294,11 @@ returns non-nil. None of the arguments may move point."
 
 
 (defalias 'sensetion-edit-ignore
-  ;; TODO: allow this anywhere?
   (sensetion--edit-function
    (lambda (tk _)
      (if (sensetion--tk-annotatable? tk)
-	 (progn
+	 (when (or (not (sensetion--tk-annotated? tk))
+		   (y-or-n-p "Delete all annotations and ignore token?"))
 	   (when (sensetion--tk-annotated? tk)
 	     (cl-incf (car sensetion--local-status) -1))
 	   (cl-incf (cdr sensetion--local-status) -1)
@@ -307,7 +307,7 @@ returns non-nil. None of the arguments may move point."
        (progn
 	 (setf (sensetion--tk-tag tk) "un")
 	 (cl-incf (cdr sensetion--local-status))))
-     t))
+       t))
   "Annotate that token is to be ignored in annotation.")
 
 

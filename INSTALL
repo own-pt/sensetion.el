@@ -10,6 +10,7 @@ manually, note that you might need Emacs version 26 or higher.
 - [[https://www.elastic.co/downloads/elasticsearch][elastic search]]
 - (optional) python 3 and some libraries (see =utils/requirements.txt=)
 
+
 * Data
 
 You use the Makefile in the root directory to add data to
@@ -24,6 +25,7 @@ in the root directory.
 
 You can produce data to be used by this annotation interface using a
 Python script; see =utils/README=.
+
 
 * Emacs beginner installation
 
