@@ -321,6 +321,14 @@ Can be used to switch to sequential annotation or to see the context of a senten
     (sensetion--alist->sent (sensetion--es-id->sent sent-id))))
 
 
+(defun sensetion--get-token-at-point ()
+  ;; for debugging
+  (when-let ((token-index (sensetion--tk-ix-prop-at-point))
+	     (sent        (sensetion--get-sent-at-point))
+	     (tokens      (sensetion--sent-tokens sent)))
+    (nth token-index tokens)))
+
+
 (defun sensetion--update-sent (sent)
   (sensetion--es-update-modified-sent sent))
 
@@ -516,13 +524,13 @@ was linearized), and reinsert SENT."
   "Get pos1 of synsets assigned to TK. If there is more than one
 synset and they have different pos1, return nil."
   (when-let* ((sks   (sensetion--tk-skeys tk))
-              (st    (sensetion--sensekey-pos (cl-first sks)))
-              (sts    (if (member st '("3" "5"))
-                          '("3" "5")
-                        (list st)))
-              (same? (seq-every-p (lambda (sk) (member (sensetion--sensekey-pos sk) sts))
+              (pos   (sensetion--sensekey-pos (cl-first sks)))
+              (poses (if (member pos '("a" "s"))
+                         '("a" "s")
+                       (list pos)))
+              (same? (seq-every-p (lambda (sk) (member (sensetion--sensekey-pos sk) poses))
                                   (cl-rest sks))))
-    (sensetion--synset-type->pos st)))
+    pos))
 
 
 (defun sensetion-previous-selected (point)
@@ -575,7 +583,7 @@ synset and they have different pos1, return nil."
    st
    #s(hash-table size 5 test equal rehash-size 1.5 rehash-threshold 0.8125
                  purecopy t data
-                 ("1" "n" "2" "v" "3" "a" "4" "r"))))
+                 ("1" "n" "2" "v" "3" "a" "4" "r" "5" "s"))))
 
 
 (defun sensetion--wordnet-lookup-lemma (lemma &optional options)
