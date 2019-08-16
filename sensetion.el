@@ -530,7 +530,9 @@ synset and they have different pos1, return nil."
                        (list pos)))
               (same? (seq-every-p (lambda (sk) (member (sensetion--sensekey-pos sk) poses))
                                   (cl-rest sks))))
-    pos))
+    ;; instead of simply pos, guarantees that we don't show the user
+    ;; the 's' (virtual) PoS
+    (cl-first poses)))
 
 
 (defun sensetion-previous-selected (point)
