@@ -19,8 +19,16 @@
 	 (maybe-token-pos (sensetion--tk-senses-pos token)))
     (cl-destructuring-bind (lemma . pos) (sensetion--split-lemma+synset-type
 					  (sensetion--pick-lemma-candidate token))
-      (when (and maybe-token-pos pos (not (equal pos maybe-token-pos)))
-	(user-error "Token has already been annotated with PoS %s; if you want to annotate it as %s please remove the former sense(s)" maybe-token-pos pos))
+      (when
+	  ;; token already has annotation of different pos
+	  (and maybe-token-pos pos (not (equal pos maybe-token-pos)))
+	(if (y-or-n-p
+	     (format "Token has already been annotated with PoS %s. Remove previous annotation?"
+		     maybe-token-pos))
+	    (setf (sensetion--tk-senses token) nil
+		  (sensetion--tk-tag token)    "un")
+	  (user-error "Giving up on annotation"))
+	(message nil)) 			; fix: to clear minibuffer for hydra
       (sensetion--edit-sense lemma (or pos (sensetion--completing-read-pos)) token sent))))
 
 
