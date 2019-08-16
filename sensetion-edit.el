@@ -15,14 +15,18 @@
                      (sensetion--get-sent-at-point)))
   (unless (sensetion--selected? (point))
     (user-error "Token at point not selected for annotation"))
-  (cl-destructuring-bind (lemma . pos) (sensetion--split-lemma+synset-type
-					(sensetion--pick-candidate ix sent))
-    (sensetion--edit-sense lemma (or pos (sensetion--completing-read-pos)) ix sent)))
+  (let* ((token (elt (sensetion--sent-tokens sent) ix))
+	 (maybe-token-pos (sensetion--tk-senses-pos token)))
+    (cl-destructuring-bind (lemma . pos) (sensetion--split-lemma+synset-type
+					  (sensetion--pick-lemma-candidate token))
+      (when (and maybe-token-pos pos (not (equal pos maybe-token-pos)))
+	(user-error "Token has already been annotated with PoS %s; if you want to annotate it as %s please remove the former sense(s)" maybe-token-pos pos))
+      (sensetion--edit-sense lemma (or pos (sensetion--completing-read-pos)) token sent))))
 
 
-(defun sensetion--pick-candidate (ix sent)
+(defun sensetion--pick-lemma-candidate (token)
   "Choose candidate (lemma + synset type) to annotate among the
-options in the token corresponding to index IX in SENT."
+options in TOKEN."
   (sensetion-is
    (if (cdr lemmas)
        (choose-lemma)
@@ -42,19 +46,19 @@ options in the token corresponding to index IX in SENT."
 		  (list (+ 49 ix)
 			(format "%s%%%s" lemma pos)
 			lemma+synset-type)))
-   (lemmas (sensetion--tk-lemmas (elt (sensetion--sent-tokens sent) ix)))))
+   (lemmas (sensetion--tk-lemmas token))))
 
 
-(defun sensetion--edit-sense (lemma pos1 ix sent)
+(defun sensetion--edit-sense (lemma pos1 token sent)
   (let ((senses (sensetion--cache-lemma->senses lemma pos1 sensetion--synset-cache)))
     (unless senses
       (user-error "No senses for lemma %s with pos %s" lemma pos1))
-    (sensetion--call-hydra lemma pos1 ix sent senses)))
+    (sensetion--call-hydra lemma pos1 token sent senses)))
 
 
-(defun sensetion--call-hydra (lemma pos1 tk-ix sent options)
+(defun sensetion--call-hydra (lemma pos1 token sent options)
   (call-interactively
-   (eval (sensetion--edit-hydra-maker lemma pos1 tk-ix sent options))))
+   (eval (sensetion--edit-hydra-maker lemma pos1 token sent options))))
 
 
 (defun sensetion--sense-edit-help-text (chosen? sid terms gloss)
@@ -77,7 +81,7 @@ options in the token corresponding to index IX in SENT."
 	 (propertize txt 'face prop))))
 
 
-(defun sensetion--edit-hydra-maker (lemma pos1 tk-ix sent options)
+(defun sensetion--edit-hydra-maker (lemma pos1 token sent options)
   "Creates interactive editing hydra on-the-fly."
   (sensetion-is
    `(defhydra hydra-senses (:color blue)
@@ -92,9 +96,9 @@ options in the token corresponding to index IX in SENT."
                    ;; gets wrapped in (lambda () (interactive)
                    ;; automatically by hydra
                    `(atomic-change-group
-                      (sensetion--toggle-sense ,tk ,sk)
+                      (sensetion--toggle-sense ,token ,sk)
                       (sensetion--edit-reinsert-state-call
-                       ,tk-ix ,sent ,lemma ',options))
+                       ,token ,sent ,lemma ,pos1 ',options))
 		   (sensetion--sense-edit-help-text (sense-chosen-ind? sk) sid terms gloss)
                    :column column)))
          options))
@@ -108,9 +112,8 @@ options in the token corresponding to index IX in SENT."
           (setf (sensetion--tk-senses tk) nil)
           (setf (sensetion--tk-tag tk) "man-now")
           t))
-      ,tk-ix ,sent))
-   (pres-skeys (sensetion--tk-skeys tk))
-   (tk (elt (sensetion--sent-tokens sent) tk-ix))))
+      ,token ,sent))
+   (pres-skeys (sensetion--tk-skeys token))))
 
 
 (defun sensetion--toggle-sense (tk sk)
@@ -128,12 +131,12 @@ options in the token corresponding to index IX in SENT."
       (setf (sensetion--tk-tag tk) "man-now"))))
 
 
-(defun sensetion--edit-reinsert-state-call (tk-ix sent &optional lemma options)
+(defun sensetion--edit-reinsert-state-call (token sent &optional lemma pos1 options)
   (let ((point (point)))
     (sensetion--reinsert-sent-at-point sent)
     (goto-char point))
-  (when (and lemma options)
-    (sensetion--call-hydra lemma tk-ix sent options)))
+  (when (and lemma pos1 options)
+    (sensetion--call-hydra lemma pos1 token sent options)))
 
 
 ;; ;; ;; ;; edit source sent
