@@ -687,7 +687,7 @@ synset and they have different pos1, return nil."
                         (list st)))
               (same? (seq-every-p (lambda (sk) (member (sensetion--sk-st sk) sts))
                                   (cl-rest sks))))
-    (sensetion--synset-type->pos st)))
+    (sensetion--synset-type->pos (cl-first sts))))
 
 
 (defun sensetion-previous-selected (point)
