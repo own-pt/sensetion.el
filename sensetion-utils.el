@@ -83,12 +83,7 @@ itself."
   (get-text-property (line-end-position) property object))
 
 (defun sensetion--remove-nth (n list)
-  (declare
-   (type (integer 0) n)
-   (type list list))
-  (if (or (zerop n) (null list))
-      (cdr list)
-    (cons (car list) (sensetion--remove-nth (1- n) (cdr list)))))
+  (cl-remove-if (lambda (_) t) list :start n :end (1+ n)))
 
 
 (provide 'sensetion-utils)

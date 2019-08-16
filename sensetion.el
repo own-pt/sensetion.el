@@ -229,12 +229,6 @@ far, and the cdr is the number of annotatable tokens.")
     (sensetion--annotate matches document-id)))
 
 
-(defun sensetion-sequential-annotate-text (text)
-  (interactive "sDocuments matching: ")
-  (let ((matches (sensetion--es-text->sents text)))
-    (sensetion--annotate matches text)))
-
-
 (defun sensetion-annotate-target (lemma &optional pos)
   "Create targeted annotation buffer, where several sentences
 containing tokens with LEMMA and optionally POS are displayed for
@@ -690,7 +684,7 @@ gloss."
 (defun sensetion-refresh ()
   (interactive)
   (sensetion--map-buffer-lines
-   (lambda (line-n line)
+   (lambda (_ _)
      (sensetion--reinsert-sent-at-point (sensetion--get-sent-at-point) nil))))
 
 (defhydra sensetion-hydra (:color blue)
