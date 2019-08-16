@@ -55,9 +55,6 @@ asked if you would like to edit the token itself or its collocation.
 You can move sentences up or down with =C-↑= and =C-↓=. Clustering
 tokens with the same sense together might be useful.
 
-Note that you can customize most things (like annotation colors) with
-=M-x customize-group RET sensetion=.
-
 ** Command summary
 You can call a command using =M-x <command-name>= or by pressing its
 keybinding. If you find that there are too many editing and navigation
@@ -81,6 +78,33 @@ invokes a menu which includes all other commands.
 | sensetion-previous-selected                     | =<=         | Move point to previous selected token                                                                         |
 | sensetion-move-line-up                          | =C-↑=       | Move sentence up                                                                                              |
 | sensetion-move-line-down                        | =C-↓=       | Move sentence down                                                                                            |
+
+
+* Customization
+
+Among others, =sensetion.el= allows the following customizations:
+
+- changing default buffer names ;
+- toggling display of word sense information such as synset ids ;
+- changing token status colours ;
+- restricting (or not) user-supplied lemmas to those found in wordnet ;
+- displaying (or not) sentence ids
+
+A complete and up-to-date list of these can be found by running =M-x
+customize-group RET sensetion=.
+
+These customizations can be performed:
+
+- using the emacs graphical customization system: just run =M-x
+  customize-group RET sensetion= and all options should be there, with
+  accompanying documentation; do not forget to save your changes
+  (*recommended way, specially for beginners*)
+
+- using =use-package= or similar libraries (*recommended for advanced
+  use*)
+
+- manually, by setting the variables to the desired variables using
+  =setq= or =setf= (*not recommended*)
 
 
 * Report bugs
