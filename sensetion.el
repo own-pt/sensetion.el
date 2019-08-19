@@ -438,10 +438,12 @@ You can mark/unmark tokens with `sensetion-toggle-glob-mark'."
 		(sensetion--completing-read-pos)
 		(reverse (sensetion--get-text-property-eol 'sensetion--to-glob))
 		(sensetion--get-sent-at-point)))
-  (let ((globbed-sent (sensetion--glob lemma pos ixs-to-glob sent)))
+  (let ((point (point))
+	(globbed-sent (sensetion--glob lemma pos ixs-to-glob sent)))
     (sensetion--reinsert-sent-at-point globbed-sent)
     (with-inhibiting-read-only
-     (sensetion--put-text-property-eol 'sensetion--to-glob nil))))
+     (sensetion--put-text-property-eol 'sensetion--to-glob nil))
+    (goto-char point)))
 
 
 (defun sensetion--glob (lemma pos ixs-to-glob sent)
@@ -499,7 +501,7 @@ was linearized), and reinsert SENT."
 			(when sensetion--lemma (sensetion--cache-lemma->senses sensetion--lemma nil sensetion--synset-cache)))
        (insert line)))
    (when update
-    (sensetion--update-sent sent))))
+     (sensetion--update-sent sent))))
 
 ;; TODO: when annotating glob, check if token is part of more than one
 ;; colloc
