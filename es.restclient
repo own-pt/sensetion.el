@@ -88,6 +88,19 @@ Content-Type: application/json
 DELETE http://localhost:9200/:DOCS_URL/
 Content-Type: application/json
 
+#### reset read-only
+# docs
+PUT http://localhost:9200/:DOCS_URL/_settings?pretty
+Content-Type: application/json
+
+{"index.blocks.read_only_allow_delete": null}
+
+# synsets
+PUT http://localhost:9200/:SYNSETS_URL/_settings?pretty
+Content-Type: application/json
+
+{"index.blocks.read_only_allow_delete": null}
+
 
 #### DEVELOPMENT
 #
