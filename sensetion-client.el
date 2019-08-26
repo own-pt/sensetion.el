@@ -37,7 +37,9 @@
 			    :params params :type type
 			    :sync t :data data :complete (when debug #'sensetion--es-request-debug-fn)))
 	 (data (request-response-data response)))
-    data))
+    (if-let ((error? (map-elt data 'error)))
+	(error "Elasticsearch error %s" error?)
+      data)))
 
 
 (cl-defun sensetion--es-query (path data &key (type "GET") params (sync t) debug)
