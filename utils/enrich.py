@@ -75,13 +75,20 @@ def go_doc(fp):
 @click.command()
 @click.argument('input_files', type=click.Path(exists=True), nargs=-1)
 @click.option('--es', 'elasticsearch', default=False, is_flag=True, help="Include elasticsearch indexing command before each sentence.")
-def main(input_files, elasticsearch=False):
+@click.option('--mongo', 'mongo', default=False, is_flag=True, help="Include _id field in each sent.")
+def main(input_files, elasticsearch=False, mongo=False):
     for fp in input_files:
         sents = go_doc(fp)
         for sent in sents:
             if elasticsearch:
-                click.echo(to_json({'index': {'_id' : sent_id(sent[DOC_ID_KEY], sent[SENT_ID_KEY])}}))
-            click.echo(to_json(sent))
+                click.echo(
+                    to_json({'index': {'_id': sent_id(sent[DOC_ID_KEY], sent[SENT_ID_KEY])}}))
+                click.echo(to_json(sent))
+            elif mongo:
+                sent['_id'] = sent_id(sent[DOC_ID_KEY], sent[SENT_ID_KEY])
+                click.echo(to_json(sent))
+            else:
+                click.echo(to_json(sent))
 
 
 if __name__ == '__main__':
