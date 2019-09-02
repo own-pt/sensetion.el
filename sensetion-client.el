@@ -355,7 +355,7 @@ emacs cannot interpret as json. "
 
 (cl-defmethod sensetion--backend-update-modified-sent ((backend (eql mongo)) sent)
   (mongo-replace-one "sensetion-database"  "documents"
-		     '((_id . "0f09c2fd-69e6-420d-bae3-823b2200be59-0-1"))
+		     `((_id . ,(sensetion--sent-id sent)))
 		     (sensetion--sent->alist sent)))
 
 
