@@ -38,7 +38,7 @@
 
 
 (defcustom sensetion-backend 'mongo
-  "TODO"
+  "Choice of database backend."
   :group 'sensetion
   :type '(choice (const :tag "mongodb" mongo)
 		 (const :tag "elasticsearch" es)))

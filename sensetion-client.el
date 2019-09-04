@@ -234,67 +234,40 @@ ARGS if present will be used to format CMD."
     (json-read-from-string output)))
 
 
-(defun mongo-unquote-query (query)
-  "Json encodes QUERY, and unquotes any ObjectId calls.
-
-We don't have syntax for the ObjectId call that mongo wants in
- lisp, so a query has to look like this:
-'((_id .  \"ObjectId(\"587babfaef131d0d4603b3ad\")\"))
-
-Mongo can't have the quotes around the call, so this function
-removes them.
-"
-  (replace-regexp-in-string "\"\\(ObjectID(\\\\\"\\(.*?\\)\\\\\")\\)\""
-                            "ObjectId(\"\\2\")"
-                            (json-encode query)))
-
-
-(defun mongo-requote-output (output)
-  "Adds quotes around ObjectId in OUTPUT.
-When mongo outputs json, it has unquoted ObjectIds in it that
-emacs cannot interpret as json. "
-  (replace-regexp-in-string
-   "ObjectId(\"\\(.*?\\)\")"
-   "\"ObjectId(\\\\\"\\1\\\\\")\""
-   output))
-
-
 (defun mongo-find (db collection query &optional projection)
-  (let* ((query-json (mongo-unquote-query query))
+  (let* ((query-json query)
          (projection-json
           (and projection (json-encode projection)))
-         (output (mongo-requote-output
-                  (concat "["
-                          (replace-regexp-in-string
-                           "\n" ""
-                           (shell-command-to-string
-                            (format "mongo %s --quiet --eval 'db.%s.find(%s).forEach(function(myDoc) { printjsononeline(myDoc); print( \",\"); })'"
-                                    db collection
-                                    (if projection
-                                        (format "%s, %s" query-json projection-json)
-                                      query-json))))
-                          "]")))) 
+         (output (concat "["
+                         (replace-regexp-in-string
+                          "\n" ""
+                          (shell-command-to-string
+                           (format "mongo %s --quiet --eval 'db.%s.find(%s).forEach(function(myDoc) { printjsononeline(myDoc); print( \",\"); })'"
+                                   db collection
+                                   (if projection
+                                       (format "%s, %s" query-json projection-json)
+                                     query-json))))
+                         "]"))) 
     (let ((json-array-type 'list))
       (json-read-from-string output))))
 
 
 (defun mongo-find-sort (db collection query sort &optional projection)
-  (let* ((query-json (mongo-unquote-query query))
+  (let* ((query-json query)
 	 (query-sort (json-encode-alist sort))
          (projection-json
           (and projection (json-encode projection)))
-         (output (mongo-requote-output
-                  (concat "["
-                          (replace-regexp-in-string
-                           "\n" ""
-                           (shell-command-to-string
-                            (format "mongo %s --quiet --eval 'db.%s.find(%s).sort(%s).forEach(function(myDoc) { printjsononeline(myDoc); print( \",\"); })'"
-                                    db collection
-                                    (if projection
-                                        (format "%s, %s" query-json projection-json)
-                                      query-json)
-				    query-sort)))
-                          "]")))) 
+         (output (concat "["
+                         (replace-regexp-in-string
+                          "\n" ""
+                          (shell-command-to-string
+                           (format "mongo %s --quiet --eval 'db.%s.find(%s).sort(%s).forEach(function(myDoc) { printjsononeline(myDoc); print( \",\"); })'"
+                                   db collection
+                                   (if projection
+                                       (format "%s, %s" query-json projection-json)
+                                     query-json)
+				   query-sort)))
+                         "]"))) 
     (let ((json-array-type 'list))
       (json-read-from-string output))))
 
