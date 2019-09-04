@@ -223,37 +223,51 @@
 
 ;;; mongodb backend
 
+
+(defun mongo-requote-output (output)
+  "Adds quotes around ObjectId in OUTPUT.
+When mongo outputs json, it has unquoted ObjectIds in it that
+emacs cannot interpret as json. "
+  (replace-regexp-in-string
+   "ObjectId(\"\\(.*?\\)\")"
+   "\"ObjectId(\\\\\"\\1\\\\\")\""
+   output))
+
 (defun mongo-cmd (db collection cmd &rest args)
   "In DB.COLLECTION run CMD. 
 ARGS if present will be used to format CMD."
-  (let ((output (shell-command-to-string
-		 (format "mongo %s --quiet --eval 'db.%s.%s'"
-			 db collection
-			 (apply #'format cmd args))))
+  (let ((output (mongo-requote-output
+		 (shell-command-to-string
+		  (format "mongo %s --quiet --eval 'db.%s.%s'"
+			  db collection
+			  (apply #'format cmd args)))))
 	(json-array-type 'list))
     (json-read-from-string output)))
 
 
 (defun mongo-find (db collection query &optional projection)
-  (let* ((query-json query)
+  (let* ((query-json (json-encode query))
          (projection-json
           (and projection (json-encode projection)))
-         (output (concat "["
-                         (replace-regexp-in-string
-                          "\n" ""
-                          (shell-command-to-string
-                           (format "mongo %s --quiet --eval 'db.%s.find(%s).forEach(function(myDoc) { printjsononeline(myDoc); print( \",\"); })'"
-                                   db collection
-                                   (if projection
-                                       (format "%s, %s" query-json projection-json)
-                                     query-json))))
-                         "]"))) 
+	 (cmd (format "mongo %s --quiet --eval 'db.%s.find(%s).forEach(function(myDoc) { printjsononeline(myDoc); print( \",\"); })'"
+                      db collection
+                      (if projection
+                          (format "%s, %s" query-json projection-json)
+                        query-json)))
+         (output (mongo-requote-output
+		  (concat "["
+                          (replace-regexp-in-string
+                           "\n" ""
+                           (shell-command-to-string
+                            cmd))
+                          "]"))))
+
     (let ((json-array-type 'list))
       (json-read-from-string output))))
 
 
 (defun mongo-find-sort (db collection query sort &optional projection)
-  (let* ((query-json query)
+  (let* ((query-json (json-encode query))
 	 (query-sort (json-encode-alist sort))
          (projection-json
           (and projection (json-encode projection)))
