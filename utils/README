@@ -42,3 +42,11 @@ dump all documents in a given elasticsearch server to a chosen directory.
 #+BEGIN_SRC sh
 python3 es-dump.py --help
 #+END_SRC
+* inject-mongodb.py
+
+Insert Wordnet data and corpus data (prepared by =enrich.py=) to be
+used by sensetion into a MongoDB instance.
+
+#+BEGIN_SRC sh
+python3 inject-mongodb.py --help
+#+END_SRC
