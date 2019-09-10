@@ -242,8 +242,7 @@ ARGS if present will be used to format CMD."
 	  output
 	(with-current-buffer (get-buffer-create "*sensetion-log*")
 	  (insert output)
-	  (message "See *sensetion-log*")
-	  (error "Something went wrong!")))))
+	  (error "Something went wrong! See *sensetion-log*")))))
 
 
 (defun sensetion--mongo-find (db collection query &optional projection)
@@ -340,7 +339,7 @@ ARGS if present will be used to format CMD."
   (let ((result (sensetion--mongo-replace-one "sensetion-database"  "documents"
 				     `((_id . ,(sensetion--sent-id sent)))
 				     (sensetion--sent->alist sent))))
-    (case (cdr (assoc 'modifiedCount))
+    (case (map-elt result 'modifiedCount)
       (0 (error "No sentence modified!"))
       (1 t)
       (otherwise (error "More than one sentence modified!")))))
