@@ -224,7 +224,7 @@
 ;;; mongodb backend
 
 
-(defun mongo-requote-output (output)
+(defun sensetion--mongo-requote-output (output)
   "Adds quotes around ObjectId in OUTPUT.
 When mongo outputs json, it has unquoted ObjectIds in it that
 emacs cannot interpret as json. "
@@ -233,98 +233,94 @@ emacs cannot interpret as json. "
    "\"ObjectId(\\\\\"\\1\\\\\")\""
    output))
 
-(defun mongo-cmd (db collection cmd &rest args)
+
+(defun sensetion--mongo-cmd (args)
   "In DB.COLLECTION run CMD. 
 ARGS if present will be used to format CMD."
-  (let ((output (mongo-requote-output
-		 (shell-command-to-string
-		  (format "mongo %s --quiet --eval 'db.%s.%s'"
-			  db collection
-			  (apply #'format cmd args)))))
-	(json-array-type 'list))
-    (json-read-from-string output)))
+  (destructuring-bind (code . output) (sensetion--process-exit-code-and-output "mongo" args)
+      (if (equal code 0)
+	  output
+	(with-current-buffer (get-buffer-create "*sensetion-log*")
+	  (insert output)
+	  (message "See *sensetion-log*")
+	  (error "Something went wrong!")))))
 
 
-(defun mongo-find (db collection query &optional projection)
+(defun sensetion--mongo-find (db collection query &optional projection)
   (let* ((query-json (json-encode query))
          (projection-json
           (and projection (json-encode projection)))
-	 (cmd (format "mongo %s --quiet --eval 'db.%s.find(%s).forEach(function(myDoc) { printjsononeline(myDoc); print( \",\"); })'"
-                      db collection
-                      (if projection
-                          (format "%s, %s" query-json projection-json)
-                        query-json)))
-         (output (mongo-requote-output
-		  (concat "["
-                          (replace-regexp-in-string
-                           "\n" ""
-                           (shell-command-to-string
-                            cmd))
-                          "]"))))
-
+	 (args (list db "--quiet" "--eval"
+		     (format "db.%s.find(%s).forEach(function(myDoc) { printjsononeline(myDoc); print( \",\"); })"
+			     collection
+			     (if projection
+				 (format "%s, %s" query-json projection-json)
+                               query-json))))
+	 (output (sensetion--mongo-cmd args)))
     (let ((json-array-type 'list))
-      (json-read-from-string output))))
+      (json-read-from-string
+       (sensetion--mongo-requote-output
+	(concat "[" (replace-regexp-in-string "\n" "" output) "]"))))))
 
 
-(defun mongo-find-sort (db collection query sort &optional projection)
+(defun sensetion--mongo-find-sort (db collection query sort &optional projection)
   (let* ((query-json (json-encode query))
 	 (query-sort (json-encode-alist sort))
          (projection-json
           (and projection (json-encode projection)))
-         (output (concat "["
-                         (replace-regexp-in-string
-                          "\n" ""
-                          (shell-command-to-string
-                           (format "mongo %s --quiet --eval 'db.%s.find(%s).sort(%s).forEach(function(myDoc) { printjsononeline(myDoc); print( \",\"); })'"
-                                   db collection
-                                   (if projection
-                                       (format "%s, %s" query-json projection-json)
-                                     query-json)
-				   query-sort)))
-                         "]"))) 
+	 (args (list "mongo" "db" "--quiet" "--eval"
+		     (format "db.%s.find(%s).sort(%s).forEach(function(myDoc) { printjsononeline(myDoc); print( \"),\"); })"
+			     collection
+                             (if projection
+                                 (format "%s, %s" query-json projection-json)
+                               query-json)
+			     query-sort)))
+         (output (sensetion--mongo-cmd args)))
     (let ((json-array-type 'list))
-      (json-read-from-string output))))
+      (json-read-from-string
+       (sensetion--mongo-requote-output
+	(concat "[" (replace-regexp-in-string "\n" "" output) "]"))))))
 
-(defun mongo-replace-one (db collection query replacement)
+
+(defun sensetion--mongo-replace-one (db collection query replacement)
   "In DB.COLLECTION update records matching QUERY with the contents of $SET."
   (let* ((query-json (json-encode-alist query))
          (replacement-json (json-encode-alist replacement))
-         (cmd (format "mongo %s --quiet --eval 'db.%s.replaceOne(%s, %s)'"
-                      db collection
-                      query-json replacement-json))
-         (output (shell-command-to-string cmd)))
-    (if (string-match "WriteResult(" output)
-        (json-read-from-string
-         (substring output 12 -2))
-      output)))
+         (args (list db "--quiet" "--eval"
+		    (format "db.%s.replaceOne(%s, %s)"
+			    collection query-json replacement-json)))
+	 (output (sensetion--mongo-cmd args)))
+    (json-read-from-string output)))
 
 
 (cl-defmethod sensetion-backend-prefix-lemma ((backend (eql mongo)) prefix)
   (let* ((query `())
-	 (hits  (mongo-find "sensetion-database"
-			    "synsets"
-			    `((terms ($regex . ,(format "^%s" prefix))))))
+	 (hits  (sensetion--mongo-find "sensetion-database"
+			      "synsets"
+			      `((terms ($regex . ,(format "^%s" prefix))))))
 	 (terms (seq-mapcat (lambda (doc) (map-elt doc 'terms)) hits)))
     terms))
 
 
 (cl-defmethod sensetion-backend-prefix-document-id ((backend (eql mongo)) prefix)
-  (let* ((document-ids  (mongo-cmd "sensetion-database"  "documents" "distinct(\"doc_id\")")))
+  (let* ((json-array-type 'list)
+	 (output (sensetion--mongo-cmd '("sensetion-database" "--quiet" "--eval" "db.documents.distinct(\"doc_id\")")))
+	 (document-ids  (json-read-from-string output)))
     (seq-filter (lambda (document-id) (string-prefix-p prefix document-id)) document-ids)))
 
 
 (cl-defmethod sensetion--backend-get-sorted-doc-sents ((backend (eql mongo)) doc-id)
-  (let ((hits (mongo-find-sort "sensetion-database" "documents" `((doc_id . ,doc-id)) '(("sent_id" . 1)))))
+  (let ((hits (sensetion--mongo-find-sort "sensetion-database" "documents" `((doc_id . ,doc-id)) '(("sent_id" . 1)))))
     (mapcar #'(lambda (sent) (sensetion--alist->sent (cdr sent))) hits)))
 
 
 (defun sensetion--mongo-lemma-pos->docs (lemma pos)
-  (mongo-find "sensetion-database" "documents"
+  (sensetion--mongo-find "sensetion-database" "documents"
 	      `((tokens.lemmas . ,(format "%s%%%s" lemma (sensetion--pos->synset-type pos))))))
 
 
 (defun sensetion--mongo-lemma->docs (lemma)
-  (mongo-find "sensetion-database" "documents"
+  (sensetion--mongo-find "sensetion-database" "documents"
 	      `((tokens.lemmas ($regex . ,(format "^%s%%[1-5]" lemma))))))
 
 
@@ -337,18 +333,22 @@ ARGS if present will be used to format CMD."
 
 
 (cl-defmethod sensetion--backend-id->sent ((backend (eql mongo)) sent_id)
-  (cdr (car (mongo-find "sensetion-database" "documents" `((_id . ,sent_id))))))
+  (cdr (car (sensetion--mongo-find "sensetion-database" "documents" `((_id . ,sent_id))))))
 
 
 (cl-defmethod sensetion--backend-update-modified-sent ((backend (eql mongo)) sent)
-  (mongo-replace-one "sensetion-database"  "documents"
-		     `((_id . ,(sensetion--sent-id sent)))
-		     (sensetion--sent->alist sent)))
+  (let ((result (sensetion--mongo-replace-one "sensetion-database"  "documents"
+				     `((_id . ,(sensetion--sent-id sent)))
+				     (sensetion--sent->alist sent))))
+    (case (cdr (assoc 'modifiedCount))
+      (0 (error "No sentence modified!"))
+      (1 t)
+      (otherwise (error "More than one sentence modified!")))))
 
 
 (cl-defmethod sensetion--backend-lemma->synsets ((backend (eql mongo)) lemma pos)
   (let* ((lemma (cl-substitute ?_ (string-to-char " ") lemma :test #'eq))
-	 (docs (mongo-find "sensetion-database" "synsets"
+	 (docs (sensetion--mongo-find "sensetion-database" "synsets"
 			   `((terms . ,lemma) (pos . ,pos)))))
     (mapcar #'(lambda (doc) (sensetion--alist->synset (cdr doc)))
 	    docs)))
