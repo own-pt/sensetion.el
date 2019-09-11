@@ -267,8 +267,8 @@ ARGS if present will be used to format CMD."
 	 (query-sort (json-encode-alist sort))
          (projection-json
           (and projection (json-encode projection)))
-	 (args (list "mongo" "db" "--quiet" "--eval"
-		     (format "db.%s.find(%s).sort(%s).forEach(function(myDoc) { printjsononeline(myDoc); print( \"),\"); })"
+	 (args (list db "--quiet" "--eval"
+		     (format "db.%s.find(%s).sort(%s).forEach(function(myDoc) { printjsononeline(myDoc); print( \",\"); })"
 			     collection
                              (if projection
                                  (format "%s, %s" query-json projection-json)
