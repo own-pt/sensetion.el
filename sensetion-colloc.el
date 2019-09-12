@@ -5,12 +5,11 @@
   (sensetion-is
    (list
     (s-concat
-     (if (and target sensetion-identify-sentence)
-	 (propertize
-	  (format "(%s %s) "
-		  (sensetion--sent-doc-id sent) (sensetion--sent-sent-id sent))
-	  'face 'bold)
-       "")
+     (when (and target (sensetion--project-display-meta-data-fn sensetion-current-project))
+       (propertize
+	(format "%s "
+		(funcall (sensetion--project-display-meta-data-fn sensetion-current-project) sent))
+	'face 'bold))
      (s-join " " tks))
     (cons done total))
    :where

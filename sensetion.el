@@ -23,25 +23,12 @@
   :group 'data)
 
 
-(defcustom sensetion-output-buffer-name
-  "sensetion"
-  "Buffer name where sensetion results are displayed."
-  :group 'sensetion
-  :type 'string)
-
-
 (defcustom sensetion-elasticsearch-path
   nil
   "Path to elasticsearch executable."
   :group 'sensetion
   :type '(choice file (const nil)))
 
-
-(defcustom sensetion-backend 'mongo
-  "Choice of database backend."
-  :group 'sensetion
-  :type '(choice (const :tag "mongodb" mongo)
-		 (const :tag "elasticsearch" es)))
 
 (defcustom sensetion-backend-url
   "http://localhost"
@@ -123,23 +110,11 @@ with low confidence."
   :type 'list
   :risky t)
 
-
-(defcustom sensetion-restrict-lemmas t
-  "When yes restrict the user to add only lemmas that is part of
-wordnet to a token or a glob."
-  :group 'sensetion
-  :type '(choice (const :tag "yes" yes)
-		 (const :tag "no"  confirm)))
-
-
-(defcustom sensetion-identify-sentence t
-  "When t shows a tuple before each sentence in target mode with
-  the doc-id and sent-id."
-  :group 'sensetion
-  :type 'boolean)
-
 ;;; Vars
 
+(defvar sensetion-project-list nil)
+
+(defvar sensetion-current-project nil)
 
 (defvar-local sensetion--lemma
   nil
@@ -215,8 +190,9 @@ far, and the cdr is the number of annotatable tokens.")
 ;;;###autoload
 (defalias 'sensetion #'sensetion-annotate)
 
-(defun sensetion-annotate (annotation-function)
-  (interactive (list (sensetion--pick-annotation-function)))
+(defun sensetion-annotate (project annotation-function)
+  (interactive (list (or sensetion-current-project (sensetion-select-project))
+		     (sensetion--pick-annotation-function)))
   (call-interactively annotation-function))
 
 (defun sensetion--pick-annotation-function ()
@@ -225,6 +201,17 @@ far, and the cdr is the number of annotatable tokens.")
     "Annotation mode: "
     `((?t "targeted mode" "Annotate sentences containing a given target lemma/PoS." ,#'sensetion-annotate-target)
       (?s "sequential mode" "Annotate sentences from a given document." ,#'sensetion-sequential-annotate-doc)))))
+
+
+(defun sensetion-select-project ()
+  (interactive)
+  (let ((selected (case (length sensetion-project-list)
+		    (0 (error "sensetion-project-list is empty!"))
+		    (1 (car sensetion-project-list))
+		    (otherwise (find (ido-completing-read "Select project: " (mapcar #'sensetion--project-name sensetion-project-list) nil t)
+				    sensetion-project-list :key #'sensetion--project-name :test #'equal)))))
+    (setf sensetion-current-project
+	  selected)))
 
 
 (defun sensetion-sequential-annotate-doc (document-id)
@@ -278,7 +265,7 @@ annotation."
 
 
 (defun sensetion--create-buffer-name (id)
-  (format "*%s@%s*" sensetion-output-buffer-name id))
+  (format "*%s@%s*" (sensetion--project-output-buffer-name sensetion-current-project) id))
 
 
 (defun sensetion--make-collocations (matches &optional target synset-cache)

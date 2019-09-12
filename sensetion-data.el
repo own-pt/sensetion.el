@@ -4,6 +4,40 @@
 (require 'map)
 (require 's)
 
+(cl-defstruct (sensetion--project (:constructor nil)
+			 (:constructor sensetion-make-project))
+    "Structure representing an annotation project.
+
+Slots:
+
+`name'
+     The name of the project.
+
+`backend'
+     The database backend used by this project.
+
+`output-buffer-name' (optional, default: sensetion)
+     The buffer name where sensetion results are displayed.
+
+`display-meta-data-fn' (optional)
+     Function used to display meta data during target mode. When
+     not defined nothing is displayed.
+
+`restrict-lemmas' (optional, default: t)
+     When non-nil restrict the user to add only lemmas that is part of
+     wordnet to a token or a glob.
+
+`sense-menu-show-synset-id' (optional)
+     When non-nil show synset id in sense menu during annotation.
+"
+
+    (name (error "You must provide a name"))
+    (backend (error "You must provide a backend"))
+    (output-buffer-name "sensetion")
+    display-meta-data-fn
+    (restrict-lemmas t)
+    sense-menu-show-synset-id)
+
 ;; TODO: maybe use maps all the way
 (cl-defstruct (sensetion--tk (:constructor nil)
                     (:constructor sensetion--make-tk))

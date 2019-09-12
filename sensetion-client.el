@@ -39,32 +39,32 @@
 
 (defun sensetion-client-prefix-lemma (prefix)
   "See `sensetion-backend-prefix-lemma'"
-  (sensetion-backend-prefix-lemma sensetion-backend prefix))
+  (sensetion-backend-prefix-lemma (sensetion--project-backend sensetion-current-project) prefix))
 
 (defun sensetion-client-prefix-document-id (prefix)
   "See `sensetion-backend-prefix-document-id'"
-  (sensetion-backend-prefix-document-id sensetion-backend prefix))
+  (sensetion-backend-prefix-document-id (sensetion--project-backend sensetion-current-project) prefix))
 
 (defun sensetion--client-get-sorted-doc-sents (doc-id)
   "See `sensetion--backend-get-sorted-doc-sents'"
-  (sensetion--backend-get-sorted-doc-sents sensetion-backend doc-id))
+  (sensetion--backend-get-sorted-doc-sents (sensetion--project-backend sensetion-current-project) doc-id))
 
 (defun sensetion--client-get-sents (lemma &optional pos)
   "See `sensetion--backend-get-sents'"
-  (sensetion--backend-get-sents sensetion-backend lemma pos))
+  (sensetion--backend-get-sents (sensetion--project-backend sensetion-current-project) lemma pos))
 
 (defun sensetion--client-id->sent (sent_id)
   "See `sensetion--backend-id->sent'"
-  (sensetion--backend-id->sent sensetion-backend sent_id))
+  (sensetion--backend-id->sent (sensetion--project-backend sensetion-current-project) sent_id))
 
 (defun sensetion--client-update-modified-sent (sent)
   "See `sensetion--backend-update-modified-sent'"
   (let ((sent (sensetion--remove-man-now sent)))
-    (sensetion--backend-update-modified-sent sensetion-backend sent)))
+    (sensetion--backend-update-modified-sent (sensetion--project-backend sensetion-current-project) sent)))
 
 (defun sensetion--client-lemma->synsets (lemma pos)
   "See `sensetion--backend-lemma->synsets'"
-  (sensetion--backend-lemma->synsets sensetion-backend lemma pos))
+  (sensetion--backend-lemma->synsets (sensetion--project-backend sensetion-current-project) lemma pos))
 
 
 ;;; elasticsearch backend
@@ -223,6 +223,10 @@
 
 ;;; mongodb backend
 
+(cl-defstruct (sensetion--mongo (:constructor nil)
+		       (:constructor sensetion-make-mongo))
+  (db "sensetion-database") (synset-collection "synsets") (document-collection "documents"))
+
 
 (defun sensetion--mongo-requote-output (output)
   "Adds quotes around ObjectId in OUTPUT.
@@ -292,51 +296,56 @@ ARGS if present will be used to format CMD."
     (json-read-from-string output)))
 
 
-(cl-defmethod sensetion-backend-prefix-lemma ((backend (eql mongo)) prefix)
+(cl-defmethod sensetion-backend-prefix-lemma ((backend sensetion--mongo) prefix)
   (let* ((query `())
-	 (hits  (sensetion--mongo-find "sensetion-database"
-			      "synsets"
+	 (hits  (sensetion--mongo-find (sensetion--mongo-db backend)
+			      (sensetion--mongo-synset-collection backend)
 			      `((terms ($regex . ,(format "^%s" prefix))))))
 	 (terms (seq-mapcat (lambda (doc) (map-elt doc 'terms)) hits)))
     terms))
 
 
-(cl-defmethod sensetion-backend-prefix-document-id ((backend (eql mongo)) prefix)
+(cl-defmethod sensetion-backend-prefix-document-id ((backend sensetion--mongo) prefix)
   (let* ((json-array-type 'list)
-	 (output (sensetion--mongo-cmd '("sensetion-database" "--quiet" "--eval" "db.documents.distinct(\"doc_id\")")))
+	 (args (list (sensetion--mongo-db backend) "--quiet" "--eval"
+		     (format "db.%s.distinct(\"doc_id\")"
+			     (sensetion--mongo-document-collection backend))))
+	 (output (sensetion--mongo-cmd args))
 	 (document-ids  (json-read-from-string output)))
     (seq-filter (lambda (document-id) (string-prefix-p prefix document-id)) document-ids)))
 
 
-(cl-defmethod sensetion--backend-get-sorted-doc-sents ((backend (eql mongo)) doc-id)
-  (let ((hits (sensetion--mongo-find-sort "sensetion-database" "documents" `((doc_id . ,doc-id)) '(("sent_id" . 1)))))
+(cl-defmethod sensetion--backend-get-sorted-doc-sents ((backend sensetion--mongo) doc-id)
+  (let ((hits (sensetion--mongo-find-sort (sensetion--mongo-db backend) (sensetion--mongo-document-collection backend)
+				 `((doc_id . ,doc-id)) '(("sent_id" . 1)))))
     (mapcar #'(lambda (sent) (sensetion--alist->sent (cdr sent))) hits)))
 
 
-(defun sensetion--mongo-lemma-pos->docs (lemma pos)
-  (sensetion--mongo-find "sensetion-database" "documents"
+(defun sensetion--mongo-lemma-pos->docs (backend lemma pos)
+  (sensetion--mongo-find (sensetion--mongo-db backend) (sensetion--mongo-document-collection backend)
 	      `((tokens.lemmas . ,(format "%s%%%s" lemma (sensetion--pos->synset-type pos))))))
 
 
-(defun sensetion--mongo-lemma->docs (lemma)
-  (sensetion--mongo-find "sensetion-database" "documents"
+(defun sensetion--mongo-lemma->docs (backend lemma)
+  (sensetion--mongo-find (sensetion--mongo-db backend) (sensetion--mongo-document-collection backend)
 	      `((tokens.lemmas ($regex . ,(format "^%s%%[1-5]" lemma))))))
 
 
-(cl-defmethod sensetion--backend-get-sents ((backend (eql mongo)) lemma &optional pos)
+(cl-defmethod sensetion--backend-get-sents ((backend sensetion--mongo) lemma &optional pos)
   (let* ((lemma (cl-substitute ?_ (string-to-char " ") lemma :test #'eq))
 	 (sents (if pos
-		   (sensetion--mongo-lemma-pos->docs lemma pos)
-		 (sensetion--mongo-lemma->docs lemma))))
+		   (sensetion--mongo-lemma-pos->docs backend lemma pos)
+		 (sensetion--mongo-lemma->docs backend lemma))))
     (mapcar #'(lambda (sent) (sensetion--alist->sent (cdr sent))) sents)))
 
 
-(cl-defmethod sensetion--backend-id->sent ((backend (eql mongo)) sent_id)
-  (cdr (car (sensetion--mongo-find "sensetion-database" "documents" `((_id . ,sent_id))))))
+(cl-defmethod sensetion--backend-id->sent ((backend sensetion--mongo) sent_id)
+  (cdr (car (sensetion--mongo-find (sensetion--mongo-db backend) (sensetion--mongo-document-collection backend)
+			  `((_id . ,sent_id))))))
 
 
-(cl-defmethod sensetion--backend-update-modified-sent ((backend (eql mongo)) sent)
-  (let ((result (sensetion--mongo-replace-one "sensetion-database"  "documents"
+(cl-defmethod sensetion--backend-update-modified-sent ((backend sensetion--mongo) sent)
+  (let ((result (sensetion--mongo-replace-one (sensetion--mongo-db backend)  (sensetion--mongo-document-collection backend)
 				     `((_id . ,(sensetion--sent-id sent)))
 				     (sensetion--sent->alist sent))))
     (case (map-elt result 'modifiedCount)
@@ -345,9 +354,9 @@ ARGS if present will be used to format CMD."
       (otherwise (error "More than one sentence modified!")))))
 
 
-(cl-defmethod sensetion--backend-lemma->synsets ((backend (eql mongo)) lemma pos)
+(cl-defmethod sensetion--backend-lemma->synsets ((backend sensetion--mongo) lemma pos)
   (let* ((lemma (cl-substitute ?_ (string-to-char " ") lemma :test #'eq))
-	 (docs (sensetion--mongo-find "sensetion-database" "synsets"
+	 (docs (sensetion--mongo-find (sensetion--mongo-db backend) (sensetion--mongo-synset-collection backend)
 			   `((terms . ,lemma) (pos . ,pos)))))
     (mapcar #'(lambda (doc) (sensetion--alist->synset (cdr doc)))
 	    docs)))
