@@ -69,7 +69,7 @@ options in TOKEN."
    (eval (sensetion--edit-hydra-maker lemma pos1 token sent options))))
 
 
-(defun sensetion--sense-edit-help-text (chosen? sid terms gloss)
+(defun sensetion--sense-edit-help-text (chosen? sid terms definition)
   (sensetion-is
    (format "%s%s %s"
 	   chosen-mark
@@ -78,7 +78,7 @@ options in TOKEN."
 		      (s-word-wrap (- (frame-width) 5)
 				   (concat terms-txt
 					   " • "
-					   gloss))))
+					   definition))))
    :where
    (terms-txt (mapconcat #'bold terms ","))
    (synset? (if (sensetion--project-sense-menu-show-synset-id sensetion-current-project)

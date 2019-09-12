@@ -580,12 +580,12 @@ synset and they have different pos1, return nil."
    st
    #s(hash-table size 5 test equal rehash-size 1.5 rehash-threshold 0.8125
                  purecopy t data
-                 ("1" "n" "2" "v" "3" "a" "4" "r" "5" "s"))))
+                 ("1" "N" "2" "V" "3" "A" "4" "R" "5" "S"))))
 
 
 (defun sensetion--wordnet-lookup-lemma (lemma &optional options)
   "(hash-table ,lemma ((,pos (,sense-key ,hydra-index ,synset-id ,terms ,gloss) ...) ...)"
-  (let ((poses '("n" "v" "r" "a"))
+  (let ((poses '("N" "V" "R" "A"))
 	(options (or options (make-hash-table :test 'equal :size 200))))
     (setf (gethash lemma options)
 	  (mapcar
@@ -609,7 +609,7 @@ gloss."
 		 (ix->hydra-key counter)
 		 (sensetion--synset-id synset)
 		 (sensetion--synset-terms synset)
-		 (sensetion--synset-gloss synset))
+		 (sensetion--synset-def synset))
 	 (cl-incf counter)))
    (ix->hydra-key (ix)
                   (format "%s"
@@ -626,7 +626,7 @@ gloss."
               (car (cl-find lemma (cl-mapcar #'cons (sensetion--synset-keys synset) (sensetion--synset-terms synset))
 			    :test #'equal :key #'cdr))
               (error "No matching sensekey for lemma %s in synset %s-%s"
-                     lemma (sensetion--synset-ofs synset) (sensetion--synset-pos synset))))
+                     lemma (car (sensetion--synset-keys synset)) (sensetion--synset-pos synset))))
    (synsets  (cl-sort (sensetion--client-lemma->synsets lemma pos) #'string< :key #'sensetion--synset-id))))
 
 

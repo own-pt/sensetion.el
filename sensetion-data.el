@@ -46,7 +46,7 @@ Slots:
 
 (cl-defstruct (sensetion--synset (:constructor nil)
                         (:constructor sensetion--make-synset))
-  ofs pos keys terms gloss)
+  lexname pos keys terms def exs)
 
 
 (cl-defstruct (sensetion--sent (:constructor nil)
@@ -58,8 +58,8 @@ Slots:
 
 (defun sensetion--alist->synset (alist)
   (pcase alist
-    ((map ofs pos keys terms gloss)
-     (sensetion--make-synset :ofs ofs :pos pos :keys keys :terms terms :gloss gloss))))
+    ((map lexnames pos keys terms definition examples)
+     (sensetion--make-synset :pos pos :keys keys :terms terms :def definition :exs examples))))
 
 
 (defun sensetion--alist->sent (alist)
@@ -123,9 +123,9 @@ Slots:
 
 
 (defun sensetion--synset-id (synset)
-  (concat (number-to-string (sensetion--synset-ofs synset))
+  (concat (sensetion--synset-lexname synset)
           "-"
-          (sensetion--synset-pos synset)))
+          (car (sensetion--synset-terms synset))))
 
 
 (defun sensetion--sent-id (sent)
