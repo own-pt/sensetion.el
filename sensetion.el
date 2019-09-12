@@ -37,6 +37,12 @@
   :type '(choice file (const nil)))
 
 
+(defcustom sensetion-backend 'mongo
+  "Choice of database backend."
+  :group 'sensetion
+  :type '(choice (const :tag "mongodb" mongo)
+		 (const :tag "elasticsearch" es)))
+
 (defcustom sensetion-backend-url
   "http://localhost"
   "URL to backend server."
@@ -122,8 +128,8 @@ with low confidence."
   "When yes restrict the user to add only lemmas that is part of
 wordnet to a token or a glob."
   :group 'sensetion
-  :type '(choose (const :tag "yes" 'yes)
-		 (const :tag "no"  'confirm)))
+  :type '(choice (const :tag "yes" yes)
+		 (const :tag "no"  confirm)))
 
 
 (defcustom sensetion-identify-sentence t
@@ -201,10 +207,10 @@ far, and the cdr is the number of annotatable tokens.")
 
 
 (defvar sensetion--lemma-completion-function
-  (completion-table-dynamic #'sensetion-es-prefix-lemma))
+  (completion-table-dynamic #'sensetion-client-prefix-lemma))
 
 (defvar sensetion--document-id-completion-function
-  (completion-table-dynamic #'sensetion-es-prefix-document-id))
+  (completion-table-dynamic #'sensetion-client-prefix-document-id))
 
 ;;;###autoload
 (defalias 'sensetion #'sensetion-annotate)
@@ -225,7 +231,7 @@ far, and the cdr is the number of annotatable tokens.")
   (interactive (list (completing-read "Document to annotate: "
 				      sensetion--document-id-completion-function
 				      nil 'yes)))
-  (let ((matches (sensetion--es-get-sorted-doc-sents document-id)))
+  (let ((matches (sensetion--client-get-sorted-doc-sents document-id)))
     (sensetion--annotate matches document-id)))
 
 
@@ -246,7 +252,7 @@ annotation."
    :where
    (id (if pos (format "%s@%s" lemma pos) lemma))
    (matches (cl-sort
-	     (sensetion--es-get-sents lemma pos)
+	     (sensetion--client-get-sents lemma pos)
 	     (lambda (x y)
 	       (if (equal (sensetion--sent-doc-id x)
 			  (sensetion--sent-doc-id y))
@@ -318,7 +324,7 @@ Can be used to switch to sequential annotation or to see the context of a senten
 (defun sensetion--get-sent-at-point ()
   (let ((sent-id (sensetion--get-text-property-eol 'sensetion--sent-id)))
     (unless sent-id (user-error "No sentence at point"))
-    (sensetion--alist->sent (sensetion--es-id->sent sent-id))))
+    (sensetion--alist->sent (sensetion--client-id->sent sent-id))))
 
 
 (defun sensetion--get-token-at-point ()
@@ -330,7 +336,7 @@ Can be used to switch to sequential annotation or to see the context of a senten
 
 
 (defun sensetion--update-sent (sent)
-  (sensetion--es-update-modified-sent sent))
+  (sensetion--client-update-modified-sent sent))
 
 
 (defun sensetion--tk-glob? (tk)
@@ -634,7 +640,7 @@ gloss."
 			    :test #'equal :key #'cdr))
               (error "No matching sensekey for lemma %s in synset %s-%s"
                      lemma (sensetion--synset-ofs synset) (sensetion--synset-pos synset))))
-   (synsets  (cl-sort (sensetion--es-lemma->synsets lemma pos) #'string< :key #'sensetion--synset-id))))
+   (synsets  (cl-sort (sensetion--client-lemma->synsets lemma pos) #'string< :key #'sensetion--synset-id))))
 
 
 (defun sensetion--cache-lemma->senses (lemma &optional pos synset-cache)
