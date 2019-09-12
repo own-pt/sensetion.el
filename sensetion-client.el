@@ -307,7 +307,10 @@ ARGS if present will be used to format CMD."
 
 (cl-defmethod sensetion-backend-prefix-document-id ((backend sensetion--mongo) prefix)
   (let* ((json-array-type 'list)
-	 (output (sensetion--mongo-cmd '((sensetion--mongo-db backend) "--quiet" "--eval" "db.documents.distinct(\"doc_id\")")))
+	 (args (list (sensetion--mongo-db backend) "--quiet" "--eval"
+		     (format "db.%s.distinct(\"doc_id\")"
+			     (sensetion--mongo-document-collection backend))))
+	 (output (sensetion--mongo-cmd args))
 	 (document-ids  (json-read-from-string output)))
     (seq-filter (lambda (document-id) (string-prefix-p prefix document-id)) document-ids)))
 
