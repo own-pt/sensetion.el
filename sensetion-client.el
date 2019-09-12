@@ -224,7 +224,7 @@
 ;;; mongodb backend
 
 (cl-defstruct (sensetion--mongo (:constructor nil)
-		       (:constructor sensetion--make-mongo))
+		       (:constructor sensetion-make-mongo))
   (db "sensetion-database") (synset-collection "synsets") (document-collection "documents"))
 
 

@@ -245,7 +245,7 @@ returns non-nil. None of the arguments may move point."
 (defun sensetion--completing-read-lemma (prompt &optional initial-input)
   (let ((input-lemma (completing-read prompt
 				  sensetion--lemma-completion-function
-				  nil sensetion-restrict-lemmas initial-input)))
+				  nil (sensetion--project-restrict-lemmas sensetion-current-project) initial-input)))
     (sensetion--spaces->underlines input-lemma)))
 
 

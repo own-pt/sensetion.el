@@ -5,10 +5,10 @@
   (sensetion-is
    (list
     (s-concat
-     (when (and target (sensetion--project-identify-sentence-fn sensetion-current-project))
+     (when (and target (sensetion--project-display-meta-data-fn sensetion-current-project))
        (propertize
 	(format "%s "
-		(funcall (sensetion--project-identify-sentence-fn sensetion-current-project) sent))
+		(funcall (sensetion--project-display-meta-data-fn sensetion-current-project) sent))
 	'face 'bold))
      (s-join " " tks))
     (cons done total))

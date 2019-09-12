@@ -30,12 +30,6 @@
   :type '(choice file (const nil)))
 
 
-(defcustom sensetion-backend 'mongo
-  "Choice of database backend."
-  :group 'sensetion
-  :type '(choice (const :tag "mongodb" mongo)
-		 (const :tag "elasticsearch" es)))
-
 (defcustom sensetion-backend-url
   "http://localhost"
   "URL to backend server."
