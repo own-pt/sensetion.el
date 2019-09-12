@@ -39,32 +39,32 @@
 
 (defun sensetion-client-prefix-lemma (prefix)
   "See `sensetion-backend-prefix-lemma'"
-  (sensetion-backend-prefix-lemma sensetion-backend prefix))
+  (sensetion-backend-prefix-lemma (sensetion--project-backend sensetion-current-project) prefix))
 
 (defun sensetion-client-prefix-document-id (prefix)
   "See `sensetion-backend-prefix-document-id'"
-  (sensetion-backend-prefix-document-id sensetion-backend prefix))
+  (sensetion-backend-prefix-document-id (sensetion--project-backend sensetion-current-project) prefix))
 
 (defun sensetion--client-get-sorted-doc-sents (doc-id)
   "See `sensetion--backend-get-sorted-doc-sents'"
-  (sensetion--backend-get-sorted-doc-sents sensetion-backend doc-id))
+  (sensetion--backend-get-sorted-doc-sents (sensetion--project-backend sensetion-current-project) doc-id))
 
 (defun sensetion--client-get-sents (lemma &optional pos)
   "See `sensetion--backend-get-sents'"
-  (sensetion--backend-get-sents sensetion-backend lemma pos))
+  (sensetion--backend-get-sents (sensetion--project-backend sensetion-current-project) lemma pos))
 
 (defun sensetion--client-id->sent (sent_id)
   "See `sensetion--backend-id->sent'"
-  (sensetion--backend-id->sent sensetion-backend sent_id))
+  (sensetion--backend-id->sent (sensetion--project-backend sensetion-current-project) sent_id))
 
 (defun sensetion--client-update-modified-sent (sent)
   "See `sensetion--backend-update-modified-sent'"
   (let ((sent (sensetion--remove-man-now sent)))
-    (sensetion--backend-update-modified-sent sensetion-backend sent)))
+    (sensetion--backend-update-modified-sent (sensetion--project-backend sensetion-current-project) sent)))
 
 (defun sensetion--client-lemma->synsets (lemma pos)
   "See `sensetion--backend-lemma->synsets'"
-  (sensetion--backend-lemma->synsets sensetion-backend lemma pos))
+  (sensetion--backend-lemma->synsets (sensetion--project-backend sensetion-current-project) lemma pos))
 
 
 ;;; elasticsearch backend

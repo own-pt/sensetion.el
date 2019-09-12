@@ -81,7 +81,8 @@ options in TOKEN."
 					   gloss))))
    :where
    (terms-txt (mapconcat #'bold terms ","))
-   (synset? (if sensetion-sense-menu-show-synset-id (concat "(" (prop sid 'italic) ")") ""))
+   (synset? (if (sensetion--project-sense-menu-show-synset-id sensetion-current-project)
+		(concat "(" (prop sid 'italic) ")") ""))
    (chosen-mark (if chosen? "+ " ""))
    (bold (txt)
 	 (prop txt 'bold))

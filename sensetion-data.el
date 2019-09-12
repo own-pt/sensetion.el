@@ -4,6 +4,15 @@
 (require 'map)
 (require 's)
 
+(cl-defstruct (sensetion--project (:constructor nil)
+			 (:constructor sensetion--make-project))
+  (name (error "You must provide a name"))
+  (backend (error "You must provide a backend"))
+  (output-buffer-name "sensetion")
+  identify-sentence-fn
+  (restrict-lemmas t)
+  sense-menu-show-synset-id)
+
 ;; TODO: maybe use maps all the way
 (cl-defstruct (sensetion--tk (:constructor nil)
                     (:constructor sensetion--make-tk))
