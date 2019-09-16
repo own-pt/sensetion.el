@@ -60,16 +60,14 @@
 
 (defcustom sensetion-previously-annotated-colour
   "dark green"
-  "Colour to display the tokens which have been previously
-annotated."
+  "Colour to display the tokens which have been previously annotated."
   :group 'sensetion
   :type 'color)
 
 
 (defcustom sensetion-previously-annotated-unsure-colour
   "light green"
-  "Colour to display the tokens which have been previously
-annotated with low confidence."
+  "Colour to display the tokens which have been previously annotated with low confidence."
   :group 'sensetion
   :type 'color)
 
@@ -83,8 +81,7 @@ annotated with low confidence."
 
 (defcustom sensetion-currently-annotated-unsure-colour
   "light blue"
-  "Colour to use in displaying tokens annotated in this batch,
-with low confidence."
+  "Colour to use in displaying tokens annotated in this batch, with low confidence."
   :group 'sensetion
   :type 'color)
 
@@ -191,6 +188,7 @@ far, and the cdr is the number of annotatable tokens.")
 (defalias 'sensetion #'sensetion-annotate)
 
 (defun sensetion-annotate (project annotation-function)
+  "Start annotation session of PROJECT using ANNOTATION-FUNCTION."
   (interactive (list (or sensetion-current-project (sensetion-select-project))
 		     (sensetion--pick-annotation-function)))
   (call-interactively annotation-function))
@@ -204,17 +202,22 @@ far, and the cdr is the number of annotatable tokens.")
 
 
 (defun sensetion-select-project ()
+  "Select a project from `sensetion-project-list'."
   (interactive)
-  (let ((selected (case (length sensetion-project-list)
-		    (0 (error "sensetion-project-list is empty!"))
-		    (1 (car sensetion-project-list))
-		    (otherwise (find (ido-completing-read "Select project: " (mapcar #'sensetion--project-name sensetion-project-list) nil t)
-				    sensetion-project-list :key #'sensetion--project-name :test #'equal)))))
-    (setf sensetion-current-project
-	  selected)))
+  (let ((selected-project
+	 (pcase sensetion-project-list
+	   ('()
+	    (user-error "There is no project available.  Please define a project"))
+	   (`(,project) project)
+	   (_
+	    (cl-find
+	     (ido-completing-read "Select project: " (mapcar #'sensetion--project-name sensetion-project-list) nil t)
+	     sensetion-project-list :key #'sensetion--project-name :test #'equal)))))
+    (setf sensetion-current-project selected-project)))
 
 
 (defun sensetion-sequential-annotate-doc (document-id)
+  "Annotate document specified by DOCUMENT-ID in sequential mode."
   (interactive (list (completing-read "Document to annotate: "
 				      sensetion--document-id-completion-function
 				      nil 'yes)))
@@ -223,7 +226,9 @@ far, and the cdr is the number of annotatable tokens.")
 
 
 (defun sensetion-annotate-target (lemma &optional pos)
-  "Create targeted annotation buffer, where several sentences
+  "Annotate target LEMMA and POS.
+
+Create targeted annotation buffer, where several sentences
 containing tokens with LEMMA and optionally POS are displayed for
 annotation."
   (interactive
@@ -269,7 +274,10 @@ annotation."
 
 
 (defun sensetion--make-collocations (matches &optional target synset-cache)
-  "Insert MATCHES at current buffer, return status."
+  "Insert MATCHES at current buffer, return status.
+
+TARGET is the target lemma, and SYNSET-CACHE caches the synset
+data available."
   (sensetion-is
    (cl-mapc #'go matches)
    (cons done total)
@@ -291,9 +299,11 @@ annotation."
 
 
 (defun sensetion-sequential-annotate-sentence-document ()
-  "In targeted mode, open a buffer of sequential annotation with point at the same sentence as the one in point.
+  "In targeted mode, open a buffer of sequential annotation.
 
-Can be used to switch to sequential annotation or to see the context of a sentence."
+Point at the new buffer is at corresponding sentence of the other
+buffer.  Can be used to switch to sequential annotation or to see
+the context of a sentence."
   (interactive)
   (unless sensetion--lemma
     (user-error "You are already in sequential mode"))
@@ -335,8 +345,10 @@ Can be used to switch to sequential annotation or to see the context of a senten
 ;; TODO: unglobbing (or any kind of editing that calls sent-colloc)
 ;; turns just annotated tokens into previously annotated tokens
 (defun sensetion-unglob (ix sent)
-  "If token of index IX in SENT at point is part of collocation,
-unglob it and reinsert the sentence in the buffer.
+  "Unglob token of index IX in SENT at.
+
+The token must be part of a collocation.  The sentence is
+automatically reinserted in the buffer.
 
 Unglobbing means making all tokens in the collocation normal
 tokens, and removing the glob token corresponding to the
@@ -393,7 +405,9 @@ collocation."
 
 
 (defun sensetion--mark-glob (beg end ix marked)
-  "Marks token to be globbed with the `sensetion-glob' command."
+  "Mark token to be globbed with the `sensetion-glob' command.
+
+Token is the one between BEG and END, corresponding to index IX."
   (with-inhibiting-read-only
    (add-face-text-property beg end '(:underline t))
    (sensetion--put-text-property-eol 'sensetion--to-glob (cons ix marked))))
@@ -410,8 +424,7 @@ collocation."
 
 
 (defun sensetion-toggle-glob-mark (beg end)
-  "Mark or unmark token to be globbed with the `sensetion-glob'
-command."
+  "Mark or unmark token between BEG and END to be globbed with the `sensetion-glob' command."
   (interactive (sensetion--tk-points))
   (let* ((ix (sensetion--tk-ix-prop-at-point beg))
          (marked (sensetion--tks-to-glob-prop))
@@ -422,7 +435,9 @@ command."
 
 
 (defun sensetion-glob (lemma pos ixs-to-glob sent)
-  "Glob all tokens in SENT whose indices are in IXS-TO-GLOB,
+  "Glob all tokens in SENT which are marked.
+
+Marked tokens are those whose indices are in IXS-TO-GLOB,
 assigning the resulting glob token LEMMA and POS.
 
 You can mark/unmark tokens with `sensetion-toggle-glob-mark'."
@@ -516,8 +531,10 @@ was linearized), and reinsert SENT."
 
 
 (defun sensetion--tk-senses-pos (tk)
-  "Get pos1 of synsets assigned to TK. If there is more than one
-synset and they have different pos1, return nil."
+  "Get pos1 of synsets assigned to TK.
+
+If there is more than one synset and they have different pos1,
+return nil."
   (when-let* ((sks   (sensetion--tk-skeys tk))
               (pos   (sensetion--sensekey-pos (cl-first sks)))
               (poses (if (member pos '("a" "s"))
@@ -584,7 +601,7 @@ synset and they have different pos1, return nil."
 
 
 (defun sensetion--wordnet-lookup-lemma (lemma &optional options)
-  "(hash-table ,lemma ((,pos (,sense-key ,hydra-index ,synset-id ,terms ,gloss) ...) ...)"
+  ;; (hash-table ,lemma ((,pos (,sense-key ,hydra-index ,synset-id ,terms ,gloss) ...) ...)
   (let ((poses '("N" "V" "R" "A"))
 	(options (or options (make-hash-table :test 'equal :size 200))))
     (setf (gethash lemma options)
@@ -623,10 +640,10 @@ gloss."
    (counter 0)
    (lemma-sk (lemma synset)
              (or
-              (car (cl-find lemma (cl-mapcar #'cons (sensetion--synset-keys synset) (sensetion--synset-terms synset))
-			    :test #'equal :key #'cdr))
+              (cl-first (cl-find lemma (cl-mapcar #'cons (sensetion--synset-keys synset) (sensetion--synset-terms synset))
+			    :test #'equal :key #'cl-rest))
               (error "No matching sensekey for lemma %s in synset %s-%s"
-                     lemma (car (sensetion--synset-keys synset)) (sensetion--synset-pos synset))))
+                     lemma (cl-first (sensetion--synset-keys synset)) (sensetion--synset-pos synset))))
    (synsets  (cl-sort (sensetion--client-lemma->synsets lemma pos) #'string< :key #'sensetion--synset-id))))
 
 
@@ -681,12 +698,14 @@ gloss."
 
 
 (defun sensetion-toggle-scripts ()
+  "Toggle display of super/subscripts in annotation buffer."
   (interactive)
   (if (memq 'sensetion--scripts buffer-invisibility-spec)
       (remove-from-invisibility-spec 'sensetion--scripts)
     (add-to-invisibility-spec 'sensetion--scripts)))
 
 (defun sensetion-refresh ()
+  "Update annotation buffer."
   (interactive)
   (sensetion--map-buffer-lines
    (lambda (_ _)
@@ -713,3 +732,5 @@ gloss."
 
 
 (provide 'sensetion)
+
+;;; sensetion.el ends here
