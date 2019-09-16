@@ -26,17 +26,13 @@ Slots:
 `restrict-lemmas' (optional, default: t)
      When non-nil restrict the user to add only lemmas that is part of
      wordnet to a token or a glob.
-
-`sense-menu-show-synset-id' (optional)
-     When non-nil show synset id in sense menu during annotation.
 "
 
     (name (error "You must provide a name"))
     (backend (error "You must provide a backend"))
     (output-buffer-name "sensetion")
     display-meta-data-fn
-    (restrict-lemmas t)
-    sense-menu-show-synset-id)
+    (restrict-lemmas t))
 
 ;; TODO: maybe use maps all the way
 (cl-defstruct (sensetion--tk (:constructor nil)
@@ -115,6 +111,13 @@ Slots:
 (defalias 'sensetion--tk-skeys #'sensetion--tk-senses)
 
 
+(defun sensetion--sensekey-lexical-id (sk)
+  (pcase (s-split ":" sk)
+    (`(,_ ,_ ,lex-id ,_ ,_)
+     lex-id)
+    (_ (error "Malformed sense key %s" sk))))
+
+
 (defun sensetion--sensekey-pos (sk)
   (pcase (s-split ":" sk)
     (`(,lemma* ,_ ,_ ,_ ,_)
@@ -123,9 +126,11 @@ Slots:
 
 
 (defun sensetion--synset-id (synset)
-  (concat (sensetion--synset-lexname synset)
-          "-"
-          (car (sensetion--synset-terms synset))))
+  (pcase synset
+    ((cl-struct sensetion--synset pos lexname keys terms)
+     (let ((lexical-id (sensetion--sensekey-lemma-lexical-id (cl-first keys))))
+       (format "%s-%s-%s-%s"
+	       pos lexname (cl-first terms) lexical-id)))))
 
 
 (defun sensetion--sent-id (sent)

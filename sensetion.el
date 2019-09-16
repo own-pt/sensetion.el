@@ -44,11 +44,20 @@
   :type 'integer)
 
 
-(defcustom sensetion-sense-menu-show-synset-id
+(defcustom sensetion-sense-menu-show-lexicographer-filename
   nil
-  "Show synset id in sense menu during annotation."
+  "Show lexicographer file name of synset in sense menu during annotation."
   :group 'sensetion
   :type  'boolean)
+
+
+(defcustom sensetion-sensetion-maximum-examples-to-show
+  nil
+  "Maximum number of examples sentences to show in sense annotation menu.
+
+If nil, show all examples."
+  :group 'sensetion
+  :type '(choice integer (const nil)))
 
 
 (defcustom sensetion-unnanotated-colour
@@ -191,6 +200,7 @@ far, and the cdr is the number of annotatable tokens.")
   "Start annotation session of PROJECT using ANNOTATION-FUNCTION."
   (interactive (list (or sensetion-current-project (sensetion-select-project))
 		     (sensetion--pick-annotation-function)))
+  (setq sensetion-current-project project)
   (call-interactively annotation-function))
 
 (defun sensetion--pick-annotation-function ()
@@ -204,16 +214,15 @@ far, and the cdr is the number of annotatable tokens.")
 (defun sensetion-select-project ()
   "Select a project from `sensetion-project-list'."
   (interactive)
-  (let ((selected-project
-	 (pcase sensetion-project-list
-	   ('()
-	    (user-error "There is no project available.  Please define a project"))
-	   (`(,project) project)
-	   (_
-	    (cl-find
-	     (ido-completing-read "Select project: " (mapcar #'sensetion--project-name sensetion-project-list) nil t)
-	     sensetion-project-list :key #'sensetion--project-name :test #'equal)))))
-    (setf sensetion-current-project selected-project)))
+  (pcase sensetion-project-list
+    ('()
+     (user-error "There is no project available.  Please define a project"))
+    (`(,project) project)
+    (_
+     (cl-find
+      (ido-completing-read "Select project: "
+			   (mapcar #'sensetion--project-name sensetion-project-list) nil t)
+      sensetion-project-list :key #'sensetion--project-name :test #'equal))))
 
 
 (defun sensetion-sequential-annotate-doc (document-id)
@@ -615,19 +624,22 @@ return nil."
 (defun sensetion--wordnet-lookup-lemma-pos (lemma pos)
   "Return list of lists where each element list is composed by a
 sense key, the sense key/index shown by the edit hydra, the
-synset id, the terms defined by that synset, and the synset's
-gloss."
+synset's lexicographer file, the terms defined by that synset,
+and the synset's gloss."
   (sensetion-is
    (mapcar #'go synsets)
    :where
    (go (synset)
-       (prog1
+       (pcase synset
+	 ((cl-struct sensetion--synset lexname terms def exs)
+	  (prog1
 	   (list (lemma-sk lemma synset)
 		 (ix->hydra-key counter)
-		 (sensetion--synset-id synset)
-		 (sensetion--synset-terms synset)
-		 (sensetion--synset-def synset))
-	 (cl-incf counter)))
+		 lexname
+		 terms
+		 def
+		 exs)
+	 (cl-incf counter)))))
    (ix->hydra-key (ix)
                   (format "%s"
                           (if (< ix 9)
@@ -642,8 +654,8 @@ gloss."
              (or
               (cl-first (cl-find lemma (cl-mapcar #'cons (sensetion--synset-keys synset) (sensetion--synset-terms synset))
 			    :test #'equal :key #'cl-rest))
-              (error "No matching sensekey for lemma %s in synset %s-%s"
-                     lemma (cl-first (sensetion--synset-keys synset)) (sensetion--synset-pos synset))))
+              (error "No matching sensekey for lemma %s in synset %s"
+                     lemma (sensetion--synset-id synset))))
    (synsets  (cl-sort (sensetion--client-lemma->synsets lemma pos) #'string< :key #'sensetion--synset-id))))
 
 
@@ -708,7 +720,7 @@ gloss."
   "Update annotation buffer."
   (interactive)
   (sensetion--map-buffer-lines
-   (lambda (_ _)
+   (lambda (_ __)
      (sensetion--reinsert-sent-at-point (sensetion--get-sent-at-point) nil))))
 
 (defhydra sensetion-hydra (:color blue)
