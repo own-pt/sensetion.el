@@ -13,6 +13,15 @@
 
 ;;; define generic methods
 
+(cl-defgeneric sensetion-backend-setup-wordnet (backend name wordnet-data-path)
+  "Setup Wordnet data found in WORDNET-DATA-PATH with NAME in the backend.")
+
+(cl-defgeneric sensetion-backend-setup-corpus (backend name corpus-data-path)
+  "Setup corpus data found in CORPUS-DATA-PATH with NAME in the backend.")
+
+(cl-defgeneric sensetion-backend-check-up (backend)
+  "Check if backend is up, else return an error.")
+
 (cl-defgeneric sensetion-backend-prefix-lemma (backend prefix)
   "Return a list of lemmas with PREFIX as prefix")
 
@@ -36,6 +45,18 @@
 (cl-defgeneric sensetion--backend-lemma->synsets (backend lemma pos)
   "Return a list of sensetion--synset objects given a LEMMA and a
   POS.")
+
+(defun sensetion-client-check-up ()
+  "See `sensetion-backend-check-up'"
+  (sensetion-backend-check-up (sensetion--project-backend sensetion-current-project)))
+
+(defun sensetion-client-setup-wordnet (wordnet-data-path)
+  "See `sensetion-backend-setup-wordnet'"
+  (sensetion-backend-setup-wordnet (sensetion--project-backend sensetion-current-project) name wordnet-data-path))
+
+(defun sensetion-client-setup-corpus (corpus-data-path)
+  "See `sensetion-backend-setup-corpus'"
+  (sensetion-backend-setup-corpus (sensetion--project-backend sensetion-current-project) name corpus-data-path))
 
 (defun sensetion-client-prefix-lemma (prefix)
   "See `sensetion-backend-prefix-lemma'"
@@ -67,44 +88,124 @@
   (sensetion--backend-lemma->synsets (sensetion--project-backend sensetion-current-project) lemma pos))
 
 
-;;; elasticsearch backend
-(defvar sensetion--es-headers '(("Content-Type" . "application/json ; charset=UTF-8")))
+;;; CouchDB
+(defvar sensetion--couch-headers '(("Content-Type" . "application/json")))
 
-(defvar sensetion--es-size-params '(("size" . "10000")))
+
+(defvar sensetion--couch-query-limit 100000)
 
 (defsubst sensetion--json-read ()
   (decode-coding-region (point-min) (point-max) 'utf-8)
   (let ((json-array-type 'list))
     (json-read)))
 
-(cl-defun sensetion--es-request-debug-fn (&key data error-thrown &allow-other-keys)
-  (let ((inhibit-message t))
-    (message "%s" (json-encode-alist data)))
-  (message "Done %s "
-	   (cl-case (map-elt data 'errors 'unsure #'eq)
-	     (:json-false "with no errors")
-	     (t  "with errors"))))
+;; (cl-defun sensetion--es-request-debug-fn (&key data error-thrown &allow-other-keys)
+;;   (let ((inhibit-message t))
+;;     (message "%s" (json-encode-alist data)))
+;;   (message "Done %s "
+;; 	   (cl-case (map-elt data 'errors 'unsure #'eq)
+;; 	     (:json-false "with no errors")
+;; 	     (t  "with errors"))))
 
 
-(cl-defun sensetion--es-request (path &key data type params (sync t) debug)
+(cl-defun sensetion--couch-request (path &key data type params (sync t) debug)
   (let* ((response (request (format "%s:%s/%s" sensetion-backend-url sensetion-backend-port path)
-			    :headers sensetion--es-headers :parser #'sensetion--json-read
+			    :headers sensetion--couch-headers :parser #'sensetion--json-read
 			    :params params :type type
-			    :sync t :data data :complete (when debug #'sensetion--es-request-debug-fn)))
+			    :sync t :data data))
 	 (data (request-response-data response)))
-    (if-let ((error? (map-elt data 'error)))
-	(error "Elasticsearch error %s" error?)
+    (if-let ((error? (map-elt data 'error nil #'eq)))
+	(error "Backend error %s" error?)
       data)))
 
-
-(cl-defun sensetion--es-query (path data &key (type "GET") params (sync t) debug)
-  (let* ((data (sensetion--es-request path :data data :type type :params params
-			     :sync sync :debug debug))
-	 (hits (map-elt (map-elt data 'hits nil #'eq) 'hits nil #'eq))
-	 (docs (mapcar (lambda (hit) (map-elt hit '_source)) hits)))
+(cl-defun sensetion--couch-query (path data &key (type "POST") params (sync t) debug)
+  (let* ((data (sensetion--couch-request path :data data :type type :params params
+				:sync sync :debug debug))
+	 (docs (map-elt data 'docs nil #'eq)))
     docs))
 
+(cl-defmethod sensetion-backend-check-up ((backend (eql couch)))
+  (sensetion--es-request "")
+  t)
 
+;; (cl-defmethod sensetion-backend-setup-wordnet ((backend (eql couch)) path)
+;;   (sensetion--es-request (format "sensetion-wordnet-%s" (sensetion--project-name sensetion-current-project)) )
+;;   )
+
+(cl-defmethod sensetion-backend-prefix-lemma ((backend (eql couch)) prefix)
+  (let* ((query `((selector
+		   (terms
+		    ($elemMatch ($regex . ,(format "%s.*" prefix)))))
+		  (fields . ["terms"])
+		  (limit . 10000000)
+		  (execution_stats . t)))
+	 (query (json-encode-alist query))
+	 (hits  (sensetion--couch-query "sensetion-synsets/_find" query))
+	 (terms (seq-mapcat (lambda (doc) (map-elt doc 'terms)) hits)))
+    (seq-filter (lambda (lemma) (string-prefix-p prefix lemma t)) terms)))
+
+
+(cl-defmethod sensetion-backend-prefix-document-id ((backend (eql couch)) prefix)
+  (let* ((query `((query
+		   (prefix
+		    (doc_id . ,prefix)))))
+	 (query (json-encode-alist query))
+	 (hits  (sensetion--es-query "sensetion-docs/_search"
+			    query
+			    :params sensetion--es-size-params))
+	 (document-ids (cl-map 'list (lambda (doc) (map-elt doc 'doc_id)) hits)))
+    (seq-filter (lambda (document-id) (string-prefix-p prefix document-id)) document-ids)))
+
+
+(cl-defmethod sensetion--backend-lemma->synsets ((backend (eql couch)) lemma pos)
+  (let* ((query `((query
+		   (bool
+		    (filter .
+			    [((term
+			       (terms . ,lemma)))
+			     ((term
+			       (pos . ,pos)))])))))
+	 (query (json-encode-alist query))
+	 (hits (sensetion--es-query "sensetion-synsets/_search"
+			   query
+			   :params sensetion--es-size-params)))
+    (mapcar #'sensetion--alist->synset hits)))
+
+
+(cl-defmethod sensetion--backend-id->sent ((backend (eql couch)) sent-id)
+  (map-elt
+   (sensetion--es-request (format "sensetion-docs/_doc/%s" sent-id))
+   '_source nil #'eq))
+
+
+(cl-defmethod sensetion--backend-get-sents ((backend (eql couch)) lemma &optional pos)
+  (let* ((lemma (cl-substitute ?_ (string-to-char " ") lemma :test #'eq))
+	 (docs (if pos
+		   (sensetion--es-lemma-pos->docs lemma pos)
+		 (sensetion--es-lemma->docs lemma))))
+    (mapcar #'sensetion--alist->sent docs)))
+
+
+(cl-defmethod sensetion--backend-get-sorted-doc-sents ((backend (eql couch)) doc-id)
+  (let* ((query `((query
+		   (term
+		    (doc_id . ,doc-id)))
+		  (sort . ("sent_id"))))
+	 (query (json-encode-alist query))
+	 (hits (sensetion--es-query "sensetion-docs/_search"
+			   query
+			   :params sensetion--es-size-params)))
+    (mapcar #'sensetion--alist->sent hits)))
+
+
+(cl-defmethod sensetion--backend-update-modified-sent ((backend (eql couch)) sent)
+  (let ((data (encode-coding-string (json-encode-alist (sensetion--sent->alist sent)) 'utf-8 t)))
+    (sensetion--es-request (format "sensetion-docs/_doc/%s" (sensetion--sent-id sent))
+		  ;; DISCUSS: could be made async, but then might have
+		  ;; race condition?
+		  :data data :type "PUT")))
+
+;;; elasticsearch backend
 (cl-defmethod sensetion-backend-prefix-lemma ((backend (eql es)) prefix)
   (let* ((query `((query
 		   (prefix

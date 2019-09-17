@@ -38,7 +38,7 @@
 
 
 (defcustom sensetion-backend-port
-  9200
+  5984
   "Port used by backend server."
   :group 'sensetion
   :type 'integer)

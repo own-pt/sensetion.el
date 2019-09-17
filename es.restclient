@@ -3,9 +3,151 @@
 # restclient-log-request: nil
 # End:
 
+# https://stackoverflow.com/questions/27563402/work-with-json-schema-in-couchdb
+
 :SYNSETS_URL = sensetion-synsets
 :DOCS_URL = sensetion-docs
 
+##### couchdb
+# synsets
+# cat synsets-mongo.json | jq -c '. + {_id: "\(.ofs)-\(.pos)"}' > pre-synsets-couch.json
+# jq -c '{docs: [inputs]}' pre-synsets-couch.json > synsets-couch.json
+# curl -XPOST -H 'Content-Type: application/json' http://localhost:5984/sensetion-synsets/_bulk_docs/ --data-binary @synsets-couch.json | less
+POST http://localhost:5984/:SYNSETS_URL/_bulk_docs
+Content-Type: application/json
+
+< data/synsets-couch.json
+
+
+## jq -c '. + {_id: "\(.doc_id)-\(.sent_id)"}' repsol.json > pre-repsol-couch.json
+# jq -c '{docs: [inputs]}' pre-repsol-couch.json > repsol-couch.json
+
+### indices
+POST http://localhost:5984/:SYNSETS_URL/_index
+Content-Type: application/json
+
+{
+    "index": {
+        "fields": ["_id", "terms"]
+    },
+    "name" : "synsets-index",
+    "type" : "json"
+}
+
+#
+POST http://localhost:5984/:DOCS_URL/_index
+Content-Type: application/json
+
+{
+    "index": {
+        "fields": ["_id", "tokens.lemmas", "doc_id"]
+    },
+    "name" : "docs-index",
+    "type" : "json"
+}
+
+## prefix lemma
+POST http://localhost:5984/:SYNSETS_URL/_find
+Accept: application/json
+Content-Type: application/json
+
+{
+    "selector": {
+        "terms": {"$elemMatch": {"$regex": "rock.*"}}
+    },
+    "fields": ["terms"],
+    "limit": 10000000,
+    "execution_stats": true
+}
+
+## prefix doc_id
+POST http://localhost:5984/:DOCS_URL/_find
+Accept: application/json
+Content-Type: application/json
+
+{
+    "selector": {
+        "doc_id": {"$regex": "0f09c2fd-69e6-420d-bae3-823b2200be59.*"}
+    },
+    "limit": 10000000,
+     "execution_stats": true
+}
+
+# lemma -> synsets
+POST http://localhost:5984/:SYNSETS_URL/_find
+Accept: application/json
+Content-Type: application/json
+
+{
+    "selector": {
+    "terms": {"$elemMatch": {"$eq": "rock"}},
+    "_id": {"$gt": null}
+    },
+    "limit": 10,
+    "sort": ["_id"],
+    "execution_stats": true
+}
+
+# sent_id -> sent
+POST http://localhost:5984/:DOCS_URL/_find
+Accept: application/json
+Content-Type: application/json
+
+{
+    "selector": {
+        "_id": {"$eq": "0f09c2fd-69e6-420d-bae3-823b2200be59-0-1"}
+    },
+    "limit": 1,
+    "execution_stats": true
+}
+
+# lemma -> sents
+POST http://localhost:5984/:DOCS_URL/_find
+Accept: application/json
+Content-Type: application/json
+
+{
+    "selector": {
+        "tokens": {"$elemMatch": {"lemmas": {"$elemMatch": {"$regex": "rock(%[1-4])?"}}}},
+	"_id" : {"$gt": null}
+	
+    },
+    "sort": ["_id"],
+    "limit": 10,
+    "execution_stats": true
+}
+
+# lemma pos -> sents
+POST http://localhost:5984/:DOCS_URL/_find
+Accept: application/json
+Content-Type: application/json
+
+{
+    "selector": {
+        "tokens": {"$elemMatch": {"lemmas": {"$elemMatch": {"$eq": "rock%1"}}}},
+	"_id": {"$gt": null}
+    },
+    "sort": ["_id"],
+    "limit": 2,
+    "execution_stats": true
+}
+
+# doc_id -> sents
+POST http://localhost:5984/:DOCS_URL/_find
+Accept: application/json
+Content-Type: application/json
+
+{
+    "selector": {
+        "doc_id": {"$eq": "0f09c2fd-69e6-420d-bae3-823b2200be59-0"},
+	"_id": {"$gt": null}
+    },
+    "sort": ["_id"],
+    "limit": 2,
+    "execution_stats": true
+}
+
+##################################################################
 #### SYNSETS
 # create index synsets
 PUT http://localhost:9200/:SYNSETS_URL
