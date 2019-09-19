@@ -223,8 +223,7 @@ ARGS if present will be used to format CMD."
 (cl-defmethod sensetion--backend-lemma->synsets ((backend sensetion--mongo) lemma pos)
   (let* ((lemma (cl-substitute ?_ (string-to-char " ") lemma :test #'eq))
 	 (docs (sensetion--mongo-find (sensetion--mongo-db backend) (sensetion--mongo-synset-collection backend)
-			   `((terms . ,lemma) (pos . ,pos)))))
-    (mapcar #'(lambda (doc) (sensetion--alist->synset (cdr doc)))
-	    docs)))
+			     `((terms . ,lemma) (pos . ,pos)) :sort '(("_id" . -1)))))
+    (mapcar #'sensetion--alist->synset docs)))
 
 (provide 'sensetion-client)

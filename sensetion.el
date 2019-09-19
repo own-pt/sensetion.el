@@ -23,20 +23,6 @@
   :group 'data)
 
 
-(defcustom sensetion-elasticsearch-path
-  nil
-  "Path to elasticsearch executable."
-  :group 'sensetion
-  :type '(choice file (const nil)))
-
-
-(defcustom sensetion-backend-url
-  "http://localhost"
-  "URL to backend server."
-  :group 'sensetion
-  :type 'url)
-
-
 (defcustom sensetion-backend-port
   9200
   "Port used by backend server."
@@ -44,11 +30,20 @@
   :type 'integer)
 
 
-(defcustom sensetion-sense-menu-show-synset-id
+(defcustom sensetion-sense-menu-show-lexicographer-filename
   nil
-  "Show synset id in sense menu during annotation."
+  "Show lexicographer file name of synset in sense menu during annotation."
   :group 'sensetion
   :type  'boolean)
+
+
+(defcustom sensetion-sensetion-maximum-examples-to-show
+  nil
+  "Maximum number of examples sentences to show in sense annotation menu.
+
+If nil, show all examples."
+  :group 'sensetion
+  :type '(choice integer (const nil)))
 
 
 (defcustom sensetion-unnanotated-colour
@@ -60,16 +55,14 @@
 
 (defcustom sensetion-previously-annotated-colour
   "dark green"
-  "Colour to display the tokens which have been previously
-annotated."
+  "Colour to display the tokens which have been previously annotated."
   :group 'sensetion
   :type 'color)
 
 
 (defcustom sensetion-previously-annotated-unsure-colour
   "light green"
-  "Colour to display the tokens which have been previously
-annotated with low confidence."
+  "Colour to display the tokens which have been previously annotated with low confidence."
   :group 'sensetion
   :type 'color)
 
@@ -83,8 +76,7 @@ annotated with low confidence."
 
 (defcustom sensetion-currently-annotated-unsure-colour
   "light blue"
-  "Colour to use in displaying tokens annotated in this batch,
-with low confidence."
+  "Colour to use in displaying tokens annotated in this batch, with low confidence."
   :group 'sensetion
   :type 'color)
 
@@ -195,6 +187,7 @@ far, and the cdr is the number of annotatable tokens.")
 (defalias 'sensetion #'sensetion-annotate)
 
 (defun sensetion-annotate (_project annotation-function)
+  "Start annotation session of PROJECT using ANNOTATION-FUNCTION."
   (interactive (list (or sensetion-current-project (sensetion-select-project))
 		     (sensetion--pick-annotation-function)))
   (call-interactively annotation-function))
@@ -208,18 +201,22 @@ far, and the cdr is the number of annotatable tokens.")
 
 
 (defun sensetion-select-project ()
+  "Select a project from `sensetion-project-list'."
   (interactive)
-  (let ((selected (case (length sensetion-project-list)
-		    (0 (error "sensetion-project-list is empty!"))
-		    (1 (car sensetion-project-list))
-		    (otherwise (cl-find
-				(ido-completing-read "Select project: " (mapcar #'sensetion--project-name sensetion-project-list) nil t)
-				sensetion-project-list :key #'sensetion--project-name :test #'equal)))))
-    (setf sensetion-current-project
-	  selected)))
+  (pcase sensetion-project-list
+    ('()
+     (user-error "There is no project available.  Please define a project"))
+    (`(,project) project)
+    (_
+     (let ((selected (cl-find
+		      (ido-completing-read "Select project: "
+					   (mapcar #'sensetion--project-name sensetion-project-list) nil t)
+		      sensetion-project-list :key #'sensetion--project-name :test #'equal)))
+     (setf sensetion-current-project selected)))))
 
 
 (defun sensetion-sequential-annotate-doc (document-id)
+  "Annotate document specified by DOCUMENT-ID in sequential mode."
   (interactive (list (completing-read "Document to annotate: "
 				      sensetion--document-id-completion-function
 				      nil 'yes)))
@@ -228,7 +225,9 @@ far, and the cdr is the number of annotatable tokens.")
 
 
 (defun sensetion-annotate-target (lemma &optional pos)
-  "Create targeted annotation buffer, where several sentences
+  "Annotate target LEMMA and POS.
+
+Create targeted annotation buffer, where several sentences
 containing tokens with LEMMA and optionally POS are displayed for
 annotation."
   (interactive
@@ -274,7 +273,10 @@ annotation."
 
 
 (defun sensetion--make-collocations (matches &optional target synset-cache)
-  "Insert MATCHES at current buffer, return status."
+  "Insert MATCHES at current buffer, return status.
+
+TARGET is the target lemma, and SYNSET-CACHE caches the synset
+data available."
   (sensetion-is
    (cl-mapc #'go matches)
    (cons done total)
@@ -296,9 +298,11 @@ annotation."
 
 
 (defun sensetion-sequential-annotate-sentence-document ()
-  "In targeted mode, open a buffer of sequential annotation with point at the same sentence as the one in point.
+  "In targeted mode, open a buffer of sequential annotation.
 
-Can be used to switch to sequential annotation or to see the context of a sentence."
+Point at the new buffer is at corresponding sentence of the other
+buffer.  Can be used to switch to sequential annotation or to see
+the context of a sentence."
   (interactive)
   (unless sensetion--lemma
     (user-error "You are already in sequential mode"))
@@ -340,8 +344,10 @@ Can be used to switch to sequential annotation or to see the context of a senten
 ;; TODO: unglobbing (or any kind of editing that calls sent-colloc)
 ;; turns just annotated tokens into previously annotated tokens
 (defun sensetion-unglob (ix sent)
-  "If token of index IX in SENT at point is part of collocation,
-unglob it and reinsert the sentence in the buffer.
+  "Unglob token of index IX in SENT at.
+
+The token must be part of a collocation.  The sentence is
+automatically reinserted in the buffer.
 
 Unglobbing means making all tokens in the collocation normal
 tokens, and removing the glob token corresponding to the
@@ -398,7 +404,9 @@ collocation."
 
 
 (defun sensetion--mark-glob (beg end ix marked)
-  "Marks token to be globbed with the `sensetion-glob' command."
+  "Mark token to be globbed with the `sensetion-glob' command.
+
+Token is the one between BEG and END, corresponding to index IX."
   (with-inhibiting-read-only
    (add-face-text-property beg end '(:underline t))
    (sensetion--put-text-property-eol 'sensetion--to-glob (cons ix marked))))
@@ -415,8 +423,7 @@ collocation."
 
 
 (defun sensetion-toggle-glob-mark (beg end)
-  "Mark or unmark token to be globbed with the `sensetion-glob'
-command."
+  "Mark or unmark token between BEG and END to be globbed with the `sensetion-glob' command."
   (interactive (sensetion--tk-points))
   (let* ((ix (sensetion--tk-ix-prop-at-point beg))
          (marked (sensetion--tks-to-glob-prop))
@@ -427,7 +434,9 @@ command."
 
 
 (defun sensetion-glob (lemma pos ixs-to-glob sent)
-  "Glob all tokens in SENT whose indices are in IXS-TO-GLOB,
+  "Glob all tokens in SENT which are marked.
+
+Marked tokens are those whose indices are in IXS-TO-GLOB,
 assigning the resulting glob token LEMMA and POS.
 
 You can mark/unmark tokens with `sensetion-toggle-glob-mark'."
@@ -521,8 +530,10 @@ was linearized), and reinsert SENT."
 
 
 (defun sensetion--tk-senses-pos (tk)
-  "Get pos1 of synsets assigned to TK. If there is more than one
-synset and they have different pos1, return nil."
+  "Get pos1 of synsets assigned to TK.
+
+If there is more than one synset and they have different pos1,
+return nil."
   (when-let* ((sks   (sensetion--tk-skeys tk))
               (pos   (sensetion--sensekey-pos (cl-first sks)))
               (poses (if (member pos '("a" "s"))
@@ -585,12 +596,12 @@ synset and they have different pos1, return nil."
    st
    #s(hash-table size 5 test equal rehash-size 1.5 rehash-threshold 0.8125
                  purecopy t data
-                 ("1" "n" "2" "v" "3" "a" "4" "r" "5" "s"))))
+                 ("1" "N" "2" "V" "3" "A" "4" "R" "5" "S"))))
 
 
 (defun sensetion--wordnet-lookup-lemma (lemma &optional options)
-  "(hash-table ,lemma ((,pos (,sense-key ,hydra-index ,synset-id ,terms ,gloss) ...) ...)"
-  (let ((poses '("n" "v" "r" "a"))
+  ;; (hash-table ,lemma ((,pos (,sense-key ,hydra-index ,synset-id ,terms ,gloss) ...) ...)
+  (let ((poses '("N" "V" "R" "A"))
 	(options (or options (make-hash-table :test 'equal :size 200))))
     (setf (gethash lemma options)
 	  (mapcar
@@ -603,19 +614,22 @@ synset and they have different pos1, return nil."
 (defun sensetion--wordnet-lookup-lemma-pos (lemma pos)
   "Return list of lists where each element list is composed by a
 sense key, the sense key/index shown by the edit hydra, the
-synset id, the terms defined by that synset, and the synset's
-gloss."
+synset's lexicographer file, the terms defined by that synset,
+and the synset's gloss."
   (sensetion-is
    (mapcar #'go synsets)
    :where
    (go (synset)
-       (prog1
+       (pcase synset
+	 ((cl-struct sensetion--synset lexname terms def exs)
+	  (prog1
 	   (list (lemma-sk lemma synset)
 		 (ix->hydra-key counter)
-		 (sensetion--synset-id synset)
-		 (sensetion--synset-terms synset)
-		 (sensetion--synset-gloss synset))
-	 (cl-incf counter)))
+		 lexname
+		 terms
+		 def
+		 exs)
+	 (cl-incf counter)))))
    (ix->hydra-key (ix)
                   (format "%s"
                           (if (< ix 9)
@@ -628,11 +642,11 @@ gloss."
    (counter 0)
    (lemma-sk (lemma synset)
              (or
-              (car (cl-find lemma (cl-mapcar #'cons (sensetion--synset-keys synset) (sensetion--synset-terms synset))
-			    :test #'equal :key #'cdr))
-              (error "No matching sensekey for lemma %s in synset %s-%s"
-                     lemma (sensetion--synset-ofs synset) (sensetion--synset-pos synset))))
-   (synsets  (cl-sort (sensetion--client-lemma->synsets lemma pos) #'string< :key #'sensetion--synset-id))))
+              (cl-first (cl-find lemma (cl-mapcar #'cons (sensetion--synset-keys synset) (sensetion--synset-terms synset))
+			    :test #'equal :key #'cl-rest))
+              (error "No matching sensekey for lemma %s in synset %s"
+                     lemma (sensetion--synset-id synset))))
+   (synsets  (sensetion--client-lemma->synsets lemma pos))))
 
 
 (defun sensetion--cache-lemma->senses (lemma &optional pos synset-cache)
@@ -686,15 +700,17 @@ gloss."
 
 
 (defun sensetion-toggle-scripts ()
+  "Toggle display of super/subscripts in annotation buffer."
   (interactive)
   (if (memq 'sensetion--scripts buffer-invisibility-spec)
       (remove-from-invisibility-spec 'sensetion--scripts)
     (add-to-invisibility-spec 'sensetion--scripts)))
 
 (defun sensetion-refresh ()
+  "Update annotation buffer."
   (interactive)
   (sensetion--map-buffer-lines
-   (lambda (_ _)
+   (lambda (_ __)
      (sensetion--reinsert-sent-at-point (sensetion--get-sent-at-point) nil))))
 
 (defhydra sensetion-hydra (:color blue)
@@ -718,3 +734,5 @@ gloss."
 
 
 (provide 'sensetion)
+
+;;; sensetion.el ends here

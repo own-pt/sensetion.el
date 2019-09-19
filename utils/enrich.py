@@ -74,22 +74,11 @@ def go_doc(fp):
 
 @click.command()
 @click.argument('input_files', type=click.Path(exists=True), nargs=-1)
-@click.option('--backend', type=click.Choice(['elasticsearch', 'mongo', 'agnostic'], case_sensitive=False))
-def main(input_files, backend='agnostic'):
+def main(input_files):
     for fp in input_files:
         sents = go_doc(fp)
         for sent in sents:
-            if backend == "elasticsearch":
-                click.echo(
-                    to_json({'index': {'_id': sent_id(sent[DOC_ID_KEY], sent[SENT_ID_KEY])}}))
-                click.echo(to_json(sent))
-            elif backend == "mongo":
-                sent['_id'] = sent_id(sent[DOC_ID_KEY], sent[SENT_ID_KEY])
-                click.echo(to_json(sent))
-            elif backend == "agnostic":
-                click.echo(to_json(sent))
-            else:
-                click.echo("Unrecognized backend {}".format(backend), err=True)
+            click.echo(to_json(sent))
 
 
 if __name__ == '__main__':
