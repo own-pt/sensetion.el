@@ -6,7 +6,7 @@
 
 (cl-defstruct (sensetion--project (:constructor nil)
 			 (:constructor sensetion-make-project))
-    "Structure representing an annotation project.
+  "Structure representing an annotation project.
 
 Slots:
 
@@ -20,23 +20,20 @@ Slots:
      The buffer name where sensetion results are displayed.
 
 `display-meta-data-fn' (optional)
-     Function used to display meta data during target mode. When
-     not defined nothing is displayed.
+     Function used to display meta data during target mode.
+     Its only argument is a `sensetion--sent' object.
+     When not defined no metadata is displayed.
 
 `restrict-lemmas' (optional, default: t)
      When non-nil restrict the user to add only lemmas that is part of
      wordnet to a token or a glob.
-
-`sense-menu-show-synset-id' (optional)
-     When non-nil show synset id in sense menu during annotation.
 "
 
-    (name (error "You must provide a name"))
-    (backend (error "You must provide a backend"))
-    (output-buffer-name "sensetion")
-    display-meta-data-fn
-    (restrict-lemmas t)
-    sense-menu-show-synset-id)
+  (name (error "You must provide a name"))
+  (backend (error "You must provide a backend"))
+  (output-buffer-name "sensetion")
+  display-meta-data-fn
+  (restrict-lemmas t))
 
 ;; TODO: maybe use maps all the way
 (cl-defstruct (sensetion--tk (:constructor nil)
@@ -46,7 +43,7 @@ Slots:
 
 (cl-defstruct (sensetion--synset (:constructor nil)
                         (:constructor sensetion--make-synset))
-  ofs pos keys terms gloss)
+  lexname pos keys terms def exs)
 
 
 (cl-defstruct (sensetion--sent (:constructor nil)
@@ -58,8 +55,9 @@ Slots:
 
 (defun sensetion--alist->synset (alist)
   (pcase alist
-    ((map ofs pos keys terms gloss)
-     (sensetion--make-synset :ofs ofs :pos pos :keys keys :terms terms :gloss gloss))))
+    ((map lexname pos keys terms definition examples)
+     (sensetion--make-synset :lexname lexname :pos pos
+		    :keys keys :terms terms :def definition :exs examples))))
 
 
 (defun sensetion--alist->sent (alist)
@@ -115,6 +113,13 @@ Slots:
 (defalias 'sensetion--tk-skeys #'sensetion--tk-senses)
 
 
+(defun sensetion--sensekey-lexical-id (sk)
+  (pcase (s-split ":" sk)
+    (`(,_ ,_ ,lex-id ,_ ,_)
+     lex-id)
+    (_ (error "Malformed sense key %s" sk))))
+
+
 (defun sensetion--sensekey-pos (sk)
   (pcase (s-split ":" sk)
     (`(,lemma* ,_ ,_ ,_ ,_)
@@ -123,9 +128,11 @@ Slots:
 
 
 (defun sensetion--synset-id (synset)
-  (concat (number-to-string (sensetion--synset-ofs synset))
-          "-"
-          (sensetion--synset-pos synset)))
+  (pcase synset
+    ((cl-struct sensetion--synset pos lexname keys terms)
+     (let ((lexical-id (sensetion--sensekey-lexical-id (cl-first keys))))
+       (format "%s-%s-%s-%s"
+	       pos lexname (cl-first terms) lexical-id)))))
 
 
 (defun sensetion--sent-id (sent)

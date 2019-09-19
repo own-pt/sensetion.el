@@ -69,7 +69,14 @@ options in TOKEN."
    (eval (sensetion--edit-hydra-maker lemma pos1 token sent options))))
 
 
-(defun sensetion--sense-edit-help-text (chosen? sid terms gloss)
+(defun sensetion--format-gloss (definition examples)
+  (let ((examples-to-show (if-let ((n sensetion-sensetion-maximum-examples-to-show))
+			      (seq-take examples n)
+			    examples)))
+    (string-join (cons definition examples-to-show) " • ")))
+
+
+(defun sensetion--sense-edit-help-text (chosen? lexname terms definition examples)
   (sensetion-is
    (format "%s%s %s"
 	   chosen-mark
@@ -77,12 +84,13 @@ options in TOKEN."
 	   (s-replace "\n" "\n   "
 		      (s-word-wrap (- (frame-width) 5)
 				   (concat terms-txt
-					   " • "
-					   gloss))))
+					   " | "
+					   (sensetion--format-gloss definition examples)))))
    :where
    (terms-txt (mapconcat #'bold terms ","))
-   (synset? (if (sensetion--project-sense-menu-show-synset-id sensetion-current-project)
-		(concat "(" (prop sid 'italic) ")") ""))
+   (synset? (if sensetion-sense-menu-show-lexicographer-filename
+		(concat "(" (prop lexname 'italic) ")")
+	      ""))
    (chosen-mark (if chosen? "+ " ""))
    (bold (txt)
 	 (prop txt 'bold))
@@ -100,7 +108,7 @@ options in TOKEN."
       ("0" ,no-sense-function "No sense in Wordnet" :column ,column)
       ,@(mapcar
          (lambda (s)
-           (cl-destructuring-bind (sk hkey sid terms gloss) s
+           (seq-let (sk hkey lexname terms definition examples) s
              (list hkey
                    ;; gets wrapped in (lambda () (interactive)
                    ;; automatically by hydra
@@ -108,7 +116,8 @@ options in TOKEN."
                       (sensetion--toggle-sense ,token ,sk)
                       (sensetion--edit-reinsert-state-call
                        ,token ,sent ,lemma ,pos1 ',options))
-		   (sensetion--sense-edit-help-text (sense-chosen-ind? sk) sid terms gloss)
+		   (sensetion--sense-edit-help-text (sense-chosen-ind? sk)
+					   lexname terms definition examples)
                    :column column)))
          options))
    :where
@@ -183,9 +192,9 @@ options in TOKEN."
 (defun sensetion--refresh-sent (sent &optional buffer)
   (catch 'sensetion--exit
     (sensetion--map-buffer-lines
-     (lambda (_ _)
+     (lambda (_i _)
        (when-let* ((line-sent (sensetion--get-sent-at-point))
-                   (_ (equal (sensetion--sent-id sent) (sensetion--sent-id line-sent))))
+                   (_    (equal (sensetion--sent-id sent) (sensetion--sent-id line-sent))))
          (sensetion--reinsert-sent-at-point sent)
          (throw 'sensetion--exit t)))
      buffer)))
