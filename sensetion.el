@@ -194,7 +194,7 @@ far, and the cdr is the number of annotatable tokens.")
 ;;;###autoload
 (defalias 'sensetion #'sensetion-annotate)
 
-(defun sensetion-annotate (project annotation-function)
+(defun sensetion-annotate (_project annotation-function)
   (interactive (list (or sensetion-current-project (sensetion-select-project))
 		     (sensetion--pick-annotation-function)))
   (call-interactively annotation-function))
@@ -212,8 +212,9 @@ far, and the cdr is the number of annotatable tokens.")
   (let ((selected (case (length sensetion-project-list)
 		    (0 (error "sensetion-project-list is empty!"))
 		    (1 (car sensetion-project-list))
-		    (otherwise (find (ido-completing-read "Select project: " (mapcar #'sensetion--project-name sensetion-project-list) nil t)
-				    sensetion-project-list :key #'sensetion--project-name :test #'equal)))))
+		    (otherwise (cl-find
+				(ido-completing-read "Select project: " (mapcar #'sensetion--project-name sensetion-project-list) nil t)
+				sensetion-project-list :key #'sensetion--project-name :test #'equal)))))
     (setf sensetion-current-project
 	  selected)))
 
