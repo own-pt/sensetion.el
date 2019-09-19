@@ -24,8 +24,8 @@
 
 
 (defcustom sensetion-backend-port
-  9200
-  "Port used by backend server."
+  nil
+  "(deprecated) Port used by backend server."
   :group 'sensetion
   :type 'integer)
 
@@ -646,7 +646,7 @@ and the synset's gloss."
 			    :test #'equal :key #'cl-rest))
               (error "No matching sensekey for lemma %s in synset %s"
                      lemma (sensetion--synset-id synset))))
-   (synsets  (sensetion--client-lemma->synsets lemma pos))))
+   (synsets  (sensetion--client-lemma->sorted-synsets lemma pos))))
 
 
 (defun sensetion--cache-lemma->senses (lemma &optional pos synset-cache)

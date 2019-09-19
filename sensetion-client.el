@@ -13,10 +13,10 @@
 
 ;;; define generic methods
 
-(cl-defgeneric sensetion-backend-prefix-lemma (backend prefix)
+(cl-defgeneric sensetion--backend-prefix-lemma (backend prefix)
   "Return a list of lemmas with PREFIX as prefix")
 
-(cl-defgeneric sensetion-backend-prefix-document-id (backend prefix)
+(cl-defgeneric sensetion--backend-prefix-document-id (backend prefix)
   "Return a list of doc-id with PREFIX as prefix")
 
 (cl-defgeneric sensetion--backend-get-sorted-doc-sents (backend doc-id)
@@ -33,17 +33,17 @@
 (cl-defgeneric sensetion--backend-update-modified-sent (backend sent)
   "Update the backend info SENT content")
 
-(cl-defgeneric sensetion--backend-lemma->synsets (backend lemma pos)
+(cl-defgeneric sensetion--backend-lemma->sorted-synsets (backend lemma pos)
   "Return a list of sensetion--synset objects given a LEMMA and a
   POS.")
 
 (defun sensetion-client-prefix-lemma (prefix)
-  "See `sensetion-backend-prefix-lemma'"
-  (sensetion-backend-prefix-lemma (sensetion--project-backend sensetion-current-project) prefix))
+  "See `sensetion--backend-prefix-lemma'"
+  (sensetion--backend-prefix-lemma (sensetion--project-backend sensetion-current-project) prefix))
 
 (defun sensetion-client-prefix-document-id (prefix)
-  "See `sensetion-backend-prefix-document-id'"
-  (sensetion-backend-prefix-document-id (sensetion--project-backend sensetion-current-project) prefix))
+  "See `sensetion--backend-prefix-document-id'"
+  (sensetion--backend-prefix-document-id (sensetion--project-backend sensetion-current-project) prefix))
 
 (defun sensetion--client-get-sorted-doc-sents (doc-id)
   "See `sensetion--backend-get-sorted-doc-sents'"
@@ -62,22 +62,19 @@
   (let ((sent (sensetion--remove-man-now sent)))
     (sensetion--backend-update-modified-sent (sensetion--project-backend sensetion-current-project) sent)))
 
-(defun sensetion--client-lemma->synsets (lemma pos)
-  "See `sensetion--backend-lemma->synsets'"
-  (sensetion--backend-lemma->synsets (sensetion--project-backend sensetion-current-project) lemma pos))
+(defun sensetion--client-lemma->sorted-synsets (lemma pos)
+  "See `sensetion--backend-lemma->sorted-synsets'"
+  (sensetion--backend-lemma->sorted-synsets (sensetion--project-backend sensetion-current-project) lemma pos))
 
 
 (defun sensetion--remove-man-now (sent)
   (cl-labels
       ((remove-man-now (tk)
 		       (pcase tk
-			 ((cl-struct sensetion--tk tag)
-			  (when (equal (sensetion--tk-tag tk) "man-now")
-			    (setf (sensetion--tk-tag tk) "man"))))
+			 ((cl-struct sensetion--tk (tag "man-now"))
+			  (setf (sensetion--tk-tag tk) "man")))
 		       tk))
-    (pcase sent
-      ((cl-struct sensetion--sent tokens)
-       (setf (sensetion--sent-tokens sent) (mapcar #'remove-man-now tokens))))
+    (setf (sensetion--sent-tokens sent) (mapcar #'remove-man-now (sensetion--sent-tokens sent)))
     sent))
 
 
@@ -163,7 +160,7 @@ ARGS if present will be used to format CMD."
     (seq-filter (lambda (term) (string-prefix-p prefix term)) terms)))
 
 
-(cl-defmethod sensetion-backend-prefix-document-id ((backend sensetion--mongo) prefix)
+(cl-defmethod sensetion--backend-prefix-document-id ((backend sensetion--mongo) prefix)
   (sensetion--mongo-distinct (sensetion--mongo-db backend) (sensetion--mongo-document-collection backend)
 		    "doc_id" `((doc_id ($regex . ,(format "^%s" prefix))))))
 
@@ -220,7 +217,7 @@ ARGS if present will be used to format CMD."
       (error "No result"))))
 
 
-(cl-defmethod sensetion--backend-lemma->synsets ((backend sensetion--mongo) lemma pos)
+(cl-defmethod sensetion--backend-lemma->sorted-synsets ((backend sensetion--mongo) lemma pos)
   (let* ((lemma (cl-substitute ?_ (string-to-char " ") lemma :test #'eq))
 	 (docs (sensetion--mongo-find (sensetion--mongo-db backend) (sensetion--mongo-synset-collection backend)
 			     `((terms . ,lemma) (pos . ,pos)) :sort '(("_id" . -1)))))
