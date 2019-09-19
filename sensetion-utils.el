@@ -85,11 +85,18 @@ itself."
 (defun sensetion--remove-nth (n list)
   (cl-remove-if (lambda (_) t) list :start n :end (1+ n)))
 
-(defun sensetion--process-exit-code-and-output (program args)
-  "Run PROGRAM with ARGS and return the exit code and output in a list."
-  (with-temp-buffer
-    (cons (apply 'call-process program nil (current-buffer) nil args)
-          (buffer-string))))
+(defun sensetion--parse-jsonlines (&optional reverse)
+  "Parse and return in a list the newline-delimited JSON values following point.
+Advances point until end-of-buffer.
+If REVERSE is non-nil, return the results in the proper order."
+  (let ((res))
+    (while (not (eobp))
+      (push (json-read) res)
+      ;; skip whitespace
+      (skip-chars-forward "[:space:]"))
+    (if reverse
+	(reverse res)
+      res)))
 
 
 (provide 'sensetion-utils)

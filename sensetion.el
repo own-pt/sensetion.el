@@ -129,6 +129,10 @@ A cons cell where the car is the number of tokens annotated so
 far, and the cdr is the number of annotatable tokens.")
 
 
+(defvar sensetion-log-buffer-name "*sensetion log*"
+  "Buffer where sensetion errors are logged.")
+
+
 (defvar-local sensetion--synset-cache nil)
 
 
@@ -311,7 +315,7 @@ Can be used to switch to sequential annotation or to see the context of a senten
 (defun sensetion--get-sent-at-point ()
   (let ((sent-id (sensetion--get-text-property-eol 'sensetion--sent-id)))
     (unless sent-id (user-error "No sentence at point"))
-    (sensetion--alist->sent (sensetion--client-id->sent sent-id))))
+    (sensetion--client-id->sent sent-id)))
 
 
 (defun sensetion--get-token-at-point ()
