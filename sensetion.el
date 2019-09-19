@@ -203,16 +203,17 @@ far, and the cdr is the number of annotatable tokens.")
 (defun sensetion-select-project ()
   "Select a project from `sensetion-project-list'."
   (interactive)
-  (pcase sensetion-project-list
-    ('()
-     (user-error "There is no project available.  Please define a project"))
-    (`(,project) project)
-    (_
-     (let ((selected (cl-find
-		      (ido-completing-read "Select project: "
-					   (mapcar #'sensetion--project-name sensetion-project-list) nil t)
-		      sensetion-project-list :key #'sensetion--project-name :test #'equal)))
-     (setf sensetion-current-project selected)))))
+  (setf sensetion-current-project
+	(pcase sensetion-project-list
+	  ('()
+	   (user-error "There is no project available.  Please define a project"))
+	  (`(,project)
+	   project)
+	  (_
+	   (cl-find
+	    (ido-completing-read "Select project: "
+				 (mapcar #'sensetion--project-name sensetion-project-list) nil t)
+	    sensetion-project-list :key #'sensetion--project-name :test #'equal)))))
 
 
 (defun sensetion-sequential-annotate-doc (document-id)

@@ -117,7 +117,7 @@ ARGS if present will be used to format CMD."
           (and projection (json-encode projection)))
 	 (args (list db "--quiet" "--norc"
 		     (sensetion--mongo-cmd-file
-		      (format "db.%s.find(%s)%s.forEach(function(myDoc) { printjsononeline(myDoc); })"
+		      (format "db.%s.find(%s)%s.forEach(printjsononeline)"
 			      collection
 			      (if projection
 				  (format "%s, %s" query-json projection-json)
@@ -131,7 +131,7 @@ ARGS if present will be used to format CMD."
 (cl-defun sensetion--mongo-distinct (db collection field &optional query)
   (let ((args (list db "--quiet" "--norc"
 		    (sensetion--mongo-cmd-file
-		     (format "db.%s.distinct(%s).forEach(function(myDoc) { printjsononeline(myDoc); })"
+		     (format "db.%s.distinct(%s).forEach(printjsononeline)"
 			     collection
 			     (if query
 				 (format "\"%s\", %s" field (json-encode query))
@@ -150,13 +150,9 @@ ARGS if present will be used to format CMD."
     (sensetion--mongo-cmd args)))
 
 
-(cl-defmethod sensetion-backend-prefix-lemma ((backend sensetion--mongo) prefix)
-  ;; FIXME: use distinct
-  (let* ((hits  (sensetion--mongo-find (sensetion--mongo-db backend)
-			      (sensetion--mongo-synset-collection backend)
-			      `((terms ($regex . ,(format "^%s" prefix))))
-			      :projection '((terms . 1) (_id . 0))))
-	 (terms (seq-mapcat (lambda (doc) (map-elt doc 'terms nil #'eq)) hits)))
+(cl-defmethod sensetion--backend-prefix-lemma ((backend sensetion--mongo) prefix)
+  (let ((terms (sensetion--mongo-distinct (sensetion--mongo-db backend) (sensetion--mongo-synset-collection backend)
+				 "terms" `((terms ($regex . ,(format "^%s" prefix)))))))
     (seq-filter (lambda (term) (string-prefix-p prefix term)) terms)))
 
 

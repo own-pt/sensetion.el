@@ -6,7 +6,7 @@
 
 (cl-defstruct (sensetion--project (:constructor nil)
 			 (:constructor sensetion-make-project))
-    "Structure representing an annotation project.
+  "Structure representing an annotation project.
 
 Slots:
 
@@ -20,19 +20,20 @@ Slots:
      The buffer name where sensetion results are displayed.
 
 `display-meta-data-fn' (optional)
-     Function used to display meta data during target mode. When
-     not defined nothing is displayed.
+     Function used to display meta data during target mode.
+     Its only argument is a `sensetion--sent' object.
+     When not defined no metadata is displayed.
 
 `restrict-lemmas' (optional, default: t)
      When non-nil restrict the user to add only lemmas that is part of
      wordnet to a token or a glob.
 "
 
-    (name (error "You must provide a name"))
-    (backend (error "You must provide a backend"))
-    (output-buffer-name "sensetion")
-    display-meta-data-fn
-    (restrict-lemmas t))
+  (name (error "You must provide a name"))
+  (backend (error "You must provide a backend"))
+  (output-buffer-name "sensetion")
+  display-meta-data-fn
+  (restrict-lemmas t))
 
 ;; TODO: maybe use maps all the way
 (cl-defstruct (sensetion--tk (:constructor nil)
