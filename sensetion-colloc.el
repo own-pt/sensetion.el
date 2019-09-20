@@ -4,12 +4,9 @@
   "Return propertized string with SENT contents and its statistics."
   (sensetion-is
    (list
-    (s-concat
-     (when (and target (sensetion--project-display-meta-data-fn sensetion-current-project))
-       (propertize
-	(format "%s "
-		(funcall (sensetion--project-display-meta-data-fn sensetion-current-project) sent))
-	'face 'bold))
+    (concat
+     (when (sensetion--project-display-meta-data-fn sensetion-current-project)
+       (funcall (sensetion--project-display-meta-data-fn sensetion-current-project) sent target))
      (s-join " " tks))
     (cons done total))
    :where
@@ -25,14 +22,14 @@
 		   (ckeys (cdr kind)))
 	       (pcase ckeys
 		 (`(,k) 			;part of exactly one glob
-		  (seq-let (ix glob-tk) (map-elt globs k nil #'equal)
+		  (seq-let (glob-ix glob-tk) (map-elt globs k nil #'equal)
 		    (sensetion--tk-colloc ix form kind ckeys
 				 (select? glob-tk)
 				 (sensetion--tk-tag glob-tk)
 				 (sensetion--tk-senses-pos glob-tk)
 				 (map-senses (sensetion--tk-senses glob-tk))
 				 (sensetion--tk-unsure glob-tk)
-				 ix)))
+				 glob-ix)))
 		 (`() 			;part of no glob
 		  (sensetion--tk-colloc ix form kind nil (select? tk) tag
 			       (sensetion--tk-senses-pos tk)

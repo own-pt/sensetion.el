@@ -70,10 +70,12 @@ options in TOKEN."
 
 
 (defun sensetion--format-gloss (definition examples)
-  (let ((examples-to-show (if-let ((n sensetion-sensetion-maximum-examples-to-show))
-			      (seq-take examples n)
-			    examples)))
-    (string-join (cons definition examples-to-show) " • ")))
+  (string-join
+   (cons definition
+	 (if-let ((n sensetion-sensetion-maximum-examples-to-show))
+	     (seq-take examples n)
+	   examples))
+   " • "))
 
 
 (defun sensetion--sense-edit-help-text (chosen? lexname terms definition examples)

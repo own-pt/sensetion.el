@@ -21,8 +21,9 @@ Slots:
 
 `display-meta-data-fn' (optional)
      Function used to display meta data during target mode.
-     Its only argument is a `sensetion--sent' object.
-     When not defined no metadata is displayed.
+     Its two arguments are a `sensetion--sent' object and a boolean
+     value indicating if the current annotation mode is targeted.
+     When this function is not defined no metadata is displayed.
 
 `restrict-lemmas' (optional, default: t)
      When non-nil restrict the user to add only lemmas that is part of

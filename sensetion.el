@@ -243,15 +243,7 @@ annotation."
 			     (sensetion--wordnet-lookup-lemma lemma sensetion--synset-cache))))
    :where
    (id (if pos (format "%s@%s" lemma pos) lemma))
-   (matches (cl-sort
-	     (sensetion--client-get-sents lemma pos)
-	     (lambda (x y)
-	       (if (equal (sensetion--sent-doc-id x)
-			  (sensetion--sent-doc-id y))
-		   (< (sensetion--sent-sent-id x)
-		      (sensetion--sent-sent-id y))
-		 (string-lessp (sensetion--sent-doc-id x)
-			       (sensetion--sent-doc-id y))))))
+   (matches (sensetion--client-get-sorted-sents lemma pos))
    (pos (unless (equal pos "any") pos))))
 
 
@@ -262,7 +254,7 @@ annotation."
       (error "No matches for %s" id))
     (with-current-buffer result-buffer
       (sensetion-mode)
-      (with-inhibiting-read-only
+      (sensetion--with-inhibiting-read-only
        (when buffer-setup-fn (funcall buffer-setup-fn))
        (setq sensetion--local-status (sensetion--make-collocations matches target sensetion--synset-cache)))
       (sensetion--beginning-of-buffer))
@@ -345,7 +337,9 @@ the context of a sentence."
 ;; TODO: unglobbing (or any kind of editing that calls sent-colloc)
 ;; turns just annotated tokens into previously annotated tokens
 (defun sensetion-unglob (ix sent)
-  "Unglob token of index IX in SENT at.
+  "Unglob token of index IX in SENT.
+
+When called interactively, unglobs the token at point.
 
 The token must be part of a collocation.  The sentence is
 automatically reinserted in the buffer.
@@ -408,17 +402,17 @@ collocation."
   "Mark token to be globbed with the `sensetion-glob' command.
 
 Token is the one between BEG and END, corresponding to index IX."
-  (with-inhibiting-read-only
+  (sensetion--with-inhibiting-read-only
    (add-face-text-property beg end '(:underline t))
    (sensetion--put-text-property-eol 'sensetion--to-glob (cons ix marked))))
 
 
 (defun sensetion--tks-to-glob-prop ()
-  (get-text-property (line-end-position) 'sensetion--to-glob))
+  (sensetion--get-text-property-eol 'sensetion--to-glob))
 
 
 (defun sensetion--unmark-glob (beg end ix marked)
-  (with-inhibiting-read-only
+  (sensetion--with-inhibiting-read-only
    (sensetion--put-text-property-eol 'sensetion--to-glob (cl-remove ix marked))
    (add-face-text-property beg end '(:underline nil))))
 
@@ -449,7 +443,7 @@ You can mark/unmark tokens with `sensetion-toggle-glob-mark'."
   (let ((point (point))
 	(globbed-sent (sensetion--glob lemma pos ixs-to-glob sent)))
     (sensetion--reinsert-sent-at-point globbed-sent)
-    (with-inhibiting-read-only
+    (sensetion--with-inhibiting-read-only
      (sensetion--put-text-property-eol 'sensetion--to-glob nil))
     (goto-char point)))
 
@@ -480,7 +474,8 @@ You can mark/unmark tokens with `sensetion-toggle-glob-mark'."
 		((cl-struct sensetion--tk form lemmas tag senses glob unsure meta)
 		 ;; TODO: delete senses and make status "un"
 		 (sensetion--make-tk :kind (cl-list* "cf" key cks)
-			    :form form :lemmas lemmas :tag tag :senses senses :glob glob :unsure unsure :meta meta)))))
+			    :form form :lemmas lemmas :tag tag :senses senses
+			    :glob glob :unsure unsure :meta meta)))))
    (new-glob (sensetion--make-tk :lemmas (list (sensetion--make-lemma* lemma st)) :tag "un"
                         :kind `("glob" ,new-k) :glob "man"))
    (st (sensetion--pos->synset-type pos))
@@ -501,7 +496,7 @@ You can mark/unmark tokens with `sensetion-toggle-glob-mark'."
 (cl-defun sensetion--reinsert-sent-at-point (sent &optional (update t))
   "Save SENT, delete current line (where previous version of sent
 was linearized), and reinsert SENT."
-  (with-inhibiting-read-only
+  (sensetion--with-inhibiting-read-only
    (atomic-change-group
      (delete-region (line-beginning-position) (line-end-position))
      (seq-let (line _)
@@ -513,7 +508,6 @@ was linearized), and reinsert SENT."
 
 ;; TODO: when annotating glob, check if token is part of more than one
 ;; colloc
-
 (cl-defun sensetion--tk-has-lemma? (tk &optional (lemma sensetion--lemma))
   (sensetion-is
    (cl-member lemma
@@ -686,7 +680,7 @@ and the synset's gloss."
 (defun sensetion-move-line-up ()
   "Move up the current line."
   (interactive)
-  (with-inhibiting-read-only
+  (sensetion--with-inhibiting-read-only
    (transpose-lines 1)
    (forward-line -2)))
 
@@ -694,7 +688,7 @@ and the synset's gloss."
 (defun sensetion-move-line-down ()
   "Move down the current line."
   (interactive)
-  (with-inhibiting-read-only
+  (sensetion--with-inhibiting-read-only
    (forward-line 1)
    (transpose-lines 1)
    (forward-line -1)))

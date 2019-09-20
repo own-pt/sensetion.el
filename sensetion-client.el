@@ -23,7 +23,7 @@
   "Given the DOC-ID return a list of sensetion--sent objects
   sorted by sent-id")
 
-(cl-defgeneric sensetion--backend-get-sents (backend lemma &optional pos)
+(cl-defgeneric sensetion--backend-get-sorted-sents (backend lemma &optional pos)
   "Return a list of sensetion--sent objects thats cotains tokens
   with LEMMA and/or POS")
 
@@ -49,9 +49,9 @@
   "See `sensetion--backend-get-sorted-doc-sents'"
   (sensetion--backend-get-sorted-doc-sents (sensetion--project-backend sensetion-current-project) doc-id))
 
-(defun sensetion--client-get-sents (lemma &optional pos)
-  "See `sensetion--backend-get-sents'"
-  (sensetion--backend-get-sents (sensetion--project-backend sensetion-current-project) lemma pos))
+(defun sensetion--client-get-sorted-sents (lemma &optional pos)
+  "See `sensetion--backend-get-sorted-sents'"
+  (sensetion--backend-get-sorted-sents (sensetion--project-backend sensetion-current-project) lemma pos))
 
 (defun sensetion--client-id->sent (sent_id)
   "See `sensetion--backend-id->sent'"
@@ -170,17 +170,19 @@ ARGS if present will be used to format CMD."
 (defun sensetion--mongo-lemma-pos->docs (backend lemma pos)
   ;; FIXME: can we now assume that lemmas always have PoS/synset-type?
   (sensetion--mongo-find (sensetion--mongo-db backend) (sensetion--mongo-document-collection backend)
-		`((tokens.lemmas ($regex . ,(format "^%s(%%%s)?"
+		`((tokens.lemmas ($regex . ,(format "^%s(%%%s)?$"
 						    lemma
-						    (sensetion--pos->synset-type pos)))))))
+						    (sensetion--pos->synset-type pos)))))
+		:sort '(("_id" . -1))))
 
 
 (defun sensetion--mongo-lemma->docs (backend lemma)
   (sensetion--mongo-find (sensetion--mongo-db backend) (sensetion--mongo-document-collection backend)
-		`((tokens.lemmas ($regex . ,(format "^%s(%%[1-5])?" lemma))))))
+		`((tokens.lemmas ($regex . ,(format "^%s(%%[1-5])?$" lemma))))
+		:sort '(("_id" . -1))))
 
 
-(cl-defmethod sensetion--backend-get-sents ((backend sensetion--mongo) lemma &optional pos)
+(cl-defmethod sensetion--backend-get-sorted-sents ((backend sensetion--mongo) lemma &optional pos)
   (let* ((lemma (cl-substitute ?_ (string-to-char " ") lemma :test #'eq))
 	 (sents (if pos
 		   (sensetion--mongo-lemma-pos->docs backend lemma pos)

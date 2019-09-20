@@ -34,7 +34,8 @@ itself."
     (sensetion--map-buffer-lines f)))
 
 
-(defmacro with-inhibiting-read-only (&rest body)
+(defmacro sensetion--with-inhibiting-read-only (&rest body)
+  (declare (debug t) (indent 1))
   `(let ((inhibit-read-only t))
      ,@body))
 
