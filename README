@@ -10,79 +10,8 @@ specified.
 [[file:static/sense-menu.png]]
 
 
-* Installation
-See the =INSTALL= file.
-
-
-* Usage
-Use =M-x sensetion= to start annotating. This will ask you for a lemma
-and a PoS tag. You can press =TAB= for completion of the lemma. This
-will build a buffer with instances of this lemma+pos that have not
-been annotated yet. Unannotated words will show as red/pink, while
-previously-annotated tokens will show as green, and newly-annotated
-tokens will show as blue (all these colors can be customized by the
-user). For annotated tokens, dark colours indicate confidence in the
-annotation. You can navigate through annotatable tokens with =<= and
-=>=.
-
-If you wish to sense-tag a token, press =/= on it. You may select one
-or many senses -- or no sense at all -- by pressing the appropriate
-keyboard key. Senses which are already selected are prefixed by a plus
-sign (=+=); when satisfied, press enter/return. If you'd like to quit,
-press =q=; note that quitting does not undo anything (if you selected
-an option and then quit, its effects were already carried out). You
-can see the number of tokens annotated so far and how many tokens
-still need to be annotated in the mode-line, next to the =sensetion=
-indicator.
-
-Any editing action is saved in the buffer, but these are only
-propagated to the backend when you close the buffer and select confirm
-you would like to keep these changes.
-
-If you wish to change a token's lemma use =l=. If you wish to say a
-token is not annotatable (i.e., ignore it), use =i=. If you wish to
-say you are unsure about an annotation, use =?=.
-
-There is support for word collocations, such as phrasal verbs. The
-tokens part of a collocation are united by a key, which is shown in
-their bottom left corner. You can unglob a collocation by pressing =u=
-in any token of the collocation. To glob tokens, you mark them with
-=m= and finally press =g= to create the collocation. If you marked a
-token by mistake, you can unmark tokens by pressing =m= again. If you
-try to edit the lemma of a token part of collocation, you will be
-asked if you would like to edit the token itself or its collocation.
-
-You can move sentences up or down with =C-↑= and =C-↓=. Clustering
-tokens with the same sense together might be useful.
-
-** Command summary
-You can call a command using =M-x <command-name>= or by pressing its
-keybinding. If you find that there are too many editing and navigation
-commands to memorize, you just need to memorize the command =s=, which
-invokes a menu which includes all other commands.
-
-| command name                                    | key binding | description                                                                                                   |
-|-------------------------------------------------+-------------+---------------------------------------------------------------------------------------------------------------|
-| sensetion                                       | -           | Start sensetion annotation process.                                                                           |
-| sensetion-edit-synset                           | =.=         | Edit sentence source data (be careful!)                                                                       |
-| sensetion-sequential-annotate-sentence-document | =c=         | Show sentence at point in its original document, for context. As a byproduct, annotate document sequentially. |
-| sensetion-edit-sense                            | =/=         | Annotate sense of selected token at point                                                                     |
-| sensetion-edit-lemma                            | =l=         | Annotate lemma of token at point                                                                              |
-| sensetion-edit-ignore                           | =i=         | Marks file as to be ignored in the annotation process                                                         |
-| sensetion-edit-unsure                           | =?=         | Marks annotation as done with little confidence                                                               |
-| sensetion-toggle-glob-mark                      | =m=         | Mark/Unmark token for globbing                                                                                |
-| sensetion-glob                                  | =g=         | Glob the marked tokens as a new collocation and ask for its lemma                                             |
-| sensetion-unglob                                | =u=         | Unglob collocation of token at point (removes collocation)                                                    |
-| sensetion-toggle-scripts                        | =v=         | Show/hide super/subscripts                                                                                    |
-| sensetion-next-selected                         | =>=         | Move point to next selected token                                                                             |
-| sensetion-previous-selected                     | =<=         | Move point to previous selected token                                                                         |
-| sensetion-move-line-up                          | =C-↑=       | Move sentence up                                                                                              |
-| sensetion-move-line-down                        | =C-↓=       | Move sentence down                                                                                            |
-
-
-* Customization
-
-see =CUSTOMIZE= file.
+* How to
+See the [[https://github.com/own-pt/sensetion.el/wiki/][wiki]] for installation, input, and usage instructions.
 
 
 * Report bugs
@@ -91,46 +20,6 @@ see =CUSTOMIZE= file.
   backtrace with your report (you may open an [[https://github.com/own-pt/sensetion.el/issues][issue]]).
 
 
-* FAQ -- Frequently Asked Questions
-** How can I copy and paste annotation text without super/subscripts?
-You can assign the function =org-copy-visible= to your copying command
-key in the annotation buffers by adding these two lines to your
-sensetion =use-package= declaration:
-#+BEGIN_SRC elisp
-(use-package sensetion
-   :commands sensetion
-+  :bind (:map sensetion-mode-map
-+              ("M-w" . org-copy-visible))
-#+END_SRC
-
-
-# * Annotation format
-
-# We convert the original Glosstag XML files to property lists and then
-# to JSON, whose grammar can be found in =glosstag/grammar.txt=.
-
-# The script that converts the original XML WN gloss corpus is at
-# =convert.sh=. To re-run the conversion:
-
-# - download the [[http://wordnetcode.princeton.edu/glosstag.shtml][WordNet gloss corpus]];
-#   - you can validate it with the =xmllint= utility from the =libxml=
-#     package:
-#     : xmllint --dtdvalid dtd/glosstag.dtd merged/*.xml
-# - download and setup [[http://www.sbcl.org/][sbcl]] (although any common lisp implementation
-#   should work);
-# - setup [[https://www.quicklisp.org/beta/][quicklisp]];
-# - create a symbolic link from the =glosstag= directory inside the
-#   =quicklisp/local-projects/=.
-# - run:
-#   : ./convert.sh ~/WordNet-3.0/glosstag/merged/ DESTINATION-PATH/
-#   where the first parameter is a directory is from the gloss corpus
-#   archive, the last parameter is the directory is where you want to
-#   put the files. (Use absolute paths if you have problems with the
-#   command.) Note that the trailing slash in =glosstag/= is
-#   important. You must have the glosstag DTD in the same directory as
-#   the annotation files.
-
-
 * Status
-
 Under development -- user interface is still unstable.
+
