@@ -105,7 +105,7 @@
 
 
 (defun sensetion--tk-pos-colloc (pos)
-  (propertize (or pos "")
+  (propertize (or (sensetion--pos->string pos) "")
               'display '(raise 0.4)
               'invisible 'sensetion--scripts
               'face '(:height 0.6)))

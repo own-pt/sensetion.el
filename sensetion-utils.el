@@ -35,9 +35,11 @@ itself."
 
 
 (defmacro sensetion--with-inhibiting-read-only (&rest body)
-  (declare (debug t) (indent 1))
+  (declare (debug t))
   `(let ((inhibit-read-only t))
      ,@body))
+
+(defalias 'sensetion-λ #'pcase-lambda)
 
 
 (defmacro sensetion-is (&rest body)
@@ -71,20 +73,24 @@ itself."
 
 
 (defun sensetion--spaces->underlines (str)
-  (cl-substitute (string-to-char "_")
+  (cl-substitute ?_
                  (string-to-char " ")
-                 str))
+                 str
+		 :test #'eq))
 
 
 (defsubst sensetion--put-text-property-eol (property value &optional object)
   (put-text-property (line-end-position) (1+ (line-end-position))
 		     property value object))
 
+
 (defsubst sensetion--get-text-property-eol (property &optional object)
   (get-text-property (line-end-position) property object))
 
+
 (defun sensetion--remove-nth (n list)
   (cl-remove-if (lambda (_) t) list :start n :end (1+ n)))
+
 
 (defun sensetion--parse-jsonlines (&optional reverse)
   "Parse and return in a list the newline-delimited JSON values following point.

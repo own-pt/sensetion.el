@@ -183,6 +183,22 @@ far, and the cdr is the number of annotatable tokens.")
 (defvar sensetion--document-id-completion-function
   (completion-table-dynamic #'sensetion-client-prefix-document-id))
 
+(defconst sensetion--pos->synset-type-table
+  #s(hash-table size 5 test eq rehash-size 1.5 rehash-threshold 0.8125
+                purecopy t data
+		(:n ("1") :v ("2") :as ("3" "5") :r ("4"))))
+
+(defconst sensetion--pos->string-table
+  #s(hash-table size 5 test eq rehash-size 1.5 rehash-threshold 0.8125
+                purecopy t data
+                (:n ("n") :v ("v") :as ("a" "s") :r ("r"))))
+
+
+(defconst sensetion--synset-type->pos-table
+  #s(hash-table size 5 test equal rehash-size 1.5 rehash-threshold 0.8125
+                purecopy t data
+                ("1" :n "2" :v "3" :as "4" :r "5" :as)))
+
 ;;;###autoload
 (defalias 'sensetion #'sensetion-annotate)
 
@@ -233,7 +249,7 @@ containing tokens with LEMMA and optionally POS are displayed for
 annotation."
   (interactive
    (list (sensetion--completing-read-lemma "Lemma to annotate: ")
-         (ido-completing-read "PoS tag? " '("a" "r" "v" "n" "any") nil t nil nil "any")))
+         (sensetion--completing-read-pos t)))
   (unless lemma (user-error "Must provide lemma"))
   (sensetion-is
    (sensetion--annotate matches id lemma
@@ -242,9 +258,8 @@ annotation."
 		 (setq-local sensetion--synset-cache
 			     (sensetion--wordnet-lookup-lemma lemma sensetion--synset-cache))))
    :where
-   (id (if pos (format "%s@%s" lemma pos) lemma))
-   (matches (sensetion--client-get-sorted-sents lemma pos))
-   (pos (unless (equal pos "any") pos))))
+   (id (if pos (format "%s@%s" lemma (sensetion--pos->string pos)) lemma))
+   (matches (sensetion--client-get-sorted-sents lemma pos))))
 
 
 (defun sensetion--annotate (matches id &optional target buffer-setup-fn)
@@ -525,20 +540,15 @@ was linearized), and reinsert SENT."
 
 
 (defun sensetion--tk-senses-pos (tk)
-  "Get pos1 of synsets assigned to TK.
+  "Get PoS of synsets assigned to TK.
 
 If there is more than one synset and they have different pos1,
 return nil."
   (when-let* ((sks   (sensetion--tk-skeys tk))
               (pos   (sensetion--sensekey-pos (cl-first sks)))
-              (poses (if (member pos '("a" "s"))
-                         '("a" "s")
-                       (list pos)))
-              (same? (seq-every-p (lambda (sk) (member (sensetion--sensekey-pos sk) poses))
+              (same? (seq-every-p (lambda (sk) (eq pos (sensetion--sensekey-pos sk)))
                                   (cl-rest sks))))
-    ;; instead of simply pos, guarantees that we don't show the user
-    ;; the 's' (virtual) PoS
-    (cl-first poses)))
+    pos))
 
 
 (defun sensetion-previous-selected (point)
@@ -578,25 +588,25 @@ return nil."
       status)))
 
 
-(defun sensetion--pos->synset-type (pos)
-  (gethash
-   pos
-   #s(hash-table size 5 test equal rehash-size 1.5 rehash-threshold 0.8125
-                 purecopy t data
-                 ("n" "1" "v" "2" "a" "3" "r" "4"))))
+(defsubst sensetion--pos->synset-type (pos)
+  (cl-first (gethash pos sensetion--pos->synset-type-table)))
 
+(defsubst sensetion--pos->synset-types (pos)
+  (gethash pos sensetion--pos->synset-type-table))
 
-(defun sensetion--synset-type->pos (st)
-  (gethash
-   st
-   #s(hash-table size 5 test equal rehash-size 1.5 rehash-threshold 0.8125
-                 purecopy t data
-                 ("1" "N" "2" "V" "3" "A" "4" "R" "5" "S"))))
+(defsubst sensetion--pos->string (pos)
+  (cl-first (gethash pos sensetion--pos->string-table)))
+
+(defsubst sensetion--pos->strings (pos)
+  (gethash pos sensetion--pos->string-table))
+
+(defsubst sensetion--synset-type->pos (st)
+  (gethash st sensetion--synset-type->pos-table))
 
 
 (defun sensetion--wordnet-lookup-lemma (lemma &optional options)
   ;; (hash-table ,lemma ((,pos (,sense-key ,hydra-index ,synset-id ,terms ,gloss) ...) ...)
-  (let ((poses '("N" "V" "R" "A"))
+  (let ((poses '(:n :v :as :r))
 	(options (or options (make-hash-table :test 'equal :size 200))))
     (setf (gethash lemma options)
 	  (mapcar
@@ -646,11 +656,11 @@ and the synset's gloss."
 
 (defun sensetion--cache-lemma->senses (lemma &optional pos synset-cache)
   (unless synset-cache (sensetion--wordnet-lookup-lemma lemma synset-cache))
-  (let ((senses-by-pos (gethash lemma synset-cache nil)))
+  (let ((senses-by-pos (gethash lemma synset-cache)))
     (if senses-by-pos
 	(if pos
-	    (alist-get pos senses-by-pos nil nil #'equal)
-	  (seq-mapcat #'cdr senses-by-pos))
+	    (alist-get pos senses-by-pos)
+	  (seq-mapcat #'cl-rest senses-by-pos))
       (progn
 	(sensetion--wordnet-lookup-lemma lemma synset-cache)
 	(sensetion--cache-lemma->senses lemma pos synset-cache)))))
