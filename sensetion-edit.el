@@ -275,7 +275,7 @@ returns non-nil. None of the arguments may move point."
 		 (interactive
 		  (list (sensetion--completing-read-lemma "New lemma: ")
 			(sensetion--completing-read-pos)))
-		 (let ((new-lemmas (cons (format "%s\%%%s"
+		 (let ((new-lemmas (cons (format "%s%%%s"
 						 lemma
 						 (sensetion--pos->synset-type pos))
 					 lemmas)))
@@ -294,14 +294,14 @@ returns non-nil. None of the arguments may move point."
 (defun sensetion--create-hydra-read-lemma (all-lemmas lemmas tk sent num)
   (when lemmas
     (cons
-     (cl-destructuring-bind (lemma synset-type) (split-string (cl-first lemmas) "%")
+     (cl-destructuring-bind (lemma . pos) (sensetion--split-lemma+synset-type (cl-first lemmas))
        (list
 	(number-to-string num)
 	(lambda ()
 	  (interactive)
 	  (sensetion--hydra-edit-lemma
 	   tk sent (sensetion--remove-nth num all-lemmas)))
-	(format "%s %s" lemma (sensetion--pos->string (sensetion--synset-type->pos synset-type)))
+	(format "%s %s" lemma (sensetion--pos->string pos))
 	:column "Remove lemma pos:"))
      (sensetion--create-hydra-read-lemma all-lemmas (cdr lemmas) tk sent (+ 1 num)))))
 
