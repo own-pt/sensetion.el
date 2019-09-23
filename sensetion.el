@@ -199,8 +199,10 @@ far, and the cdr is the number of annotatable tokens.")
                 purecopy t data
                 ("1" :n "2" :v "3" :as "4" :r "5" :as)))
 
+
 ;;;###autoload
 (defalias 'sensetion #'sensetion-annotate)
+
 
 (defun sensetion-annotate (_project annotation-function)
   "Start annotation session of PROJECT using ANNOTATION-FUNCTION."
@@ -208,12 +210,17 @@ far, and the cdr is the number of annotatable tokens.")
 		     (sensetion--pick-annotation-function)))
   (call-interactively annotation-function))
 
+
 (defun sensetion--pick-annotation-function ()
   (cl-fourth
    (read-multiple-choice
     "Annotation mode: "
-    `((?t "targeted mode" "Annotate sentences containing a given target lemma/PoS." ,#'sensetion-annotate-target)
-      (?s "sequential mode" "Annotate sentences from a given document." ,#'sensetion-sequential-annotate-doc)))))
+    `((?t "targeted mode"
+	  "Annotate sentences containing a given target lemma/PoS."
+	  ,#'sensetion-annotate-target)
+      (?s "sequential mode"
+	  "Annotate sentences from a given document."
+	  ,#'sensetion-sequential-annotate-doc)))))
 
 
 (defun sensetion-select-project ()
@@ -290,14 +297,14 @@ data available."
    (cons done total)
    :where
    (go (sent)
-       (seq-let (tokens-line status)
+       (cl-destructuring-bind (tokens-line (sent-done . sent-total))
            (colloc sent)
          (insert
 	  tokens-line
 	  ;; no need to add it all the time
           (propertize "\n" 'sensetion--sent-id (sensetion--sent-id sent)))
-         (cl-incf done (car status))
-         (cl-incf total (cdr status))))
+         (cl-incf done sent-done)
+         (cl-incf total sent-total)))
    (colloc (sent)
 	   (sensetion--sent-colloc sent target senses))
    (senses (when target (sensetion--cache-lemma->senses target nil synset-cache)))

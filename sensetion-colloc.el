@@ -14,14 +14,14 @@
    (go-tk (tk ix)
 	  (pcase tk
 	    ((cl-struct sensetion--tk kind form tag senses unsure)
-	     (when (sensetion--tk-annotatable? tk)
+	     (when (select? tk)
 	       (cl-incf total)
 	       (when (sensetion--tk-annotated? tk)
 		 (cl-incf done)))
 	     (let ((kind  (car kind))
 		   (ckeys (cdr kind)))
 	       (pcase ckeys
-		 (`(,k) 			;part of exactly one glob
+		 (`(,k)			;part of exactly one glob
 		  (seq-let (glob-ix glob-tk) (map-elt globs k nil #'equal)
 		    (sensetion--tk-colloc ix form kind ckeys
 				 (select? glob-tk)
