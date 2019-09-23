@@ -3,10 +3,15 @@
 (require 'sensetion-data)
 
 
-(defun sensetion--completing-read-pos ()
-  (ido-completing-read "Token PoS tag: "
-		       '("n" "v" "a" "r")
-                       nil t nil nil))
+(defun sensetion--completing-read-pos (&optional any)
+  (cl-fourth
+   (read-multiple-choice "PoS tag: "
+			 (append (when any
+				   `((,(string-to-char " ") "any" "Any PoS tag")))
+				 '((?n "noun" "noun" :n)
+				   (?v "verb" "verb" :v)
+				   (?a "adj" "adjective" :as)
+				   (?r "adv" "adverb" :r))))))
 
 
 (defun sensetion-edit-sense (ix sent)
@@ -21,14 +26,14 @@
 					  (sensetion--pick-lemma-candidate token))
       (when
 	  ;; token already has annotation of different pos
-	  (and maybe-token-pos pos (not (equal pos maybe-token-pos)))
+	  (and maybe-token-pos pos (not (eq pos maybe-token-pos)))
 	(if (y-or-n-p
 	     (format "Token has already been annotated with PoS %s. Remove previous annotation?"
-		     maybe-token-pos))
+		     (sensetion--pos->string maybe-token-pos)))
 	    (setf (sensetion--tk-senses token) nil
 		  (sensetion--tk-tag token)    "un")
 	  (user-error "Giving up on annotation"))
-	(message nil)) 			; fix: to clear minibuffer for hydra
+	(message "")) 			; to clear minibuffer for hydra
       (sensetion--edit-sense lemma (or pos (sensetion--completing-read-pos)) token sent))))
 
 
@@ -36,9 +41,9 @@
   "Choose candidate (lemma + synset type) to annotate among the
 options in TOKEN."
   (sensetion-is
-   (if (cdr lemmas)
+   (if (cl-rest lemmas)
        (choose-lemma)
-     (let ((lemma (car lemmas)))
+     (let ((lemma (cl-first lemmas)))
        (message "Annotating lemma %s" lemma)
        (sleep-for 0.5)
        lemma))
@@ -52,21 +57,21 @@ options in TOKEN."
 		(cl-destructuring-bind (lemma . pos)
 		    (sensetion--split-lemma+synset-type lemma+synset-type)
 		  (list (+ 49 ix)
-			(format "%s%%%s" lemma pos)
+			(format "%s%%%s" lemma (sensetion--pos->string pos))
 			lemma+synset-type)))
    (lemmas (sensetion--tk-lemmas token))))
 
 
-(defun sensetion--edit-sense (lemma pos1 token sent)
-  (let ((senses (sensetion--cache-lemma->senses lemma pos1 sensetion--synset-cache)))
+(defun sensetion--edit-sense (lemma pos token sent)
+  (let ((senses (sensetion--cache-lemma->senses lemma pos sensetion--synset-cache)))
     (unless senses
-      (user-error "No senses for lemma %s with pos %s" lemma pos1))
-    (sensetion--call-hydra lemma pos1 token sent senses)))
+      (user-error "No senses for lemma %s with pos %s" lemma (sensetion--pos->string pos)))
+    (sensetion--call-hydra lemma pos token sent senses)))
 
 
-(defun sensetion--call-hydra (lemma pos1 token sent options)
+(defun sensetion--call-hydra (lemma pos token sent options)
   (call-interactively
-   (eval (sensetion--edit-hydra-maker lemma pos1 token sent options))))
+   (eval (sensetion--edit-hydra-maker lemma pos token sent options))))
 
 
 (defun sensetion--format-gloss (definition examples)
@@ -100,7 +105,7 @@ options in TOKEN."
 	 (propertize txt 'face prop))))
 
 
-(defun sensetion--edit-hydra-maker (lemma pos1 token sent options)
+(defun sensetion--edit-hydra-maker (lemma pos token sent options)
   "Creates interactive editing hydra on-the-fly."
   (sensetion-is
    `(defhydra hydra-senses (:color blue)
@@ -117,13 +122,13 @@ options in TOKEN."
                    `(atomic-change-group
                       (sensetion--toggle-sense ,token ,sk)
                       (sensetion--edit-reinsert-state-call
-                       ,token ,sent ,lemma ,pos1 ',options))
+                       ,token ,sent ,lemma ,pos ',options))
 		   (sensetion--sense-edit-help-text (sense-chosen-ind? sk)
 					   lexname terms definition examples)
                    :column column)))
          options))
    :where
-   (column (format "Pick sense for token %s with PoS %s:" lemma pos1))
+   (column (format "Pick sense for token %s with PoS %s:" lemma (sensetion--pos->string pos)))
    (sense-chosen-ind? (sk)
 		      (member sk pres-skeys))
    (no-sense-function
@@ -151,12 +156,12 @@ options in TOKEN."
       (setf (sensetion--tk-tag tk) "man-now"))))
 
 
-(defun sensetion--edit-reinsert-state-call (token sent &optional lemma pos1 options)
+(defun sensetion--edit-reinsert-state-call (token sent &optional lemma pos options)
   (let ((point (point)))
     (sensetion--reinsert-sent-at-point sent)
     (goto-char point))
-  (when (and lemma pos1 options)
-    (sensetion--call-hydra lemma pos1 token sent options)))
+  (when (and lemma pos options)
+    (sensetion--call-hydra lemma pos token sent options)))
 
 
 ;; ;; ;; ;; edit source sent
@@ -270,7 +275,9 @@ returns non-nil. None of the arguments may move point."
 		 (interactive
 		  (list (sensetion--completing-read-lemma "New lemma: ")
 			(sensetion--completing-read-pos)))
-		 (let ((new-lemmas (cons (format "%s\%%%s" lemma (sensetion--pos->synset-type pos))
+		 (let ((new-lemmas (cons (format "%s\%%%s"
+						 lemma
+						 (sensetion--pos->synset-type pos))
 					 lemmas)))
 		   (sensetion--hydra-edit-lemma tk sent new-lemmas)))
 	  "add")
@@ -287,14 +294,14 @@ returns non-nil. None of the arguments may move point."
 (defun sensetion--create-hydra-read-lemma (all-lemmas lemmas tk sent num)
   (when lemmas
     (cons
-     (cl-destructuring-bind (lemma pos) (split-string (car lemmas) "%")
+     (cl-destructuring-bind (lemma synset-type) (split-string (cl-first lemmas) "%")
        (list
 	(number-to-string num)
 	(lambda ()
 	  (interactive)
 	  (sensetion--hydra-edit-lemma
 	   tk sent (sensetion--remove-nth num all-lemmas)))
-	(format "%s %s" lemma (sensetion--synset-type->pos pos))
+	(format "%s %s" lemma (sensetion--pos->string (sensetion--synset-type->pos synset-type)))
 	:column "Remove lemma pos:"))
      (sensetion--create-hydra-read-lemma all-lemmas (cdr lemmas) tk sent (+ 1 num)))))
 

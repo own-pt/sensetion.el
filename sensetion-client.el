@@ -169,11 +169,12 @@ ARGS if present will be used to format CMD."
 
 (defun sensetion--mongo-lemma-pos->docs (backend lemma pos)
   ;; FIXME: can we now assume that lemmas always have PoS/synset-type?
-  (sensetion--mongo-find (sensetion--mongo-db backend) (sensetion--mongo-document-collection backend)
-		`((tokens.lemmas ($regex . ,(format "^%s(%%%s)?$"
-						    lemma
-						    (sensetion--pos->synset-type pos)))))
-		:sort '(("_id" . -1))))
+  (let ((synset-type-regexp (string-join (sensetion--pos->synset-types pos))))
+    (sensetion--mongo-find (sensetion--mongo-db backend) (sensetion--mongo-document-collection backend)
+		  `((tokens.lemmas ($regex . ,(format "^%s(%%[%s])?$"
+						      lemma
+						      synset-type-regexp))))
+		  :sort '(("_id" . -1)))))
 
 
 (defun sensetion--mongo-lemma->docs (backend lemma)
@@ -183,7 +184,7 @@ ARGS if present will be used to format CMD."
 
 
 (cl-defmethod sensetion--backend-get-sorted-sents ((backend sensetion--mongo) lemma &optional pos)
-  (let* ((lemma (cl-substitute ?_ (string-to-char " ") lemma :test #'eq))
+  (let* ((lemma (sensetion--spaces->underlines lemma))
 	 (sents (if pos
 		   (sensetion--mongo-lemma-pos->docs backend lemma pos)
 		 (sensetion--mongo-lemma->docs backend lemma))))
@@ -216,9 +217,11 @@ ARGS if present will be used to format CMD."
 
 
 (cl-defmethod sensetion--backend-lemma->sorted-synsets ((backend sensetion--mongo) lemma pos)
-  (let* ((lemma (cl-substitute ?_ (string-to-char " ") lemma :test #'eq))
-	 (docs (sensetion--mongo-find (sensetion--mongo-db backend) (sensetion--mongo-synset-collection backend)
-			     `((terms . ,lemma) (pos . ,pos)) :sort '(("_id" . -1)))))
+  (let* ((lemma (sensetion--spaces->underlines lemma))
+	 (poses (sensetion--pos->strings pos))
+	 (docs  (sensetion--mongo-find (sensetion--mongo-db backend) (sensetion--mongo-synset-collection backend)
+			      `((terms . ,lemma) (pos . (($in . ,poses))))
+			      :sort '(("_id" . -1)))))
     (mapcar #'sensetion--alist->synset docs)))
 
 (provide 'sensetion-client)
