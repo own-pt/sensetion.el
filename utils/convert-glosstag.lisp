@@ -50,7 +50,6 @@
      (45 . "adjs.all"))
    :size 46 :test #'eql))
 
-
 (defun plist-tk->json-tk (plist-tk)
   (let ((hash (make-hash-table :test #'equal)))
     (alexandria:doplist (key val plist-tk hash)
@@ -96,15 +95,15 @@
 					   (gethash :meta hash)))))
 
     (let ((sk (car (first (getf plist :keys)))))
-      (destructuring-bind (* lexnumstr) (split-sequence:split-sequence #\: sk :count 2)
+      (destructuring-bind (* lexnumstr)
+	  (split-sequence:split-sequence #\: sk :count 2)
 	(let* ((lexnum (parse-integer lexnumstr))
 	       (lexfile (gethash lexnum *lexnames*)))
-	  (setf (gethash :_id hash) (format nil "~a-~a" lexfile ofs))
-	  (setf (gethash :doc_id hash) lexfile))))
+	  (setf (gethash :_id hash)    (format nil "~a-~a" lexfile ofs)
+		(gethash :doc_id hash) lexfile))))
     
     (cl-json:encode-json hash stream)
-    (format stream "~%")
-    hash))
+    (format stream "~%")))
 
 
 (defun main (plists out-file)
