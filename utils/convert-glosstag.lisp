@@ -51,6 +51,7 @@
    :size 46 :test #'eql))
 
 (defun main (plists out-file)
+  (ensure-directories-exist out-file)
   (with-open-file (out out-file :direction :output :if-exists :supersede)
     (loop
       for file in plists
