@@ -1,6 +1,6 @@
 (ql:quickload '(:cl-json :split-sequence :alexandria))
 
-(defconstant *lexnames*
+(defparameter *lexnames*
   (alexandria:alist-hash-table
    '((0 . "adj.all")
      (1 . "adj.pert")
@@ -50,16 +50,31 @@
      (45 . "adjs.all"))
    :size 46 :test #'eql))
 
-(defun main (plists out-file)
-  (with-open-file (out out-file :direction :output :if-exists :supersede)
-    (loop
-      for file in plists
-      do
-	 (with-open-file (in file)
-	   (loop
-	     for plist = (read in nil nil)
-	     while plist do
-	       (plist->json plist out))))))
+
+(defun plist-tk->json-tk (plist-tk)
+  (let ((hash (make-hash-table :test #'equal)))
+    (alexandria:doplist (key val plist-tk hash)
+	(case key
+	  (:kind
+	   (cond
+	     ((symbolp val)
+	      (setf (gethash key hash) (list val)))
+	     ((not (listp (cdr val)))
+	      (setf (gethash key hash) (list (car val) (cdr val))))
+	     (t
+	      (setf (gethash key hash) val))))
+	  ((:tag :form :glob)
+	   (setf (gethash key hash)
+		 val))
+	  (:senses
+	   (setf (gethash key hash)
+		 (mapcar #'car val)))
+	  (:lemma
+	   (setf (gethash :lemmas hash)
+		 (split-sequence:split-sequence #\| val)))
+	  (otherwise
+	   (push  (cons key val)
+		  (gethash :meta hash)))))))
 
 
 (defun plist->json (plist stream)
@@ -92,23 +107,10 @@
     hash))
 
 
-(defun plist-tk->json-tk (plist-tk)
-  (let ((hash (make-hash-table :test #'equal)))
-    (alexandria:doplist (key val plist-tk)
-			(case key
-			  (:kind (cond
-				   ((symbolp val)
-				    (setf (gethash key hash) (list val)))
-				   ((not (listp (cdr val)))
-				    (setf (gethash key hash) (list (car val) (cdr val))))
-				   (t
-				    (setf (gethash key hash) val))))
-			  ((:tag :form :glob) (setf (gethash key hash)
-						    val))
-			  (:senses (setf (gethash key hash)
-					 (mapcar #'car val)))
-			  (:lemma (setf (gethash :lemmas hash)
-					(split-sequence:split-sequence #\| val)))
-			  (otherwise (push  (cons key val)
-					    (gethash :meta hash)))))
-    hash))
+(defun main (plists out-file)
+  (with-open-file (out out-file :direction :output :if-exists :supersede)
+    (loop for file in plists
+	  do (with-open-file (in file)
+	       (loop for plist = (read in nil nil)
+		     while plist do
+		       (plist->json plist out))))))
