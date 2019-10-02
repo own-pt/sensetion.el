@@ -22,6 +22,7 @@ def go_sent(sent, sent_id, doc_id, tkz):
         r[SENT_ID_KEY] = sent_id
         r[TEXT_KEY] = sent
         r[TOKENS_KEY] = tks
+        r[ID_KEY] = "{}-{}".format(doc_id, sent_id)
         return r
         
     latt = tkz.tokenize(sent)

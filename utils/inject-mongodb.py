@@ -5,38 +5,34 @@ import click
 import json
 
 
-def read_sent(sent_str):
-    sent = json.loads(sent_str)
-    sent["_id"] = "{}-{}".format(sent["doc_id"], sent["sent_id"])
-    return sent
-
 @click.command()
-@click.option('-db', '--database-name', 'database_name', default="sensetion-database",
-              type=click.STRING, help = "Name of mongoDB database")
-@click.option('-sc', '--synset-collection-name', 'synset_collection_name',
-              default="synsets", type=click.STRING,
-              help = "Name of mongoDB synset collection")
-@click.option('-dc', '--document-collection-name', 'document_collection_name',
-              default="documents", type=click.STRING,
-              help = "Name of mongoDB document collection")
-@click.argument('synsets_file', type=click.File(mode='r'), required=True)
-@click.argument('document_files', type=click.File(mode='r'), required=True, nargs=-1)
-def main(database_name, synset_collection_name, document_collection_name,
-         synsets_file, document_files):
+@click.option('-db', '--database', 'database', default="sensetion-database",
+              type=click.STRING, help = "Name of mongoDB database", show_default=True)
+@click.option('--quiet/--verbose', default=False)
+@click.argument('collection', type=click.STRING)
+@click.argument('input_files', type=click.File(mode='r'), required=True, nargs=-1)
+def main(database, quiet, collection, input_files):
+    """Insert documents from INPUT_FILES in COLLECTION at DATABASE.
+
+Each input file must be a JSON-lines document. The COLLECTION at
+DATABASE is emptied before insertion.
+    """
     client = pymongo.MongoClient()
-    db = client[database_name]
-    synset_collection = db[synset_collection_name]
-    document_collection = db[document_collection_name]
+    db = client[database]
+    collection = db[collection]
 
-    synset_collection.delete_many({})
-    document_collection.delete_many({})
+    collection.delete_many({})
 
-    synset_collection.insert_many(
-        map(json.loads, synsets_file.readlines()))
+    n_written = 0
 
-    for document_file in document_files:
-        document_collection.insert_many(
-            map(read_sent, document_file.readlines()))
+    for document_file in input_files:
+        result = collection.insert_many(map(json.loads, document_file.readlines()))
+        if not result.acknowledged:
+            raise RuntimeError("Could not insert documents")
+        if not quiet:
+            n_written = n_written + len(result.inserted_ids)
+    if not quiet:
+        print("Successfully inserted {} documents".format(n_written))
 
 
 if __name__ == '__main__':
