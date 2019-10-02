@@ -63,8 +63,7 @@
 	     (t
 	      (setf (gethash key hash) val))))
 	  ((:tag :form :glob)
-	   (setf (gethash key hash)
-		 val))
+	   (setf (gethash key hash) val))
 	  (:senses
 	   (setf (gethash key hash)
 		 (mapcar #'car val)))
