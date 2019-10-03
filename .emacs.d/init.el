@@ -58,7 +58,7 @@ There are two things you can do about this warning:
 					      :backend (sensetion-make-mongo
 							:db "sensetion-database"
 							:synset-collection "synsets"
-							:document-collection "documents"))))
+							:document-collection "project-name-documents"))))
   ;; you can customize variables here
   :custom (sensetion-identify-sentence nil)
   ;; you can specify modes to be turned on for the raw sentence
