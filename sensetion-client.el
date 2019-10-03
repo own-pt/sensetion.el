@@ -84,8 +84,22 @@
 ;;; mongodb backend
 
 (cl-defstruct (sensetion--mongo (:constructor nil)
-		       (:constructor sensetion-make-mongo))
-  (db "sensetion-database") (synset-collection "synsets") (document-collection "documents"))
+		       (:constructor sensetion--make-mongo))
+  db synset-collection document-collection)
+
+
+(cl-defun sensetion-make-mongo (&key (db "sensetion-database")
+			    (synset-collection "synsets")
+			    (document-collection "documents"))
+  (cl-labels
+      ((check-name (name)
+		   (let ((forbidden-chars "';.[]()"))
+		     (when (seq-intersection forbidden-chars name)
+		       (user-error "Mongo name must not contain any of %s"
+				   forbidden-chars)))))
+    (mapc #'check-name (list db synset-collection document-collection))
+    (sensetion--make-mongo :db db :synset-collection synset-collection
+		  :document-collection document-collection)))
 
 
 (defun sensetion--mongo-cmd (args)
@@ -118,6 +132,9 @@ ARGS if present will be used to format CMD."
 	 (args (list db "--quiet" "--norc"
 		     (sensetion--mongo-cmd-file
 		      (format "db['%s'].find(%s)%s.forEach(printjsononeline)"
+			      ;; FIXME: use `prin1-to-string' to
+			      ;; prevent problems with " in collection
+			      ;; name?
 			      collection
 			      (if projection
 				  (format "%s, %s" query-json projection-json)

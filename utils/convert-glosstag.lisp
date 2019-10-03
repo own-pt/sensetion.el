@@ -86,10 +86,13 @@
 					  val))
 			  (:tokens  (setf (gethash :tokens hash)
 					  (mapcar #'plist-tk->json-tk val)))
-			  (:keys    (push (cons "keys"
-						(mapcar #'(lambda (pair) (list (car pair) (cdr pair)))
-							val))
-					  (gethash :meta hash)))
+			  (:keys    (progn
+				      (push (cons "terms"
+						  (mapcar #'cdr val))
+					    (gethash :meta hash))
+				      (push (cons "keys"
+						  (mapcar #'car val))
+					    (gethash :meta hash))))
 			  (otherwise (push (cons key val)
 					   (gethash :meta hash)))))
 
