@@ -43,27 +43,4 @@ There are two things you can do about this warning:
 (use-package f         :defer t :ensure t)
 (use-package async     :defer t :ensure t)
 
-(use-package sensetion
-  :commands sensetion
-  ;; change path to repository here
-  :load-path "~/sensetion.el/"
-  :bind (:map sensetion-mode-map
-              ;; here you can customize the standard command names; we
-              ;; don't like to use '/' to invoke sensetion-edit, so we
-              ;; bind it to 'e'
-              ("e" . sensetion-edit))
-  ;; this is the list of projects sensetion can annotate
-  :config (setq sensetion-project-list
-		(list (sensetion-make-project :name "project-name"
-					      :backend (sensetion-make-mongo
-							:db "sensetion-database"
-							:synset-collection "synsets"
-							:document-collection "project-name-documents"))))
-  ;; you can customize variables here
-  :custom (sensetion-identify-sentence nil)
-  ;; you can specify modes to be turned on for the raw sentence
-  ;; editing like this (where lispy-mode is activated when
-  ;; `sensetion-edit-mode' is on):
-    ; :hook (sensetion-edit-mode . lispy-mode)
-  )
-
+;; Insert sensetion configuration here:
