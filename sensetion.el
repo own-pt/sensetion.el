@@ -258,6 +258,7 @@ annotation."
    (list (sensetion--completing-read-lemma "Lemma to annotate: ")
          (sensetion--completing-read-pos t)))
   (unless lemma (user-error "Must provide lemma"))
+  (message "Preparing annotation buffer")
   (sensetion-is
    (sensetion--annotate matches id lemma
 	       (lambda ()

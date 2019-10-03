@@ -117,7 +117,7 @@ ARGS if present will be used to format CMD."
           (and projection (json-encode projection)))
 	 (args (list db "--quiet" "--norc"
 		     (sensetion--mongo-cmd-file
-		      (format "db.%s.find(%s)%s.forEach(printjsononeline)"
+		      (format "db['%s'].find(%s)%s.forEach(printjsononeline)"
 			      collection
 			      (if projection
 				  (format "%s, %s" query-json projection-json)
@@ -131,7 +131,7 @@ ARGS if present will be used to format CMD."
 (cl-defun sensetion--mongo-distinct (db collection field &optional query)
   (let ((args (list db "--quiet" "--norc"
 		    (sensetion--mongo-cmd-file
-		     (format "db.%s.distinct(%s).forEach(printjsononeline)"
+		     (format "db['%s'].distinct(%s).forEach(printjsononeline)"
 			     collection
 			     (if query
 				 (format "\"%s\", %s" field (json-encode query))
@@ -145,7 +145,7 @@ ARGS if present will be used to format CMD."
          (replacement-json (json-encode-alist replacement))
          (args (list db "--quiet" "--norc"
 		     (sensetion--mongo-cmd-file
-		      (format "printjson(db.%s.replaceOne(%s, %s))"
+		      (format "printjson(db['%s'].replaceOne(%s, %s))"
 			      collection query-json replacement-json)))))
     (sensetion--mongo-cmd args)))
 
