@@ -36,6 +36,7 @@ Slots:
   display-meta-data-fn
   (restrict-lemmas t))
 
+
 ;; TODO: maybe use maps all the way
 (cl-defstruct (sensetion--tk (:constructor nil)
                     (:constructor sensetion--make-tk))

@@ -104,13 +104,20 @@ If nil, show all examples."
 
 ;;; Vars
 
-(defvar sensetion-project-list nil)
+(defvar sensetion-project-list nil
+  "List of available annotation projects.
 
-(defvar sensetion-current-project nil)
+Create a project with `sensetion-make-project'.")
+
+(defvar sensetion-current-project nil
+  "Current annotation project.
+
+Select an annotation project with `sensetion-select-project'.")
 
 (defvar-local sensetion--lemma
   nil
-  "Lemma being annotated in the buffer.")
+  "Lemma being annotated in the buffer, if in targeted annotation
+mode.")
 
 
 (defvar-local sensetion--local-status
@@ -441,7 +448,9 @@ Token is the one between BEG and END, corresponding to index IX."
 
 
 (defun sensetion-toggle-glob-mark (beg end)
-  "Mark or unmark token between BEG and END to be globbed with the `sensetion-glob' command."
+  "Mark or unmark token between BEG and END.
+
+To glob all marked tokens, use the `sensetion-glob' command."
   (interactive (sensetion--tk-points))
   (let* ((ix (sensetion--tk-ix-prop-at-point beg))
          (marked (sensetion--tks-to-glob-prop))

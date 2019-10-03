@@ -15,6 +15,7 @@
 
 
 (defun sensetion-edit-sense (ix sent)
+  "Annotate sense of token of index IX in SENT's tokens."
   (interactive (list (or (get-char-property (point) 'sensetion--glob-ix)
                          (sensetion--tk-ix-prop-at-point))
                      (sensetion--get-sent-at-point)))
@@ -33,7 +34,7 @@
 	    (setf (sensetion--tk-senses token) nil
 		  (sensetion--tk-tag token)    "un")
 	  (user-error "Giving up on annotation"))
-	(message "")) 			; to clear minibuffer for hydra
+	(message ""))		       ; to clear minibuffer for hydra
       (sensetion--edit-sense lemma (or pos (sensetion--completing-read-pos)) token sent))))
 
 

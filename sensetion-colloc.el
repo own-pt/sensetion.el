@@ -1,7 +1,10 @@
 ;;; sensetion.el --- -*- lexical-binding: t; -*-
 
 (defun sensetion--sent-colloc (sent &optional target target-senses)
-  "Return propertized string with SENT contents and its statistics."
+  "Return propertized string representing SENT and its annotation statistics.
+
+TARGET partially determines the presentation of the sentence as a
+string; if non-nil, the annotation mode is sequential."
   (sensetion-is
    (list
     (concat
@@ -38,11 +41,12 @@
 		 (_ 			;part of more than one glob
 		  (sensetion--tk-colloc ix form kind ckeys nil)))))))
    (map-senses (tk-sks)
-	       (when target (mapcar (lambda (sk)
-				      (cl-first
-				       (map-elt target-senses sk
-						nil #'equal)))
-				    tk-sks)))
+	       (when target
+		 (mapcar (lambda (sk)
+			   (cl-first
+			    (map-elt target-senses sk
+				     nil #'equal)))
+			 tk-sks)))
    (select? (tk)
 	    (if target
 		(sensetion--to-annotate? tk target)
