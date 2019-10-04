@@ -40,7 +40,5 @@ There are two things you can do about this warning:
 
 (use-package hydra     :defer t :ensure t)
 (use-package s         :defer t :ensure t)
-(use-package f         :defer t :ensure t)
-(use-package async     :defer t :ensure t)
 
 ;; Insert sensetion configuration here:
