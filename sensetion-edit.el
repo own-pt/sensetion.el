@@ -7,11 +7,11 @@
   (cl-fourth
    (read-multiple-choice "PoS tag: "
 			 (append (when any
-				   `((,(string-to-char " ") "any" "Any PoS tag")))
+				   `((?y "any" "Any PoS tag")))
 				 '((?n "noun" "noun" :n)
 				   (?v "verb" "verb" :v)
 				   (?a "adj" "adjective" :as)
-				   (?r "adv" "adverb" :r))))))
+				   (?d "adv" "adverb" :r))))))
 
 
 (defun sensetion-edit-sense (ix sent)
