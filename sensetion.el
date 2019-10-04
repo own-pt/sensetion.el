@@ -100,6 +100,14 @@ If nil, show all examples."
   :type 'list
   :risky t)
 
+(defcustom sensetion-jump-over-globs t
+  "If non-nil, when point is over a selected glob,
+  `sensetion-next-selected' and `sensetion-previous-selected'
+  jump to another glob and not to another token (which might be
+  in the same glob."
+  :group 'sensetion
+  :type 'boolean)
+
 ;;; Vars
 
 (defvar sensetion-project-list nil
@@ -566,20 +574,25 @@ return nil."
     pos))
 
 
-(defun sensetion-previous-selected (point)
-  (interactive (list (point)))
-  (let ((selected? (sensetion--selected? point)))
-    (goto-char
-     (previous-single-property-change point 'sensetion--selected nil (point-min)))
-    (when selected? (sensetion-previous-selected (point)))))
+(defun sensetion--other-selected (position maybe-glob-ix selected? &optional limit)
+  (let ((other-selected-position (sensetion--property-value-position position 'sensetion--selected t limit)))
+    (if-let* ((_ sensetion-jump-over-globs)
+	      (glob-ix maybe-glob-ix)
+	      (other-glob-ix (get-text-property other-selected-position 'sensetion--glob-ix))
+	      (_ (equal glob-ix other-glob-ix)))
+	(sensetion--other-selected other-selected-position glob-ix selected? limit)
+      (goto-char other-selected-position))))
+
+(defun sensetion-previous-selected (position maybe-glob-ix selected?)
+  "Go to previous selected token or glob."
+  (interactive (list (point) (get-text-property (point) 'sensetion--glob-ix) (sensetion--selected? (point))))
+  (sensetion--other-selected position maybe-glob-ix selected? (point-min)))
 
 
-(defun sensetion-next-selected (point)
-  (interactive (list (point)))
-  (let ((selected? (sensetion--selected? point)))
-    (goto-char
-     (next-single-property-change point 'sensetion--selected nil (point-max)))
-    (when selected? (sensetion-next-selected (point)))))
+(defun sensetion-next-selected (position maybe-glob-ix selected?)
+  "Go to next selected token or glob."
+  (interactive (list (point) (get-text-property (point) 'sensetion--glob-ix) (sensetion--selected? (point))))
+  (sensetion--other-selected position maybe-glob-ix selected? (point-max)))
 
 
 (defun sensetion--selected? (point)

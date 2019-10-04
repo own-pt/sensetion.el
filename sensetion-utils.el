@@ -106,4 +106,21 @@ If REVERSE is non-nil, return the results in the proper order."
       res)))
 
 
+(defsubst sensetion--property-value-position (position prop value limit &optional object)
+  "From POSITION, find position where PROP has VALUE.
+
+If LIMIT is greater then POSITION, search forward, else search backward in OBJECT.
+
+If PROP value at POSITION is already VALUE, then look for other
+non-contiguous position where this is so."
+  (let* ((value-here (get-text-property position prop object))
+	 (search-fn (if (> position limit)
+			#'previous-single-property-change
+		      #'next-single-property-change))
+	 (new-position (funcall search-fn position prop object limit)))
+    (if (and (equal value-here value) (not (eq new-position limit)))
+	(funcall search-fn new-position prop object limit)
+      new-position)))
+
+
 (provide 'sensetion-utils)
