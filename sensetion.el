@@ -250,6 +250,7 @@ far, and the cdr is the number of annotatable tokens.")
   (interactive (list (completing-read "Document to annotate: "
 				      sensetion--document-id-completion-function
 				      nil 'yes)))
+  (message "Preparing annotation buffer")
   (let ((matches (sensetion--client-get-sorted-doc-sents document-id)))
     (sensetion--annotate matches document-id)))
 
@@ -606,7 +607,7 @@ return nil."
     (when (member
            status
            '("man" "man-now" "un" "auto"))
-      status)))
+      t)))
 
 
 (defsubst sensetion--pos->synset-type (pos)
