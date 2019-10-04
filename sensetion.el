@@ -17,15 +17,10 @@
 
 ;;; Customizations
 (defgroup sensetion nil
-  "Support for annotating word senses."
+  "Support for annotating word senses.
+
+You may customize these variables manually or through this interface."
   :group 'data)
-
-
-(defcustom sensetion-backend-port
-  nil
-  "(deprecated) Port used by backend server."
-  :group 'sensetion
-  :type 'integer)
 
 
 (defcustom sensetion-sense-menu-show-lexicographer-filename
@@ -86,19 +81,12 @@ If nil, show all examples."
   :type 'color)
 
 
-(defcustom sensetion-mode-line
-  '(:eval (sensetion--mode-line-status-text))
-  "Modeline customization for `sensetion-mode'."
-  :group 'sensetion
-  :type 'sexp
-  :risky t)
-
-
 (defcustom sensetion-end-session-hook nil
-  "Functions run when annotation buffer is closed."
+  "Every function in this list is run when annotation buffer is closed."
   :group 'sensetion
   :type 'list
   :risky t)
+
 
 (defcustom sensetion-jump-over-globs t
   "If non-nil, when point is over a selected glob,
@@ -108,7 +96,12 @@ If nil, show all examples."
   :group 'sensetion
   :type 'boolean)
 
+
 ;;; Vars
+
+(defvar sensetion-mode-line
+  '(:eval (sensetion--mode-line-status-text))
+  "Modeline for `sensetion-mode'.")
 
 (defvar sensetion-project-list nil
   "List of available annotation projects.
