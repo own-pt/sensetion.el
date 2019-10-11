@@ -12,30 +12,34 @@
 (require 'sensetion-utils)
 
 ;;; define generic methods
+(cl-defgeneric sensetion--backend-prepare (backend)
+  "Check that backend is available and prepare it.")
 
 (cl-defgeneric sensetion--backend-prefix-lemma (backend prefix)
-  "Return a list of lemmas with PREFIX as prefix")
+  "Return a list of lemmas with PREFIX as prefix.")
 
 (cl-defgeneric sensetion--backend-prefix-document-id (backend prefix)
-  "Return a list of doc-id with PREFIX as prefix")
+  "Return a list of doc-id with PREFIX as prefix.")
 
 (cl-defgeneric sensetion--backend-get-sorted-doc-sents (backend doc-id)
-  "Given the DOC-ID return a list of sensetion--sent objects
-  sorted by sent-id")
+  "Given the DOC-ID return a list of sensetion--sent objects sorted by sent-id.")
 
 (cl-defgeneric sensetion--backend-get-sorted-sents (backend lemma &optional pos)
-  "Return a list of sensetion--sent objects thats cotains tokens
-  with LEMMA and/or POS")
+  "Return a list of sensetion--sent objects thats cotains tokens with LEMMA and/or POS.")
 
 (cl-defgeneric sensetion--backend-id->sent (backend sent_id)
-  "Return the sent given a SENT_ID")
+  "Return the sent given a SENT_ID.")
 
 (cl-defgeneric sensetion--backend-update-modified-sent (backend sent)
-  "Update the backend info SENT content")
+  "Update the backend info SENT content.")
 
 (cl-defgeneric sensetion--backend-lemma->sorted-synsets (backend lemma pos)
-  "Return a list of sensetion--synset objects given a LEMMA and a
-  POS.")
+  "Return a list of sensetion--synset objects given a LEMMA and a POS.")
+
+
+(defun sensetion--client-prepare ()
+  "See `sensetion--backend-prepare'"
+  (sensetion--backend-prepare (sensetion--project-backend sensetion-current-project)))
 
 (defun sensetion-client-prefix-lemma (prefix)
   "See `sensetion--backend-prefix-lemma'"
@@ -68,6 +72,12 @@
 
 
 (defun sensetion--remove-man-now (sent)
+  "Substitute annotation tags of 'man-now' by 'man'.
+
+We use a virutal annotation tag of 'man-now' to be able to
+differentiate between tokens that were annotated in the current
+session and tokens that had already been annotated. We don't save
+tokens with 'man-now' tags, only 'man' tags."
   (cl-labels
       ((remove-man-now (tk)
 		       (pcase tk
@@ -125,6 +135,21 @@ ARGS if present will be used to format CMD."
     (make-temp-file "sensetion" nil nil cmd-str)))
 
 
+(cl-defmethod sensetion--backend-prepare ((backend sensetion--mongo))
+  (let* ((db (sensetion--mongo-db backend))
+	 (synset-coll (sensetion--mongo-synset-collection backend))
+	 (document-coll (sensetion--mongo-document-collection backend))
+	 (args (list db "--quiet" "--norc"
+		     (sensetion--mongo-cmd-file
+		      (format "printjsononeline(db.serverCmdLineOpts());
+printjsononeline(db['%s'].createIndex({\"terms\": 1, \"pos\": 1, \"_id\": -1}));
+printjsononeline(db['%s'].createIndex({\"doc_id\": 1, \"sent_id\": -1}));
+printjsononeline(db['%s'].createIndex({\"tokens.lemmas\": 1, \"_id\": -1}));"
+			      synset-coll document-coll document-coll)))))
+    (message "Creating MongoDB indices")
+    (sensetion--mongo-cmd args)))
+
+
 (cl-defun sensetion--mongo-find (db collection query &key sort projection)
   (let* ((query-json (json-encode query))
          (projection-json
@@ -132,9 +157,10 @@ ARGS if present will be used to format CMD."
 	 (args (list db "--quiet" "--norc"
 		     (sensetion--mongo-cmd-file
 		      (format "db['%s'].find(%s)%s.forEach(printjsononeline)"
-			      ;; FIXME: use `prin1-to-string' to
-			      ;; prevent problems with " in collection
-			      ;; name?
+			      ;; FIXME: use `prin1-to-string' so that
+			      ;; we don't have to worry about escaping
+			      ;; problems and thus having to check
+			      ;; collection names?
 			      collection
 			      (if projection
 				  (format "%s, %s" query-json projection-json)

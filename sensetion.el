@@ -214,6 +214,7 @@ far, and the cdr is the number of annotatable tokens.")
   "Start annotation session of PROJECT using ANNOTATION-FUNCTION."
   (interactive (list (or sensetion-current-project (sensetion-select-project))
 		     (sensetion--pick-annotation-function)))
+  (sensetion--client-prepare)
   (call-interactively annotation-function))
 
 
