@@ -599,7 +599,8 @@ return nil."
    (or ix
        (user-error "No token at point"))
    :where
-   (ix (get-char-property point 'sensetion--tk-ix))))
+   (ix (or (get-char-property point 'sensetion--tk-ix)
+	   (get-char-property (1- point) 'sensetion--tk-ix)))))
 
 
 (defun sensetion--tk-annotatable? (tk)
