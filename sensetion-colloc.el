@@ -17,35 +17,44 @@ string; if non-nil, the annotation mode is sequential."
    (go-tk (tk ix)
 	  (pcase tk
 	    ((cl-struct sensetion--tk kind form tag senses unsure)
-	     (when (select? tk)
-	       (cl-incf total)
-	       (when (sensetion--tk-annotated? tk)
-		 (cl-incf done)))
-	     (let ((kind  (car kind))
-		   (ckeys (cdr kind)))
-	       (pcase ckeys
-		 (`(,k)			;part of exactly one glob
-		  (seq-let (glob-ix glob-tk) (map-elt globs k nil #'equal)
-		    (sensetion--tk-colloc ix form kind ckeys
-				 (select? glob-tk)
-				 (sensetion--tk-tag glob-tk)
-				 (sensetion--tk-senses-pos glob-tk)
-				 (map-senses (sensetion--tk-senses glob-tk))
-				 (sensetion--tk-unsure glob-tk)
-				 glob-ix)))
-		 (`() 			;part of no glob
-		  (sensetion--tk-colloc ix form kind nil (select? tk) tag
-			       (sensetion--tk-senses-pos tk)
-			       (map-senses senses)
-			       unsure nil))
-		 (_ 			;part of more than one glob
-		  (sensetion--tk-colloc ix form kind ckeys nil)))))))
+	     (let ((tk-selected (select? tk)))
+	       (when tk-selected
+		 (cl-incf total)
+		 (when (sensetion--tk-annotated? tk)
+		   (cl-incf done)))
+	       (let ((kind  (car kind))
+		     (ckeys (cdr kind)))
+		 (pcase ckeys
+		   (`(,k)		;part of exactly one glob
+		    (seq-let (glob-ix glob-tk) (map-elt globs k nil #'equal)
+		      (let ((glob-selected (select? glob-tk)))
+			(sensetion--tk-colloc ix form kind ckeys
+				     glob-selected
+				     (sensetion--tk-tag glob-tk)
+				     (sensetion--tk-senses-pos glob-tk)
+				     (when glob-selected
+				       (map-senses (sensetion--tk-senses glob-tk)))
+				     (sensetion--tk-unsure glob-tk)
+				     glob-ix))))
+		   (`()			;part of no glob
+		    (sensetion--tk-colloc ix form kind nil tk-selected tag
+				 (sensetion--tk-senses-pos tk)
+				 (when tk-selected
+				   (map-senses senses))
+				 unsure nil))
+		   (_ 			;part of more than one glob
+		    (sensetion--tk-colloc ix form kind ckeys nil))))))))
    (map-senses (tk-sks)
 	       (when target
 		 (mapcar (lambda (sk)
-			   (cl-first
-			    (map-elt target-senses sk
-				     nil #'equal)))
+			   (let* ((sense-data (map-elt target-senses sk
+						       nil #'equal))
+				  (sense-index (cl-first sense-data)))
+			     (unless sense-data
+			       (display-warning 'sensetion
+						(format "Sense key %s not recognized" sk)
+						:warning))
+			     sense-index))
 			 tk-sks)))
    (select? (tk)
 	    (if target
